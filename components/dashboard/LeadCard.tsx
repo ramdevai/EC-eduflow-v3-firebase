@@ -1,0 +1,72 @@
+"use client";
+
+import React from 'react';
+import { motion } from 'motion/react';
+import { Phone, Mail, GraduationCap, ChevronRight, Clock } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { Lead } from '@/lib/types';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { cn } from '@/lib/utils';
+
+interface LeadCardProps {
+  lead: Lead;
+  onClick: (lead: Lead) => void;
+  layoutId?: string;
+}
+
+export function LeadCard({ lead, onClick, layoutId }: LeadCardProps) {
+  const getStageVariant = (stage: string) => {
+    switch (stage) {
+      case 'Converted': return 'success';
+      case 'Lost': return 'error';
+      case 'New': return 'info';
+      case 'Test Sent':
+      case 'Test Completed': return 'warning';
+      default: return 'default';
+    }
+  };
+
+  return (
+    <motion.div
+      layoutId={layoutId}
+      whileHover={{ y: -2 }}
+      transition={{ duration: 0.2 }}
+    >
+      <Card 
+        onClick={() => onClick(lead)}
+        className="p-4 cursor-pointer hover:border-primary-400 dark:hover:border-primary-600 transition-colors group"
+      >
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h4 className="font-bold text-slate-900 dark:text-white group-hover:text-primary-600 transition-colors">
+              {lead.name}
+            </h4>
+            <div className="flex items-center gap-1.5 mt-1 text-[10px] font-mono text-slate-400">
+              <Phone size={10} />
+              {lead.phone}
+            </div>
+          </div>
+          <Badge variant={getStageVariant(lead.stage)}>
+            {lead.stage}
+          </Badge>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-50 dark:bg-slate-800 text-[10px] font-bold text-slate-500 uppercase tracking-tight">
+            <GraduationCap size={12} />
+            {lead.grade || 'N/A'} • {lead.board || 'N/A'}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+            <Clock size={12} />
+            {format(parseISO(lead.inquiryDate), 'MMM d, yyyy')}
+          </div>
+          <ChevronRight size={14} className="text-slate-300 dark:text-slate-600 group-hover:text-primary-500 transform group-hover:translate-x-0.5 transition-all" />
+        </div>
+      </Card>
+    </motion.div>
+  );
+}

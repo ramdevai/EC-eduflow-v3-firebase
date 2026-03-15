@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, UserPlus, CheckCircle2, XCircle } from 'lucide-react';
+import { Users, UserPlus, CheckCircle2, IndianRupee } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 
@@ -31,9 +31,9 @@ export function StatGrid({ leads }: StatGridProps) {
       bg: 'bg-amber-50 dark:bg-amber-900/20',
     },
     {
-      label: 'Lost Deals',
-      value: leads.filter(l => l.stage === 'Lost').length,
-      icon: XCircle,
+      label: 'Fees Pending',
+      value: leads.filter(l => l.stage !== 'New' && l.stage !== 'Lost' && !l.feesPaid).length,
+      icon: IndianRupee,
       color: 'text-red-600',
       bg: 'bg-red-50 dark:bg-red-900/20',
     },

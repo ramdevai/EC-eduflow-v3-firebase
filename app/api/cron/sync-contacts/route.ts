@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getPeopleClient, getSheetsClient } from '@/lib/google';
+import { getPeopleClient } from '@/lib/google';
 import { getAllLeads, addLead } from '@/lib/db-sheets';
 import { google } from 'googleapis';
 
@@ -9,18 +9,17 @@ export async function GET(req: Request) {
   // 1. Verify Cron Secret
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    // return new Response('Unauthorized', { status: 401 });
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  const sheetId = process.env.GOOGLE_SHEET_ID; // Fallback or we need a way to get all active sheets
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+
+  if (!sheetId || !refreshToken) {
+    return NextResponse.json({ error: 'Sync configuration missing (Sheet ID or Refresh Token)' }, { status: 500 });
   }
 
   try {
-    // 2. Get Refresh Token from env or DB
-    // For this prototype, we'll assume the admin's refresh token is in ENV
-    // In production, you'd fetch this from your Config sheet
-    const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
-    if (!refreshToken) {
-      return NextResponse.json({ error: 'No refresh token configured' }, { status: 500 });
-    }
-
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET
@@ -28,10 +27,10 @@ export async function GET(req: Request) {
     oauth2Client.setCredentials({ refresh_token: refreshToken });
     const { token } = await oauth2Client.getAccessToken();
     
-    if (!token) throw new Error('Failed to get access token');
+    if (!token) throw new Error('Failed to get access token from refresh token');
 
     const people = await getPeopleClient(token);
-    const existingLeads = await getAllLeads();
+    const existingLeads = await getAllLeads(sheetId, token);
 
     // 3. Fetch Contacts
     const response = await people.people.connections.list({
@@ -53,11 +52,11 @@ export async function GET(req: Request) {
         // Check for duplicates
         const isDuplicate = existingLeads.some(l => 
           l.googleContactId === googleContactId || 
-          (phone && l.phone === phone)
+          (phone && l.phone.replace(/\D/g, '') === phone.replace(/\D/g, ''))
         );
 
         if (!isDuplicate) {
-          await addLead({
+          await addLead(sheetId, token, {
             name: name.replace(SUFFIX, '').trim(),
             email,
             phone,
@@ -71,8 +70,8 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json({ success: true, added: addedCount });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Cron sync error:', error);
-    return NextResponse.json({ error: 'Sync failed' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Sync failed' }, { status: 500 });
   }
 }

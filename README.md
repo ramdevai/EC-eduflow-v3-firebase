@@ -19,31 +19,20 @@ A modern lead management system integrated with Google Sheets and Google Contact
 2. Enable **Google Sheets API** and **Google People API**.
 3. Create **OAuth 2.0 Client IDs** (Web application).
    - Authorized Redirect URI: `http://localhost:3000/api/auth/callback/google` (and your production URL).
-4. Create a **Service Account** and download the JSON key.
-   - You will need the `client_email` and `private_key` from this JSON.
+4. **IMPORTANT:** In the OAuth Consent Screen, add your email and Binal's email as **Test Users** while the app is in testing mode.
 
-### 2. Google Sheets Setup
-1. Create a new Google Sheet.
-2. Share it with your Service Account email (give "Editor" access).
-3. Create a sheet named `Leads`.
-4. Add the following headers in row 1 (Columns A to AK):
-   `ID`, `Name`, `Phone`, `Email`, `Stage`, `Inquiry Date`, `Updated At`, `Google Contact ID`, `Address`, `Gender`, `DOB`, `Grade`, `Board`, `School`, `Hobbies`, `Father Name`, `Father Phone`, `Father Email`, `Father Occupation`, `Mother Name`, `Mother Phone`, `Mother Email`, `Mother Occupation`, `Source`, `Comments`, `Notes`, `Last Follow Up`, `Test Link`, `Appointment Time`, `Fees Paid`, `Fees Amount`, `Payment Mode`, `Transaction ID`, `Report Sent Date`, `Converted Date`, `Report PDF URL`, `Community Joined`
-
-### 3. Google Form Integration (Optional but Recommended)
-To automatically ingest student demographics:
-1. Open your Registration Form.
-2. Link it to a new Google Sheet.
-3. In that Sheet, go to **Extensions > Apps Script**.
-4. Paste the code from `GoogleAppsScript.js` (found in this project).
-5. Set up a "Form Submit" trigger as instructed in that file.
-
-### 3. Environment Variables
+### 2. Environment Variables
 Copy `.env.example` to `.env.local` and fill in the values:
 - `AUTH_SECRET`: Generate with `npx auth secret`.
 - `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET`: From OAuth Client ID.
-- `GOOGLE_SHEET_ID`: The ID from your Sheet URL.
-- `GOOGLE_SERVICE_ACCOUNT_EMAIL` & `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`: From Service Account JSON.
-- `CRON_SECRET`: A random string to protect your cron endpoint.
+- `CRON_SECRET`: A random string to protect your sync endpoint.
+- `GOOGLE_REFRESH_TOKEN`: (Optional) For background sync, see sync logic.
+
+### 3. Usage
+1.  **Login:** Sign in with your Google Account.
+2.  **Connect Sheet:** On first login, paste the ID of your Google Sheet.
+3.  **Permissions:** The app uses your own permissions to edit the sheet. No Service Account needed!
+
 
 ### 4. Run Locally
 1. `npm install`

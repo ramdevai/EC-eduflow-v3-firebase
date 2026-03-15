@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { LeadStage } from '@/lib/types';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { useSession, signOut } from "next-auth/react";
 
 interface SidebarProps {
   selectedStage: LeadStage | 'All';
@@ -22,6 +23,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ selectedStage, setSelectedStage, stages, onMobileClose }: SidebarProps) {
+  const { data: session } = useSession();
   const NavButton = ({ 
     icon: Icon, 
     label, 
@@ -111,14 +113,18 @@ export function Sidebar({ selectedStage, setSelectedStage, stages, onMobileClose
         </section>
       </div>
 
-      <div className="pt-6 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
-            <UserCircle size={20} />
-          </div>
-          <div className="hidden lg:block">
-            <p className="text-xs font-bold text-slate-900 dark:text-white">Admin User</p>
-            <p className="text-[10px] text-slate-400">admin@educompass.in</p>
+      <div className="pt-6 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-3 min-w-0">
+          {session?.user?.image ? (
+            <img src={session.user.image} className="w-9 h-9 rounded-full" alt={session.user.name || ''} />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                <UserCircle size={20} />
+            </div>
+          )}
+          <div className="hidden lg:block min-w-0">
+            <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{session?.user?.name || 'User'}</p>
+            <button onClick={() => signOut()} className="text-[10px] font-bold text-primary-600 hover:underline">Sign Out</button>
           </div>
         </div>
         <ThemeToggle />

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -10,9 +10,13 @@ import {
   AlertCircle, 
   RefreshCw,
   X,
-  Sparkles
+  Sparkles,
+  Settings,
+  Database,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useSession } from "next-auth/react";
 import { useLeads } from '@/hooks/useLeads';
 import { Lead, LeadStage } from '@/lib/types';
 import { Sidebar } from '@/components/dashboard/Sidebar';
@@ -25,6 +29,8 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
+import { getWhatsAppLink } from '@/lib/messaging-utils';
+import { LoginScreen } from '@/components/LoginScreen';
 
 const STAGES: LeadStage[] = [
   'New', 'Converted', 'Details Requested', 'Test Sent', 'Test Completed', 
@@ -32,7 +38,9 @@ const STAGES: LeadStage[] = [
 ];
 
 export default function Dashboard() {
-  const { leads, loading, reminders, fetchLeads, updateLead, deleteLead, addLead } = useLeads();
+  const { data: session, status } = useSession();
+  const { leads, loading, error, sheetId, reminders, fetchLeads, updateLead, deleteLead, addLead, saveSheetId } = useLeads();
+  
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<LeadStage | 'All'>('All');
@@ -40,8 +48,7 @@ export default function Dashboard() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -57,7 +64,67 @@ export default function Dashboard() {
     });
   }, [leads, searchQuery, selectedStage]);
 
-  if (!mounted) return null;
+  if (!mounted || status === "loading") return null;
+
+  // Login Gate
+  if (!session) {
+    return <LoginScreen />;
+  }
+
+  // Setup / Settings Gate
+  if (!sheetId || isSettingsOpen) {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                <Card className="w-full max-w-lg p-10 space-y-8 shadow-2xl border-white/20">
+                    <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600">
+                            <Database size={32} />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-black dark:text-white">Database Setup</h2>
+                            <p className="text-slate-500 text-sm font-medium">Connect your Google Sheet to start.</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Master Google Sheet ID</label>
+                            <input 
+                                defaultValue={sheetId || ''} 
+                                id="sheet-id-input"
+                                placeholder="Paste Sheet ID here..." 
+                                className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 rounded-2xl font-mono text-xs outline-none focus:border-primary-500 transition-all" 
+                            />
+                            <p className="text-[10px] text-slate-400 italic px-2">
+                                Found in the URL: docs.google.com/spreadsheets/d/<span className="text-primary-600 font-bold">YOUR_ID_HERE</span>/edit
+                            </p>
+                        </div>
+
+                        <div className="bg-primary-50 dark:bg-primary-900/10 p-4 rounded-2xl border border-primary-100 dark:border-primary-900/20">
+                            <p className="text-[10px] leading-relaxed text-primary-700 dark:text-primary-400 font-medium">
+                                <b>Note:</b> You must be the owner of this sheet or have editor permissions. The app will act on your behalf using your logged-in Google account.
+                            </p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            {sheetId && (
+                                <Button variant="outline" className="flex-1 h-14 rounded-2xl" onClick={() => setIsSettingsOpen(false)}>Cancel</Button>
+                            )}
+                            <Button className="flex-[2] h-14 rounded-2xl" onClick={() => {
+                                const input = document.getElementById('sheet-id-input') as HTMLInputElement;
+                                if (input.value) {
+                                    saveSheetId(input.value);
+                                    setIsSettingsOpen(false);
+                                }
+                            }}>Save & Connect</Button>
+                        </div>
+                    </div>
+                </Card>
+            </motion.div>
+        </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 pb-24 lg:pb-0">
@@ -111,9 +178,16 @@ export default function Dashboard() {
                 <Menu size={20} />
               </button>
               <div>
-                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">
-                  {selectedStage === 'All' ? 'Dashboard' : selectedStage}
-                </h1>
+                <div className="flex items-center gap-3">
+                    <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">
+                    {selectedStage === 'All' ? 'Dashboard' : selectedStage}
+                    </h1>
+                    {reminders.length > 0 && selectedStage === 'All' && (
+                        <div className="flex items-center justify-center min-w-[24px] h-6 px-1.5 bg-red-500 text-white text-[10px] font-black rounded-full animate-bounce">
+                            {reminders.length}
+                        </div>
+                    )}
+                </div>
                 <div className="flex items-center gap-1.5 mt-1">
                     <Sparkles size={12} className="text-primary-500" />
                     <p className="text-[10px] md:text-xs text-slate-500 font-bold uppercase tracking-widest">EduCompass CRM</p>
@@ -122,6 +196,9 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="w-10 h-10 p-0 rounded-xl">
+                <Settings size={18} />
+              </Button>
               <Button variant="outline" size="sm" onClick={() => fetchLeads()} className="w-10 h-10 p-0 rounded-xl">
                 <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
               </Button>
@@ -185,14 +262,32 @@ export default function Dashboard() {
                 <Card key={lead.id} className="min-w-[280px] md:min-w-[320px] p-4 border-l-4 border-amber-500 bg-white dark:bg-slate-900 snap-center shadow-md">
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="font-bold text-slate-900 dark:text-slate-100">{lead.name}</h4>
-                    <Badge variant="warning">Follow-up</Badge>
+                    <Badge variant={lead.stage === 'Report Sent' ? 'success' : 'warning'}>
+                        {lead.stage === 'New' ? 'Overdue' : 
+                         lead.stage === 'Test Sent' ? 'Nudge' : 
+                         lead.stage === 'Report Sent' ? 'Review' : 
+                         !lead.feesPaid ? 'Fees' : 'Follow-up'}
+                    </Badge>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-4 line-clamp-2">
-                    {lead.stage === 'New' ? 'Lead hasn\'t converted in 4 days. Time for a call.' : 'Review required for report sent.'}
+                    {lead.stage === 'New' ? 'Lead hasn\'t converted in 4 days. Time for a call.' : 
+                     lead.stage === 'Test Sent' ? 'Test link sent over 48h ago. Nudge for completion.' :
+                     lead.stage === '1:1 Complete' ? 'Counseling done. Prepare and send the report.' :
+                     lead.stage === 'Report Sent' ? 'Report sent 2 days ago. Ask for a Google review.' :
+                     !lead.feesPaid ? 'Student is active but professional fees are pending.' :
+                     'Action required for this student profile.'}
                   </p>
                   <div className="flex gap-2 mt-auto">
-                    <Button size="sm" variant="outline" className="flex-1 rounded-xl text-[10px]" onClick={() => setSelectedLead(lead)}>View Profile</Button>
-                    <Button size="sm" className="flex-1 rounded-xl text-[10px]" onClick={() => window.open(`tel:${lead.phone}`)}>Quick Call</Button>
+                    <Button size="sm" variant="outline" className="flex-1 rounded-xl text-[10px]" onClick={() => setSelectedLead(lead)}>Details</Button>
+                    <Button size="sm" className="flex-1 rounded-xl text-[10px]" onClick={() => {
+                        if (lead.stage === 'Report Sent') {
+                            window.open(getWhatsAppLink(lead, 'review'), '_blank');
+                        } else {
+                            window.open(getWhatsAppLink(lead, 'followup'), '_blank');
+                        }
+                    }}>
+                        {lead.stage === 'Report Sent' ? 'Ask Review' : 'WhatsApp'}
+                    </Button>
                   </div>
                 </Card>
               ))}
@@ -202,6 +297,11 @@ export default function Dashboard() {
 
         {/* View Content */}
         <div className="relative">
+            {error && (
+                <div className="p-4 mb-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-2xl text-red-600 text-xs font-bold">
+                    Error: {error}. Please check your Sheet ID or Google permissions.
+                </div>
+            )}
             {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
                 {[1, 2, 3].map(i => (
@@ -267,14 +367,18 @@ export default function Dashboard() {
                <form className="space-y-4" onSubmit={async (e) => {
                  e.preventDefault();
                  const fd = new FormData(e.currentTarget);
-                 await addLead({
-                   name: fd.get('name') as string,
-                   phone: fd.get('phone') as string,
-                   email: fd.get('email') as string,
-                   grade: fd.get('grade') as string,
-                   board: fd.get('board') as string,
-                 });
-                 setIsAddModalOpen(false);
+                 try {
+                    await addLead({
+                        name: fd.get('name') as string,
+                        phone: fd.get('phone') as string,
+                        email: fd.get('email') as string,
+                        grade: fd.get('grade') as string,
+                        board: fd.get('board') as string,
+                    });
+                    setIsAddModalOpen(false);
+                 } catch (err) {
+                    alert('Failed to add lead. Check your sheet ID and permissions.');
+                 }
                }}>
                   <div className="space-y-4">
                     <div className="group">

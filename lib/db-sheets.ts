@@ -1,33 +1,29 @@
 import { getSheetsClient } from './google';
 import { Lead, LeadStage } from './types';
 
-const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
-const RANGE = 'Leads!A2:AK'; // Updated range to AK for new fields
+const RANGE = 'Leads!A2:AK';
 
-export async function getAllLeads(): Promise<Lead[]> {
-  if (!SPREADSHEET_ID) {
-    console.error('GOOGLE_SHEET_ID is not configured');
-    return [];
-  }
+export async function getAllLeads(spreadsheetId: string, accessToken: string): Promise<Lead[]> {
+  if (!spreadsheetId) return [];
   
   try {
-    const sheets = await getSheetsClient();
+    const sheets = await getSheetsClient(accessToken);
     const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
+      spreadsheetId: spreadsheetId,
       range: RANGE,
     });
 
     const rows = response.data.values || [];
-    return rows.map(mapRowToLead).filter(lead => lead.id); // Filter out empty rows
+    return rows.map(mapRowToLead).filter(lead => lead.id);
   } catch (error) {
     console.error('Error fetching from Google Sheets:', error);
-    return [];
+    throw error;
   }
 }
 
-export async function addLead(lead: Partial<Lead>): Promise<number> {
-  const sheets = await getSheetsClient();
-  const leads = await getAllLeads();
+export async function addLead(spreadsheetId: string, accessToken: string, lead: Partial<Lead>): Promise<number> {
+  const sheets = await getSheetsClient(accessToken);
+  const leads = await getAllLeads(spreadsheetId, accessToken);
   const newId = leads.length > 0 ? Math.max(...leads.map(l => l.id)) + 1 : 1;
 
   const row = mapLeadToRow({
@@ -47,7 +43,7 @@ export async function addLead(lead: Partial<Lead>): Promise<number> {
   } as Lead);
 
   await sheets.spreadsheets.values.append({
-    spreadsheetId: SPREADSHEET_ID,
+    spreadsheetId: spreadsheetId,
     range: 'Leads!A:A',
     valueInputOption: 'USER_ENTERED',
     requestBody: {
@@ -58,18 +54,18 @@ export async function addLead(lead: Partial<Lead>): Promise<number> {
   return newId;
 }
 
-export async function updateLead(id: number, updates: Partial<Lead>): Promise<void> {
-  const sheets = await getSheetsClient();
-  const leads = await getAllLeads();
+export async function updateLead(spreadsheetId: string, accessToken: string, id: number, updates: Partial<Lead>): Promise<void> {
+  const sheets = await getSheetsClient(accessToken);
+  const leads = await getAllLeads(spreadsheetId, accessToken);
   const index = leads.findIndex(l => l.id === id);
   if (index === -1) throw new Error('Lead not found');
 
   const updatedLead = { ...leads[index], ...updates, updatedAt: new Date().toISOString() };
   const row = mapLeadToRow(updatedLead);
-  const rowNumber = index + 2; // +1 for 0-index, +1 for headers
+  const rowNumber = index + 2;
 
   await sheets.spreadsheets.values.update({
-    spreadsheetId: SPREADSHEET_ID,
+    spreadsheetId: spreadsheetId,
     range: `Leads!A${rowNumber}:AK${rowNumber}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
@@ -78,23 +74,19 @@ export async function updateLead(id: number, updates: Partial<Lead>): Promise<vo
   });
 }
 
-export async function deleteLead(id: number): Promise<void> {
-    // Note: Deleting rows in Google Sheets API is slightly more complex than updating.
-    // We'll mark as deleted or just clear the row for now, or use batchUpdate.
-    // For simplicity in a Micro CRM, we can just clear the row or filter out "Lost" in UI.
-    // But let's implement a real delete using batchUpdate.
-    const sheets = await getSheetsClient();
-    const leads = await getAllLeads();
+export async function deleteLead(spreadsheetId: string, accessToken: string, id: number): Promise<void> {
+    const sheets = await getSheetsClient(accessToken);
+    const leads = await getAllLeads(spreadsheetId, accessToken);
     const index = leads.findIndex(l => l.id === id);
     if (index === -1) return;
 
-    const rowIndex = index + 1; // 0-based index for the Leads sheet (excluding headers if we use the sheetId)
+    const rowIndex = index; // 0-based index for rows after header (A2 is index 0)
     
-    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: SPREADSHEET_ID });
+    const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId: spreadsheetId });
     const sheetId = spreadsheet.data.sheets?.find(s => s.properties?.title === 'Leads')?.properties?.sheetId;
 
     await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: SPREADSHEET_ID,
+        spreadsheetId: spreadsheetId,
         requestBody: {
             requests: [
                 {
@@ -102,7 +94,7 @@ export async function deleteLead(id: number): Promise<void> {
                         range: {
                             sheetId,
                             dimension: 'ROWS',
-                            startIndex: rowIndex + 1, // +1 to skip headers
+                            startIndex: rowIndex + 1, // +1 for headers
                             endIndex: rowIndex + 2
                         }
                     }

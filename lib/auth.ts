@@ -20,11 +20,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (account) {
         token.accessToken = account.access_token;
         token.refreshToken = account.refresh_token;
+        token.expiresAt = account.expires_at;
       }
       return token;
     },
     async session({ session, token }: any) {
       session.accessToken = token.accessToken;
+      session.error = token.error;
       return session;
     },
   },

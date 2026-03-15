@@ -10,26 +10,55 @@ export type LeadStage =
   | 'Lost';
 
 export interface Lead {
+  // Basic & System
   id: number;
   name: string;
   phone: string;
   email: string;
-  grade: string;
-  board: string;
   stage: LeadStage;
   inquiryDate: string;
-  notes: string;
+  updatedAt: string;
+  googleContactId?: string;
+
+  // From Registration Form
+  address?: string;
+  gender?: string;
+  dob?: string;
+  grade: string; // "Class" in form
+  board: string;
+  school?: string;
+  hobbies?: string;
+  
+  // Family
+  fatherName?: string;
+  fatherPhone?: string;
+  fatherEmail?: string;
+  fatherOccupation?: string;
+  motherName?: string;
+  motherPhone?: string;
+  motherEmail?: string;
+  motherOccupation?: string;
+  
+  // Marketing & Discovery
+  source?: string; // "How did you know about me?"
+  comments?: string;
+
+  // Counseling & Business
+  notes: string; // Counseling notes
   lastFollowUp: string;
   testLink: string;
   appointmentTime: string;
   feesPaid: boolean;
+  feesAmount?: string;
+  paymentMode?: string;
+  transactionId?: string;
   reportSentDate: string;
   convertedDate: string;
-  updatedAt: string;
-  googleContactId?: string;
+  reportPdfUrl?: string;
+  communityJoined: boolean;
 }
 
-export const TEST_LINKS = {
+export const TEST_LINKS: Record<string, string> = {
   "2nd-7th": "https://careertest.edumilestones.com/student-dashboard/suitability-registration/login/OTI2/as11",
   "8th-10th": "https://careertest.edumilestones.com/student-dashboard/suitability-registration/login/OTI2/as12",
   "11th-12th": "https://careertest.edumilestones.com/student-dashboard/suitability-registration/login/OTI2/as13",

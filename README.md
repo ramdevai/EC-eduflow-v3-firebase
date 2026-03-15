@@ -26,8 +26,16 @@ A modern lead management system integrated with Google Sheets and Google Contact
 1. Create a new Google Sheet.
 2. Share it with your Service Account email (give "Editor" access).
 3. Create a sheet named `Leads`.
-4. Add the following headers in row 1:
-   `ID`, `Name`, `Phone`, `Email`, `Grade`, `Board`, `Stage`, `Inquiry Date`, `Notes`, `Last Follow Up`, `Test Link`, `Appointment Time`, `Fees Paid`, `Report Sent Date`, `Converted Date`, `Updated At`, `Google Contact ID`
+4. Add the following headers in row 1 (Columns A to AK):
+   `ID`, `Name`, `Phone`, `Email`, `Stage`, `Inquiry Date`, `Updated At`, `Google Contact ID`, `Address`, `Gender`, `DOB`, `Grade`, `Board`, `School`, `Hobbies`, `Father Name`, `Father Phone`, `Father Email`, `Father Occupation`, `Mother Name`, `Mother Phone`, `Mother Email`, `Mother Occupation`, `Source`, `Comments`, `Notes`, `Last Follow Up`, `Test Link`, `Appointment Time`, `Fees Paid`, `Fees Amount`, `Payment Mode`, `Transaction ID`, `Report Sent Date`, `Converted Date`, `Report PDF URL`, `Community Joined`
+
+### 3. Google Form Integration (Optional but Recommended)
+To automatically ingest student demographics:
+1. Open your Registration Form.
+2. Link it to a new Google Sheet.
+3. In that Sheet, go to **Extensions > Apps Script**.
+4. Paste the code from `GoogleAppsScript.js` (found in this project).
+5. Set up a "Form Submit" trigger as instructed in that file.
 
 ### 3. Environment Variables
 Copy `.env.example` to `.env.local` and fill in the values:

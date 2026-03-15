@@ -40,15 +40,15 @@ export function StatGrid({ leads }: StatGridProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
       {stats.map((stat, i) => (
-        <Card key={i} className="p-5 flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center`}>
-            <stat.icon size={24} />
+        <Card key={i} className="p-3 md:p-5 flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 text-center md:text-left">
+          <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center shrink-0`}>
+            <stat.icon size={20} className="md:w-6 md:h-6" />
           </div>
           <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">{stat.label}</p>
-            <p className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
+            <p className="text-[9px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">{stat.label}</p>
+            <p className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white leading-tight">{stat.value}</p>
           </div>
         </Card>
       ))}

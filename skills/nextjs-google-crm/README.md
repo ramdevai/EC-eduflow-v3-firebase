@@ -68,22 +68,35 @@ Automated lead import from Google Contacts.
 - **Trigger:** Vercel Cron (`vercel.json`)
 - **Logic:** Filter contacts by suffix (e.g., `[LEAD]`), de-duplicate against the Sheet using `googleContactId`, and append new rows.
 
-## ⚠️ Critical Gotchas & Best Practices
+## 🛡️ Stability & Error Handling Layer
 
-1. **Next.js 15 Async Params:** In dynamic routes (e.g., `[id]`), always `await params`.
-   ```typescript
-   export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> })
-   ```
-2. **Hydration Mismatch:** Complex dashboards with browser-only logic (Animations, Date localizing) must use a `mounted` check.
-   ```typescript
-   const [mounted, setMounted] = useState(false);
-   useEffect(() => setMounted(true), []);
-   if (!mounted) return null;
-   ```
-3. **Tailwind Versioning:** 
-   - Use **v3** for Node 18 (stable, avoids native binary issues).
-   - Use **v4** for Node 20+ (performance, native engine).
-4. **Auth Secret:** Always generate a 32-char secret via `npx auth secret`.
+To prevent recurring 500 errors and build cache corruption:
+
+### 1. Build Cache Management
+Always provide a clean development command to purge corrupted Webpack/Next.js chunks.
+```json
+"clean-dev": "rm -rf .next && next dev"
+```
+
+### 2. Environment Validation (Zod)
+Validate critical API keys and secrets at the application layer to provide meaningful error messages instead of raw crashes.
+
+```typescript
+// lib/env-check.ts
+import { z } from 'zod';
+const envSchema = z.object({
+  AUTH_SECRET: z.string().min(1),
+  GOOGLE_CLIENT_ID: z.string().min(1),
+});
+```
+
+### 3. Authenticated Route Guarding
+Ensure API routes check for both Session and custom headers (like `x-sheet-id`) before invoking Google libraries.
+
+### 4. Resilience Patterns
+- **Async Params:** In Next.js 15, dynamic route params must be awaited.
+- **Header-Based Config:** Use custom headers (e.g., `x-sheet-id`) to pass configuration from the client to serverless functions, enabling dynamic "Database" switching.
+- **Diagnostic Boundaries:** Implement a custom `error.tsx` that detects "Auth" vs "Network" errors and offers specific recovery actions (like a "Re-authenticate" button).
 
 ## 📄 Environment Configuration
 Required `.env.local` keys:

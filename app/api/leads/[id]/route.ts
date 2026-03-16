@@ -1,17 +1,23 @@
 import { NextResponse } from 'next/server';
 import { updateLead, deleteLead } from '@/lib/db-sheets';
 import { auth } from '@/lib/auth';
+import { validateEnv } from '@/lib/env-check';
 
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const envStatus = validateEnv();
+  if (!envStatus.isValid) {
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+  }
+
   const session = await auth() as any;
   const sheetId = req.headers.get('x-sheet-id');
   const { id } = await params;
 
   if (!session?.accessToken) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
   if (!sheetId) {
@@ -32,12 +38,17 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const envStatus = validateEnv();
+  if (!envStatus.isValid) {
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+  }
+
   const session = await auth() as any;
   const sheetId = req.headers.get('x-sheet-id');
   const { id } = await params;
 
   if (!session?.accessToken) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
   if (!sheetId) {

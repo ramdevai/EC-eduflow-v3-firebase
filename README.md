@@ -26,7 +26,11 @@ Copy `.env.example` to `.env.local` and fill in the values:
 - `AUTH_SECRET`: Generate with `npx auth secret`.
 - `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET`: From OAuth Client ID.
 - `CRON_SECRET`: A random string to protect your sync endpoint.
-- `GOOGLE_REFRESH_TOKEN`: (Optional) For background sync, see sync logic.
+
+**TIP:** To get your `GOOGLE_REFRESH_TOKEN` and `GOOGLE_SHEET_ID`:
+1. Start the app and Sign In.
+2. Visit `http://localhost:3000/api/auth/token` in your browser.
+3. Copy those values into your `.env.local`.
 
 ### 3. Usage
 1.  **Login:** Sign in with your Google Account.

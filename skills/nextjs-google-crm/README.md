@@ -98,6 +98,33 @@ Ensure API routes check for both Session and custom headers (like `x-sheet-id`) 
 - **Header-Based Config:** Use custom headers (e.g., `x-sheet-id`) to pass configuration from the client to serverless functions, enabling dynamic "Database" switching.
 - **Diagnostic Boundaries:** Implement a custom `error.tsx` that detects "Auth" vs "Network" errors and offers specific recovery actions (like a "Re-authenticate" button).
 
+### 5. Instant UI Response (Local State)
+To ensure the UI feels responsive even when waiting for async API calls (like updating a lead stage), use local state to mirror the backend.
+```typescript
+const [localStage, setLocalStage] = useState(lead.stage);
+const handleStageChange = (newStage) => {
+  setLocalStage(newStage); // Instant update
+  onUpdate(lead.id, { stage: newStage }); // Background sync
+};
+```
+
+### 6. Flexible Tool Links
+Allow users to customize deep-links (like Registration Forms) via Preferences persisted in `localStorage`.
+```typescript
+const [formLink, setFormLink] = useState(localStorage.getItem('form_link'));
+// Pass to communication utils
+const link = getWhatsAppLink(lead, 'onboarding', formLink);
+```
+
+### 7. Robust Contact Matching
+When syncing contacts, use fuzzy or multi-pattern matching to capture variations of lead suffixes and clean them before import. Query both 'My Contacts' and 'Other Contacts' to ensure no leads are missed.
+
+### 8. Bulletproof Form Mapping (ID Based)
+To handle siblings or returning leads, use the Lead ID as a primary key in Google Forms.
+1. Add a 'System ID' field to your Google Form.
+2. Pre-fill the ID in the WhatsApp link: `.../viewform?entry.12345=ID`.
+3. Use Apps Script to match the response directly to the Master Sheet row by ID.
+
 ## 📄 Environment Configuration
 Required `.env.local` keys:
 - `AUTH_SECRET`

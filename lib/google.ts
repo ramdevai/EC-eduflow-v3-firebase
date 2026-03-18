@@ -41,6 +41,24 @@ export async function getPeopleClient(accessToken: string) {
   }
 }
 
+export async function getFormsClient(accessToken: string) {
+  if (!accessToken) {
+    throw new Error('Access token is required to initialize Google Forms client');
+  }
+
+  try {
+    const auth = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+    auth.setCredentials({ access_token: accessToken });
+    return google.forms({ version: 'v1', auth });
+  } catch (error: any) {
+    console.error('Failed to initialize Google Forms client:', error.message);
+    throw new Error(`Google Forms API Init Error: ${error.message}`);
+  }
+}
+
 /**
  * Used for background sync using a stored refresh token
  */

@@ -3,88 +3,80 @@
 import React from 'react';
 import { 
   LayoutDashboard, 
-  Users, 
-  PlusCircle, 
-  Search, 
-  UserCircle 
+  Calendar, 
+  Plus, 
+  Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LeadStage } from '@/lib/types';
 
 interface BottomNavProps {
-  selectedStage: LeadStage | 'All';
-  setSelectedStage: (stage: LeadStage | 'All') => void;
+  activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis';
+  setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis') => void;
   onAddClick: () => void;
+  onSyncClick: () => void;
+  isSyncing?: boolean;
 }
 
-export function BottomNav({ selectedStage, setSelectedStage, onAddClick }: BottomNavProps) {
+export function BottomNav({ activeTab, setActiveTab, onAddClick, onSyncClick, isSyncing }: BottomNavProps) {
   const NavItem = ({ 
     icon: Icon, 
     label, 
     isActive, 
     onClick,
-    isCenter = false
+    isLoading = false
   }: { 
     icon: any, 
     label: string, 
     isActive?: boolean, 
     onClick: () => void,
-    isCenter?: boolean
+    isLoading?: boolean
   }) => (
     <button 
       onClick={onClick}
+      disabled={isLoading}
       className={cn(
-        "flex flex-col items-center justify-center gap-1 transition-all duration-200",
-        isCenter ? "relative -top-5" : "flex-1",
+        "flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-200",
         isActive 
           ? "text-primary-600 dark:text-primary-400" 
-          : "text-slate-400 dark:text-slate-500"
+          : "text-slate-400 dark:text-slate-500",
+        isLoading && "opacity-50"
       )}
     >
       <div className={cn(
-        "p-2 rounded-xl transition-all",
-        isCenter ? "bg-primary-600 text-white shadow-lg shadow-primary-200 dark:shadow-none p-4 rounded-2xl scale-110 active:scale-95" : "active:bg-slate-100 dark:active:bg-slate-800"
+        "p-2 rounded-xl transition-all active:bg-slate-100 dark:active:bg-slate-800",
+        isActive && "bg-primary-50 dark:bg-primary-900/10"
       )}>
-        <Icon size={isCenter ? 28 : 22} />
+        <Icon size={22} className={isLoading ? 'animate-spin' : ''} />
       </div>
-      {!isCenter && <span className="text-[10px] font-bold uppercase tracking-widest">{label}</span>}
+      <span className="text-[9px] font-bold uppercase tracking-wider">{label}</span>
     </button>
   );
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-[50] px-6 pb-6 pt-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-[50] px-2 pb-6 pt-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex items-center justify-around">
       <NavItem 
         icon={LayoutDashboard} 
-        label="Home" 
-        isActive={selectedStage === 'All'} 
-        onClick={() => setSelectedStage('All')} 
+        label="Pipeline" 
+        isActive={activeTab === 'leads'} 
+        onClick={() => setActiveTab('leads')} 
       />
       <NavItem 
-        icon={Users} 
-        label="Leads" 
-        isActive={selectedStage !== 'All'} 
-        onClick={() => setSelectedStage('New')} 
+        icon={Calendar} 
+        label="Today" 
+        isActive={activeTab === 'today'} 
+        onClick={() => setActiveTab('today')} 
       />
-      
       <NavItem 
-        icon={PlusCircle} 
-        label="Add" 
-        isCenter 
+        icon={Sparkles} 
+        label="Sync" 
+        onClick={onSyncClick} 
+        isLoading={isSyncing}
+      />
+      <NavItem 
+        icon={Plus} 
+        label="Add Lead" 
         onClick={onAddClick} 
-      />
-      
-      <NavItem 
-        icon={Search} 
-        label="Search" 
-        onClick={() => {
-            const searchInput = document.querySelector('input[type="text"]') as HTMLInputElement;
-            if (searchInput) searchInput.focus();
-        }} 
-      />
-      <NavItem 
-        icon={UserCircle} 
-        label="Profile" 
-        onClick={() => {}} 
       />
     </nav>
   );

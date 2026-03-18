@@ -11,6 +11,7 @@ export async function GET() {
     environment: {
       valid: envStatus.isValid,
       errors: envStatus.errors,
+      GOOGLE_SHEET_ID: process.env.GOOGLE_SHEET_ID,
     },
     authentication: {
       loggedIn: !!session,

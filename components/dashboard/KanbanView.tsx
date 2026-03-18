@@ -3,6 +3,7 @@
 import React from 'react';
 import { Lead, LeadStage } from '@/lib/types';
 import { LeadCard } from './LeadCard';
+import { normalizeStage } from '@/lib/utils';
 
 interface KanbanViewProps {
   leads: Lead[];
@@ -16,7 +17,7 @@ export function KanbanView({ leads, stages, onLeadClick, searchQuery }: KanbanVi
     <div className="flex gap-6 overflow-x-auto pb-8 no-scrollbar min-h-[600px] -mx-4 px-4 sm:mx-0 sm:px-0">
       {stages.map(stage => {
         const stageLeads = leads
-          .filter(l => l.stage === stage)
+          .filter(l => normalizeStage(l.stage) === stage)
           .filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
         return (
@@ -36,7 +37,6 @@ export function KanbanView({ leads, stages, onLeadClick, searchQuery }: KanbanVi
                   key={lead.id} 
                   lead={lead} 
                   onClick={onLeadClick} 
-                  layoutId={`kanban-${lead.id}`}
                 />
               ))}
               {stageLeads.length === 0 && (

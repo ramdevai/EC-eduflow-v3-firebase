@@ -3,8 +3,6 @@ import { getPeopleClient } from '@/lib/google';
 import { getAllLeads, addLead } from '@/lib/db-sheets';
 import { google } from 'googleapis';
 
-const SUFFIX = '[LEAD]';
-
 export async function GET(req: Request) {
   // 1. Verify Cron Secret
   const authHeader = req.headers.get('authorization');
@@ -12,11 +10,11 @@ export async function GET(req: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const sheetId = process.env.GOOGLE_SHEET_ID; // Fallback or we need a way to get all active sheets
+  const sheetId = process.env.GOOGLE_SHEET_ID;
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
 
-  if (!sheetId || !refreshToken) {
-    return NextResponse.json({ error: 'Sync configuration missing (Sheet ID or Refresh Token)' }, { status: 500 });
+  if (!sheetId || !refreshToken || refreshToken === 'placeholder' || sheetId === 'placeholder') {
+    return NextResponse.json({ error: 'Sync configuration missing in .env.local' }, { status: 500 });
   }
 
   try {
@@ -27,51 +25,77 @@ export async function GET(req: Request) {
     oauth2Client.setCredentials({ refresh_token: refreshToken });
     const { token } = await oauth2Client.getAccessToken();
     
-    if (!token) throw new Error('Failed to get access token from refresh token');
+    if (!token) throw new Error('Failed to refresh access token');
 
     const people = await getPeopleClient(token);
     const existingLeads = await getAllLeads(sheetId, token);
 
-    // 3. Fetch Contacts
-    const response = await people.people.connections.list({
-      resourceName: 'people/me',
-      personFields: 'names,emailAddresses,phoneNumbers',
-      pageSize: 1000,
+    // 1. Search for "lead"
+    const searchResponse = await people.people.searchContacts({
+      query: 'lead',
+      readMask: 'names,emailAddresses,phoneNumbers,biographies,organizations',
     });
 
-    const connections = response.data.connections || [];
+    const searchResults = searchResponse.data.results || [];
+    
+    // 2. Fetch Other Contacts (Light search)
+    const otherResponse = await people.otherContacts.list({
+      readMask: 'names,emailAddresses,phoneNumbers',
+      pageSize: 100,
+    });
+
+    const standardConnections = searchResults.map(r => r.person).filter((p): p is any => !!p);
+    const otherConnections = otherResponse.data.otherContacts || [];
+    
+    const allVisible = [...standardConnections, ...otherConnections];
+    const processedIds = new Set<string>();
     let addedCount = 0;
 
-    for (const person of connections) {
+    for (const person of allVisible) {
+      if (!person) continue;
       const name = person.names?.[0]?.displayName || '';
-      if (name.endsWith(SUFFIX)) {
-        const email = person.emailAddresses?.[0]?.value || '';
-        const phone = person.phoneNumbers?.[0]?.value || '';
-        const googleContactId = person.resourceName || '';
+      const notes = person.biographies?.[0]?.value || '';
+      const org = person.organizations?.[0]?.name || '';
+      const googleContactId = person.resourceName || '';
+      
+      if (!googleContactId || processedIds.has(googleContactId)) continue;
+      processedIds.add(googleContactId);
 
-        // Check for duplicates
-        const isDuplicate = existingLeads.some(l => 
-          l.googleContactId === googleContactId || 
-          (phone && l.phone.replace(/\D/g, '') === phone.replace(/\D/g, ''))
-        );
+      const combined = `${name} ${notes} ${org}`.toLowerCase();
+      if (!combined.includes('lead')) continue;
 
-        if (!isDuplicate) {
-          await addLead(sheetId, token, {
-            name: name.replace(SUFFIX, '').trim(),
-            email,
-            phone,
-            googleContactId,
-            stage: 'New',
-            notes: 'Imported from Google Contacts',
-          } as any);
-          addedCount++;
-        }
+      const phone = person.phoneNumbers?.[0]?.value || '';
+      
+      // Check duplicates
+      const isDuplicate = existingLeads.some(l => 
+        (googleContactId && l.googleContactId === googleContactId) || 
+        (phone && l.phone.replace(/\D/g, '') === phone.replace(/\D/g, ''))
+      );
+
+      if (!isDuplicate) {
+        let cleanName = name
+          .replace(/\[lead\]/gi, '')
+          .replace(/\(lead\)/gi, '')
+          .replace(/lead/gi, '')
+          .replace(/\d{1,2}(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\w*/gi, '') 
+          .replace(/[- ]+$/, '')
+          .trim();
+
+        await addLead(sheetId, token, {
+          name: cleanName || 'Unnamed Lead',
+          email: person.emailAddresses?.[0]?.value || '',
+          phone: phone,
+          googleContactId: googleContactId,
+          stage: 'New',
+          notes: notes ? `Notes: ${notes}` : 'Auto-synced via Cron',
+        } as any);
+        addedCount++;
       }
     }
 
-    return NextResponse.json({ success: true, added: addedCount });
+    return NextResponse.json({ success: true, added: addedCount, checked: processedIds.size });
   } catch (error: any) {
     console.error('Cron sync error:', error);
-    return NextResponse.json({ error: error.message || 'Sync failed' }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

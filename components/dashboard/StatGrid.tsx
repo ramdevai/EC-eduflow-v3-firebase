@@ -2,6 +2,7 @@ import React from 'react';
 import { Users, UserPlus, CheckCircle2, IndianRupee } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
+import { normalizeStage } from '@/lib/utils';
 
 interface StatGridProps {
   leads: Lead[];
@@ -18,21 +19,21 @@ export function StatGrid({ leads }: StatGridProps) {
     },
     {
       label: 'Active Leads',
-      value: leads.filter(l => l.stage !== 'Lost' && l.stage !== 'Report Sent').length,
+      value: leads.filter(l => l.status !== 'Lost').length,
       icon: UserPlus,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50 dark:bg-emerald-900/20',
     },
     {
       label: 'New Inquiries',
-      value: leads.filter(l => l.stage === 'New').length,
+      value: leads.filter(l => normalizeStage(l.stage) === 'New').length,
       icon: CheckCircle2,
       color: 'text-amber-600',
       bg: 'bg-amber-50 dark:bg-amber-900/20',
     },
     {
       label: 'Fees Pending',
-      value: leads.filter(l => l.stage !== 'New' && l.stage !== 'Lost' && !l.feesPaid).length,
+      value: leads.filter(l => l.status !== 'Lost' && !l.feesPaid).length,
       icon: IndianRupee,
       color: 'text-red-600',
       bg: 'bg-red-50 dark:bg-red-900/20',
@@ -40,15 +41,15 @@ export function StatGrid({ leads }: StatGridProps) {
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-8">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 mb-8">
       {stats.map((stat, i) => (
-        <Card key={i} className="p-3 md:p-5 flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 text-center md:text-left">
-          <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center shrink-0`}>
-            <stat.icon size={20} className="md:w-6 md:h-6" />
+        <Card key={i} className="p-2.5 md:p-5 flex flex-row items-center gap-2.5 md:gap-4 text-left">
+          <div className={`w-9 h-9 md:w-12 md:h-12 rounded-xl md:rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center shrink-0`}>
+            <stat.icon size={18} className="md:w-6 md:h-6" />
           </div>
-          <div>
-            <p className="text-[9px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5">{stat.label}</p>
-            <p className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white leading-tight">{stat.value}</p>
+          <div className="min-w-0">
+            <p className="text-[8px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mb-0.5 truncate">{stat.label}</p>
+            <p className="text-lg md:text-2xl font-bold text-slate-900 dark:text-white leading-none">{stat.value}</p>
           </div>
         </Card>
       ))}

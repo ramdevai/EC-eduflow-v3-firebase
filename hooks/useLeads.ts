@@ -8,11 +8,12 @@ export function useLeads() {
   const [error, setError] = useState<string | null>(null);
   const [sheetId, setSheetId] = useState<string | null>(null);
 
-  // Initialize sheetId from localStorage
+  // Initialize from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('educompass_sheet_id');
-    if (stored) setSheetId(stored);
-    else setLoading(false); // If no sheetId, stop loading so we can show settings
+    const storedSheetId = localStorage.getItem('educompass_sheet_id');
+    if (storedSheetId) setSheetId(storedSheetId);
+    
+    if (!storedSheetId) setLoading(false); 
   }, []);
 
   const saveSheetId = (id: string) => {
@@ -52,12 +53,16 @@ export function useLeads() {
     if (sheetId) fetchLeads();
   }, [sheetId, fetchLeads]);
 
-  const updateLead = async (id: number, updates: Partial<Lead>) => {
+  const updateLead = async (id: number, updates: Partial<Lead>): Promise<void> => {
     if (!sheetId) return;
 
-    if (updates.stage === 'Converted') {
+    if (updates.stage) {
+      updates.lastStageUpdate = new Date().toISOString();
+    }
+
+    if (updates.stage === 'Registration requested') {
       updates.convertedDate = new Date().toISOString();
-    } else if (updates.stage === 'Report Sent') {
+    } else if (updates.stage === 'Report sent') {
       updates.reportSentDate = new Date().toISOString();
     }
 
@@ -74,6 +79,7 @@ export function useLeads() {
       await fetchLeads();
     } catch (err) {
       console.error('Failed to update lead:', err);
+      throw err;
     }
   };
 
@@ -112,37 +118,51 @@ export function useLeads() {
 
   const reminders = useMemo(() => {
     const now = new Date();
+    const normalizeStage = (stage: string): string => {
+      const map: Record<string, string> = {
+        'Converted': 'Registration requested',
+        'Details Requested': 'Registration done',
+        'Test Sent': 'Test sent',
+        'Test Completed': 'Test completed',
+        'Appt Scheduled': '1:1 scheduled',
+        '1:1 Complete': 'Session complete',
+        'Report Sent': 'Report sent',
+      };
+      return map[stage] || stage;
+    };
+
     return leads.filter(lead => {
-      if (lead.stage === 'Lost' || lead.stage === 'Converted') return false;
+      const stage = normalizeStage(lead.stage);
+      if (lead.status === 'Lost' || stage === 'Registration requested') return false;
       
       const inquiryDate = lead.inquiryDate ? new Date(lead.inquiryDate) : now;
       const daysSinceInquiry = differenceInDays(now, inquiryDate);
       
       // Rule A: New Lead not converted in 4 days
-      if (lead.stage === 'New' && daysSinceInquiry >= 4) return true;
+      if (stage === 'New' && daysSinceInquiry >= 4) return true;
       
       // Rule B: Test Sent but no completion nudge after 2 days
-      if (lead.stage === 'Test Sent' && lead.updatedAt) {
+      if (stage === 'Test sent' && lead.updatedAt) {
         const daysSinceSent = differenceInDays(now, new Date(lead.updatedAt));
         if (daysSinceSent >= 2) return true;
       }
 
-      // Rule C: 1:1 Complete but report not sent after 1 day
-      if (lead.stage === '1:1 Complete' && lead.updatedAt) {
+      // Rule C: Session complete but report not sent after 1 day
+      if (stage === 'Session complete' && lead.updatedAt) {
         const daysSinceSession = differenceInDays(now, new Date(lead.updatedAt));
         if (daysSinceSession >= 1) return true;
       }
       
       // Rule D: Report Sent but no review/follow-up after 2 days
-      if (lead.stage === 'Report Sent' && lead.reportSentDate) {
+      if (stage === 'Report sent' && lead.reportSentDate) {
         const reportDate = new Date(lead.reportSentDate);
         const daysSinceReport = differenceInDays(now, reportDate);
         if (daysSinceReport >= 2) return true;
       }
 
       // Rule E: Fees Pending for active students (beyond Test Completed)
-      const lateStages: LeadStage[] = ['Test Completed', 'Appt Scheduled', '1:1 Complete', 'Report Sent'];
-      if (lateStages.includes(lead.stage) && !lead.feesPaid) {
+      const lateStages = ['Test completed', '1:1 scheduled', 'Session complete', 'Report sent'];
+      if (lateStages.includes(stage) && !lead.feesPaid) {
         return true;
       }
 

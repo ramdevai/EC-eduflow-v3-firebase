@@ -1,9 +1,35 @@
+# dependencies
 node_modules/
+
+# build outputs
 .next/
 build/
 dist/
 coverage/
-.DS_Store
-*.log
+
+# Vercel
+.vercel
+
+# environments
 .env*
 !.env.example
+
+# debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# system files
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+
+# temporary data files
+data.json
+fb_data.js
+params.txt
+test_urls.md
+

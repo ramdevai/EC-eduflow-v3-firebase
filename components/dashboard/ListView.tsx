@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns';
 import { MoreVertical, Phone, Mail, Clock } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
-import { cn } from '@/lib/utils';
+import { cn, normalizeStage } from '@/lib/utils';
 import { LeadCard } from './LeadCard';
 
 interface ListViewProps {
@@ -15,12 +15,17 @@ interface ListViewProps {
 
 export function ListView({ leads, onLeadClick }: ListViewProps) {
   const getStageVariant = (stage: string) => {
-    switch (stage) {
-      case 'Converted': return 'success';
+    const normalized = normalizeStage(stage);
+    switch (normalized) {
+      case 'Registration requested': 
+      case 'Registration done': return 'success';
       case 'Lost': return 'error';
       case 'New': return 'info';
-      case 'Test Sent':
-      case 'Test Completed': return 'warning';
+      case 'Test sent':
+      case 'Test completed': return 'warning';
+      case '1:1 scheduled':
+      case 'Session complete':
+      case 'Report sent': return 'success';
       default: return 'default';
     }
   };
@@ -34,7 +39,6 @@ export function ListView({ leads, onLeadClick }: ListViewProps) {
             key={lead.id} 
             lead={lead} 
             onClick={onLeadClick} 
-            layoutId={`list-mobile-${lead.id}`}
           />
         ))}
       </div>
@@ -72,7 +76,7 @@ export function ListView({ leads, onLeadClick }: ListViewProps) {
                     </div>
                   </td>
                   <td className="p-4">
-                    <Badge variant={getStageVariant(lead.stage)}>{lead.stage}</Badge>
+                    <Badge variant={getStageVariant(lead.stage)}>{normalizeStage(lead.stage)}</Badge>
                   </td>
                   <td className="p-4">
                     <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">{lead.grade || 'N/A'}</div>

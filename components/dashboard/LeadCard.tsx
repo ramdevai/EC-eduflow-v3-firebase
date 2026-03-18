@@ -7,7 +7,7 @@ import { format, parseISO } from 'date-fns';
 import { Lead } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { cn } from '@/lib/utils';
+import { cn, normalizeStage } from '@/lib/utils';
 
 interface LeadCardProps {
   lead: Lead;
@@ -15,26 +15,25 @@ interface LeadCardProps {
   layoutId?: string;
 }
 
-export function LeadCard({ lead, onClick, layoutId }: LeadCardProps) {
+export function LeadCard({ lead, onClick }: LeadCardProps) {
   const getStageVariant = (stage: string) => {
-    switch (stage) {
-      case 'Converted': return 'success';
+    const normalized = normalizeStage(stage);
+    switch (normalized) {
+      case 'Registration requested': 
+      case 'Registration done': return 'success';
       case 'Lost': return 'error';
       case 'New': return 'info';
-      case 'Test Sent':
-      case 'Test Completed': return 'warning';
-      case '1:1 Complete':
-      case 'Report Sent': return 'success';
+      case 'Test sent':
+      case 'Test completed': return 'warning';
+      case '1:1 scheduled':
+      case 'Session complete':
+      case 'Report sent': return 'success';
       default: return 'default';
     }
   };
 
   return (
-    <motion.div
-      layoutId={layoutId}
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
-    >
+    <div>
       <Card 
         onClick={() => onClick(lead)}
         className="p-4 cursor-pointer hover:border-primary-400 dark:hover:border-primary-600 transition-colors group"
@@ -50,7 +49,7 @@ export function LeadCard({ lead, onClick, layoutId }: LeadCardProps) {
             </div>
           </div>
           <Badge variant={getStageVariant(lead.stage)}>
-            {lead.stage}
+            {normalizeStage(lead.stage)}
           </Badge>
         </div>
 
@@ -75,6 +74,6 @@ export function LeadCard({ lead, onClick, layoutId }: LeadCardProps) {
           <ChevronRight size={14} className="text-slate-300 dark:text-slate-600 group-hover:text-primary-500 transform group-hover:translate-x-0.5 transition-all" />
         </div>
       </Card>
-    </motion.div>
+    </div>
   );
 }

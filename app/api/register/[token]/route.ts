@@ -1,0 +1,116 @@
+import { NextResponse } from 'next/server';
+import { getSheetsClient } from '@/lib/google';
+import { getLeadByToken, updateLead } from '@/lib/db-sheets';
+import { google } from 'googleapis';
+
+async function getSystemAccessToken() {
+    const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+    if (!refreshToken || refreshToken === 'placeholder') {
+        throw new Error('System sync not configured (Refresh Token missing)');
+    }
+
+    const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET
+    );
+    oauth2Client.setCredentials({ refresh_token: refreshToken });
+    const { token } = await oauth2Client.getAccessToken();
+    if (!token) throw new Error('Failed to refresh system token');
+    return token;
+}
+
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ token: string }> }
+) {
+  const { token } = await params;
+  const sheetId = process.env.GOOGLE_SHEET_ID;
+
+  if (!sheetId || sheetId === 'placeholder') {
+    return NextResponse.json({ 
+        error: 'System not configured', 
+        details: 'GOOGLE_SHEET_ID is missing in .env.local on the server.' 
+    }, { status: 500 });
+  }
+
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+  if (!refreshToken || refreshToken === 'placeholder') {
+    return NextResponse.json({ 
+        error: 'System not configured', 
+        details: 'GOOGLE_REFRESH_TOKEN is missing in .env.local on the server.' 
+    }, { status: 500 });
+  }
+
+  try {
+    const accessToken = await getSystemAccessToken();
+    const lead = await getLeadByToken(sheetId, accessToken, token);
+
+    if (!lead) {
+      return NextResponse.json({ error: 'Invalid or expired registration link' }, { status: 404 });
+    }
+
+    // Return only necessary fields for pre-filling
+    return NextResponse.json({
+        name: lead.name,
+        phone: lead.phone,
+        email: lead.email,
+        grade: lead.grade,
+        board: lead.board,
+        address: lead.address,
+        dob: lead.dob,
+        gender: lead.gender,
+        school: lead.school,
+        hobbies: lead.hobbies,
+        fatherName: lead.fatherName,
+        fatherPhone: lead.fatherPhone,
+        fatherEmail: lead.fatherEmail,
+        fatherOccupation: lead.fatherOccupation,
+        motherName: lead.motherName,
+        motherPhone: lead.motherPhone,
+        motherEmail: lead.motherEmail,
+        motherOccupation: lead.motherOccupation,
+        source: lead.source,
+        comments: lead.comments,
+    });
+  } catch (error: any) {
+    console.error('Registration GET error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ token: string }> }
+) {
+  const { token } = await params;
+  const sheetId = process.env.GOOGLE_SHEET_ID;
+
+  if (!sheetId || sheetId === 'placeholder') {
+    return NextResponse.json({ error: 'System not configured' }, { status: 500 });
+  }
+
+  try {
+    const body = await req.json();
+    const accessToken = await getSystemAccessToken();
+    const lead = await getLeadByToken(sheetId, accessToken, token);
+
+    if (!lead) {
+      return NextResponse.json({ error: 'Invalid registration link' }, { status: 404 });
+    }
+
+    // Update the lead with form data and EXPIRE the token
+    const updates = {
+        ...body,
+        stage: lead.stage === 'Registration requested' ? 'Registration done' : lead.stage,
+        updatedAt: new Date().toISOString(),
+        registrationToken: '' // Clear token so link expires
+    };
+
+    await updateLead(sheetId, accessToken, lead.id, updates);
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Registration POST error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

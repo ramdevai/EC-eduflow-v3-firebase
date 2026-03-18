@@ -13,7 +13,9 @@ import {
   Sparkles,
   Settings,
   Database,
-  ExternalLink
+  ExternalLink,
+  Link as LinkIcon,
+  ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSession } from "next-auth/react";
@@ -23,18 +25,22 @@ import { Sidebar } from '@/components/dashboard/Sidebar';
 import { StatGrid } from '@/components/dashboard/StatGrid';
 import { KanbanView } from '@/components/dashboard/KanbanView';
 import { ListView } from '@/components/dashboard/ListView';
+import { AnalysisView } from '@/components/dashboard/AnalysisView';
 import { LeadDrawer } from '@/components/dashboard/LeadDrawer';
 import { BottomNav } from '@/components/dashboard/BottomNav';
+import { TodayView } from '@/components/dashboard/TodayView';
+import { TemplatesView } from '@/components/dashboard/TemplatesView';
+import { LostLeadsView } from '@/components/dashboard/LostLeadsView';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { cn } from '@/lib/utils';
+import { cn, normalizeStage } from '@/lib/utils';
 import { getWhatsAppLink } from '@/lib/messaging-utils';
 import { LoginScreen } from '@/components/LoginScreen';
 
 const STAGES: LeadStage[] = [
-  'New', 'Converted', 'Details Requested', 'Test Sent', 'Test Completed', 
-  'Appt Scheduled', '1:1 Complete', 'Report Sent', 'Lost'
+  'New', 'Registration requested', 'Registration done', 'Test sent', 'Test completed', 
+  '1:1 scheduled', 'Session complete', 'Report sent', 'Lost'
 ];
 
 export default function Dashboard() {
@@ -50,366 +56,668 @@ export default function Dashboard() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+  const [activeTab, setActiveTab] = useState<'leads' | 'today' | 'templates' | 'lost' | 'analysis'>('leads');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  // Clean up URL and ensure we are in a clean state after login
+  useEffect(() => {
+    if (status === "authenticated" && mounted) {
+      if (window.location.search || window.location.hash) {
+          window.history.replaceState(null, '', '/');
+      }
+      
+      const justLoggedIn = sessionStorage.getItem('just_logged_in');
+      if (justLoggedIn) {
+        window.history.replaceState(null, '', '/');
+        sessionStorage.removeItem('just_logged_in');
+      }
+    }
+  }, [status, mounted]);
+
+
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleCreateSheet = async () => {
+    setIsCreating(true);
+    try {
+      // 1. Create the sheet
+      const createRes = await fetch('/api/setup/create-sheet', { method: 'POST' });
+      const createData = await createRes.json();
+      if (!createRes.ok) throw new Error(createData.error);
+      
+      const newSheetId = createData.sheetId;
+      
+      // 2. Initialize it automatically
+      const initRes = await fetch('/api/setup/initialize-sheet', {
+        method: 'POST',
+        headers: { 'x-sheet-id': newSheetId }
+      });
+      const initData = await initRes.json();
+      if (!initRes.ok) throw new Error(initData.error);
+      
+      // 3. Save locally
+      saveSheetId(newSheetId);
+      alert('Workspace created and initialized successfully!');
+      fetchLeads();
+    } catch (err: any) {
+      alert('Creation failed: ' + err.message);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleConnectExisting = async () => {
+    const input = document.getElementById('sheet-id-input') as HTMLInputElement;
+    const id = input.value.trim();
+    if (!id) {
+        alert('Please enter a Sheet ID');
+        return;
+    }
+
+    setIsConnecting(true);
+    try {
+        // Validate the sheet format
+        const res = await fetch('/api/setup/initialize-sheet', {
+            method: 'POST',
+            headers: { 
+                'x-sheet-id': id,
+                'x-validate-only': 'true'
+            }
+        });
+        const data = await res.json();
+        
+        if (!res.ok) {
+            if (confirm(`${data.error}\n\nWould you like to run 'Fix sheet structure' now to repair these issues automatically? (No existing data will be lost)`)) {
+                setIsInitializing(true);
+                const initRes = await fetch('/api/setup/initialize-sheet', {
+                    method: 'POST',
+                    headers: { 'x-sheet-id': id }
+                });
+                if (!initRes.ok) throw new Error('Failed to initialize sheet');
+                saveSheetId(id);
+                setIsSettingsOpen(false);
+                fetchLeads();
+            }
+            return;
+        }
+
+        saveSheetId(id);
+        setIsSettingsOpen(false);
+        fetchLeads();
+    } catch (err: any) {
+        alert('Connection failed: ' + err.message);
+    } finally {
+        setIsConnecting(false);
+        setIsInitializing(false);
+    }
+  };
+
+  const handleSyncContacts = async () => {
+    if (!sheetId) return;
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/leads/sync', {
+        method: 'POST',
+        headers: { 'x-sheet-id': sheetId }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      
+      let message = `Sync complete!`;
+      if (data.added > 0) message += `\n✅ Added: ${data.added} new leads.`;
+      if (data.updated > 0) message += `\n🔄 Updated: ${data.updated} existing leads.`;
+      
+      if (data.skippedCount > 0) {
+        message += `\n⏭️ Skipped: ${data.skippedCount} (Unchanged duplicates).`;
+      }
+      if (data.added === 0 && data.updated === 0 && data.skippedCount === 0) {
+        message = "No leads found in your contacts matching 'lead'.";
+      }
+      alert(message);
+      fetchLeads();
+    } catch (err: any) {
+      alert('Sync failed: ' + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleSeedLeads = async () => {
+    if (!sheetId) return;
+    if (!confirm('This will add sample leads to your sheet. Continue?')) return;
+    setIsSeeding(true);
+    try {
+      const res = await fetch('/api/setup/seed-leads', {
+        method: 'POST',
+        headers: { 'x-sheet-id': sheetId }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert(`Successfully added ${data.count} sample leads!`);
+      fetchLeads();
+    } catch (err: any) {
+      alert('Seeding failed: ' + err.message);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  const handleInitializeSheet = async () => {
+    if (!sheetId) return;
+    setIsInitializing(true);
+    try {
+      const res = await fetch('/api/setup/initialize-sheet', {
+        method: 'POST',
+        headers: { 'x-sheet-id': sheetId }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert(data.message);
+      fetchLeads();
+    } catch (err: any) {
+      alert('Initialization failed: ' + err.message);
+    } finally {
+      setIsInitializing(false);
+    }
+  };
 
   const filteredLeads = useMemo(() => {
     return leads.filter(lead => {
       const matchesSearch = lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           lead.phone.includes(searchQuery) ||
                           (lead.email && lead.email.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesStage = selectedStage === 'All' || lead.stage === selectedStage;
-      return matchesSearch && matchesStage;
+      const matchesStage = selectedStage === 'All' || normalizeStage(lead.stage) === selectedStage;
+      
+      if (activeTab === 'lost') return lead.stage === 'Lost';
+      return matchesSearch && matchesStage && lead.stage !== 'Lost';
     });
-  }, [leads, searchQuery, selectedStage]);
+  }, [leads, searchQuery, selectedStage, activeTab]);
 
-  if (!mounted || status === "loading") return null;
-
-  // Login Gate
-  if (!session) {
-    return <LoginScreen />;
-  }
-
-  // Setup / Settings Gate
-  if (!sheetId || isSettingsOpen) {
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                <Card className="w-full max-w-lg p-10 space-y-8 shadow-2xl border-white/20">
-                    <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-600">
-                            <Database size={32} />
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-black dark:text-white">Database Setup</h2>
-                            <p className="text-slate-500 text-sm font-medium">Connect your Google Sheet to start.</p>
-                        </div>
-                    </div>
-
-                    <div className="space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Master Google Sheet ID</label>
-                            <input 
-                                defaultValue={sheetId || ''} 
-                                id="sheet-id-input"
-                                placeholder="Paste Sheet ID here..." 
-                                className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 rounded-2xl font-mono text-xs outline-none focus:border-primary-500 transition-all" 
-                            />
-                            <p className="text-[10px] text-slate-400 italic px-2">
-                                Found in the URL: docs.google.com/spreadsheets/d/<span className="text-primary-600 font-bold">YOUR_ID_HERE</span>/edit
-                            </p>
-                        </div>
-
-                        <div className="bg-primary-50 dark:bg-primary-900/10 p-4 rounded-2xl border border-primary-100 dark:border-primary-900/20">
-                            <p className="text-[10px] leading-relaxed text-primary-700 dark:text-primary-400 font-medium">
-                                <b>Note:</b> You must be the owner of this sheet or have editor permissions. The app will act on your behalf using your logged-in Google account.
-                            </p>
-                        </div>
-
-                        <div className="flex gap-3">
-                            {sheetId && (
-                                <Button variant="outline" className="flex-1 h-14 rounded-2xl" onClick={() => setIsSettingsOpen(false)}>Cancel</Button>
-                            )}
-                            <Button className="flex-[2] h-14 rounded-2xl" onClick={() => {
-                                const input = document.getElementById('sheet-id-input') as HTMLInputElement;
-                                if (input.value) {
-                                    saveSheetId(input.value);
-                                    setIsSettingsOpen(false);
-                                }
-                            }}>Save & Connect</Button>
-                        </div>
-                    </div>
-                </Card>
-            </motion.div>
-        </div>
-    );
-  }
-
+  // Main Render Logic
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 pb-24 lg:pb-0">
-      {/* Mobile Sidebar Overlay */}
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] lg:hidden"
-            />
-            <motion.div 
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 left-0 w-72 z-[70] lg:hidden"
-            >
-              <Sidebar 
-                selectedStage={selectedStage} 
-                setSelectedStage={setSelectedStage} 
-                stages={STAGES} 
-                onMobileClose={() => setIsSidebarOpen(false)}
-              />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block w-72 h-screen sticky top-0 shrink-0">
-        <Sidebar 
-          selectedStage={selectedStage} 
-          setSelectedStage={setSelectedStage} 
-          stages={STAGES} 
-        />
-      </div>
-
-      <main className="flex-1 px-4 py-6 md:py-10 md:px-10 max-w-7xl mx-auto w-full overflow-hidden">
-        {/* Header */}
-        <header className="flex flex-col gap-6 mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button 
-                onClick={() => setIsSidebarOpen(true)}
-                className="lg:hidden p-2.5 -ml-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm text-slate-600 dark:text-slate-400 active:scale-95 transition-all"
-              >
-                <Menu size={20} />
-              </button>
-              <div>
-                <div className="flex items-center gap-3">
-                    <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">
-                    {selectedStage === 'All' ? 'Dashboard' : selectedStage}
-                    </h1>
-                    {reminders.length > 0 && selectedStage === 'All' && (
-                        <div className="flex items-center justify-center min-w-[24px] h-6 px-1.5 bg-red-500 text-white text-[10px] font-black rounded-full animate-bounce">
-                            {reminders.length}
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+        {!mounted || status === "loading" ? (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-center space-y-4">
+                    <RefreshCw className="w-10 h-10 animate-spin text-primary-600 mx-auto" />
+                    <p className="text-slate-500 font-medium tracking-tight">Authenticating your session...</p>
+                </div>
+            </div>
+        ) : status === "unauthenticated" ? (
+            <LoginScreen />
+        ) : !sheetId || isSettingsOpen ? (
+            <div className="min-h-screen flex items-center justify-center p-6">
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-xl">
+                    <Card className="p-8 md:p-10 space-y-10 shadow-2xl border-white/20">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-primary-100">
+                                <Database size={32} />
+                            </div>
+                            <div>
+                                <h2 className="text-3xl font-black dark:text-white tracking-tight">{sheetId ? 'Preferences' : 'Workspace Setup'}</h2>
+                                <p className="text-slate-500 text-sm font-medium">
+                                    {sheetId ? 'Manage your connected Google Sheet.' : 'Choose how you want to start with EduCompass.'}
+                                </p>
+                            </div>
                         </div>
+
+                        {!sheetId ? (
+                            <div className="space-y-6">
+                                {/* Option 1: Create New */}
+                                <button 
+                                    onClick={handleCreateSheet}
+                                    disabled={isCreating}
+                                    className="w-full text-left p-6 bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 rounded-[2rem] hover:border-primary-500 transition-all group flex items-center gap-6"
+                                >
+                                    <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl flex items-center justify-center text-emerald-600 shrink-0 group-hover:scale-110 transition-transform">
+                                        <Sparkles size={28} className={isCreating ? 'animate-spin' : ''} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-black text-slate-900 dark:text-white">Create New Workspace</h3>
+                                        <p className="text-xs text-slate-500 mt-1">Recommended. Creates a fresh sheet with all tabs and templates automatically.</p>
+                                    </div>
+                                    <ChevronRight className="text-slate-300" />
+                                </button>
+
+                                <div className="flex items-center gap-4 px-4">
+                                    <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">or connect existing</span>
+                                    <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
+                                </div>
+
+                                {/* Option 2: Link Existing */}
+                                <div className="space-y-3">
+                                    <div className="relative group">
+                                        <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={20} />
+                                        <input 
+                                            id="sheet-id-input"
+                                            placeholder="Paste your Google Sheet ID here..." 
+                                            className="w-full pl-12 pr-4 py-5 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all dark:text-white" 
+                                        />
+                                    </div>
+                                    <Button 
+                                        className="w-full h-16 rounded-2xl text-lg font-black shadow-lg"
+                                        onClick={handleConnectExisting}
+                                        disabled={isConnecting}
+                                    >
+                                        {isConnecting ? 'Validating...' : 'Connect Existing Sheet'}
+                                    </Button>
+                                    <p className="text-[10px] text-slate-400 italic text-center px-4">
+                                        Sheet ID is in the URL: docs.google.com/spreadsheets/d/<span className="text-primary-600 font-bold">YOUR_ID</span>/edit
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-8">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Connected Google Sheet ID</label>
+                                    <div className="flex gap-2">
+                                        <input 
+                                            defaultValue={sheetId} 
+                                            id="sheet-id-input"
+                                            className="flex-1 p-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 rounded-2xl font-mono text-xs outline-none focus:border-primary-500 transition-all dark:text-white" 
+                                        />
+                                        <Button variant="outline" className="h-14 w-14 p-0 rounded-2xl" onClick={() => window.open(`https://docs.google.com/spreadsheets/d/${sheetId}/edit`, '_blank')}>
+                                            <ExternalLink size={20} />
+                                        </Button>
+                                    </div>
+                                    <div className="flex items-center gap-2 px-2 mt-1">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                        <span className="text-[10px] font-black text-emerald-600 tracking-widest uppercase">Live Workspace</span>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Button variant="outline" className="h-14 rounded-2xl font-bold" onClick={() => setIsSettingsOpen(false)}>Close</Button>
+                                    <Button className="h-14 rounded-2xl font-black" onClick={handleConnectExisting} disabled={isConnecting}>
+                                        {isConnecting ? 'Updating...' : 'Update Sheet'}
+                                    </Button>
+                                </div>
+
+                                <div className="pt-6 border-t border-slate-100 dark:border-slate-800 space-y-6">
+                                    <div className="text-center space-y-1">
+                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">CRM Database Maintenance</h4>
+                                        <p className="text-[9px] text-slate-400 italic">Essential tools to keep your Google Sheet synchronized and healthy.</p>
+                                    </div>
+                                    
+                                    <div className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Button 
+                                                variant="secondary" 
+                                                className="w-full h-12 rounded-xl text-xs gap-2"
+                                                onClick={handleInitializeSheet}
+                                                disabled={isInitializing}
+                                            >
+                                                <RefreshCw size={16} className={isInitializing ? 'animate-spin' : ''} />
+                                                Fix sheet structure
+                                            </Button>
+                                            <p className="text-[9px] text-slate-500 dark:text-slate-400 text-center px-4 leading-relaxed">
+                                                Checks your spreadsheet for missing columns or tabs and repairs them automatically. 
+                                                <span className="font-bold text-emerald-600 dark:text-emerald-500"> Your existing lead data will not be lost or changed.</span>
+                                            </p>
+                                        </div>
+                                        
+                                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800/50">
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-full h-12 rounded-xl text-[10px] gap-2 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-primary-600 transition-all"
+                                                onClick={handleSeedLeads}
+                                                disabled={isSeeding}
+                                            >
+                                                <Plus size={14} className={isSeeding ? 'animate-spin' : ''} />
+                                                Seed Sample Data (Testing Only)
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="bg-primary-50 dark:bg-primary-900/10 p-5 rounded-[2rem] border border-primary-100 dark:border-primary-900/20 flex gap-4 items-start">
+                            <AlertCircle className="text-primary-600 shrink-0 mt-0.5" size={18} />
+                            <p className="text-xs leading-relaxed text-primary-700 dark:text-primary-400 font-medium">
+                                The app acts on your behalf using your Google account. Ensure you have Edit permissions for the connected sheet.
+                            </p>
+                        </div>
+                    </Card>
+                </motion.div>
+            </div>
+        ) : (
+            <div className="flex min-h-screen pb-24 lg:pb-0">
+                {/* Mobile Sidebar Overlay */}
+                <AnimatePresence>
+                    {isSidebarOpen && (
+                        <motion.div 
+                            key="mobile-sidebar-container"
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
+                            className="fixed inset-0 z-[60] lg:hidden"
+                        >
+                            <motion.div 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                onClick={() => setIsSidebarOpen(false)}
+                                className="absolute inset-0 bg-slate-900/40"
+                            />
+                            <motion.div 
+                                initial={{ x: '-100%' }}
+                                animate={{ x: 0 }}
+                                exit={{ x: '-100%' }}
+                                transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
+                                className="absolute inset-y-0 left-0 w-72 z-[70] will-change-transform"
+                            >
+                                <Sidebar 
+                                    activeTab={activeTab} 
+                                    setActiveTab={setActiveTab} 
+                                    onMobileClose={() => setIsSidebarOpen(false)}
+                                    onPreferencesClick={() => setIsSettingsOpen(true)}
+                                />
+                            </motion.div>
+                        </motion.div>
                     )}
+                </AnimatePresence>
+
+                {/* Desktop Sidebar */}
+                <div className="hidden lg:block w-72 h-screen sticky top-0 shrink-0">
+                    <Sidebar 
+                        activeTab={activeTab} 
+                        setActiveTab={setActiveTab} 
+                        onPreferencesClick={() => setIsSettingsOpen(true)}
+                    />
                 </div>
-                <div className="flex items-center gap-1.5 mt-1">
-                    <Sparkles size={12} className="text-primary-500" />
-                    <p className="text-[10px] md:text-xs text-slate-500 font-bold uppercase tracking-widest">EduCompass CRM</p>
-                </div>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="w-10 h-10 p-0 rounded-xl">
-                <Settings size={18} />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => fetchLeads()} className="w-10 h-10 p-0 rounded-xl">
-                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-              </Button>
-              <Button className="hidden md:flex" onClick={() => setIsAddModalOpen(true)}>
-                <Plus size={18} />
-                Add Lead
-              </Button>
-            </div>
-          </div>
-
-          <StatGrid leads={leads} />
-        </header>
-
-        {/* Action Bar */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-           <div className="relative flex-1 group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search by name, phone..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 shadow-sm transition-all dark:placeholder:text-slate-600"
-            />
-          </div>
-          
-          <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-1.5 shadow-sm self-end sm:self-auto">
-            <button 
-              onClick={() => setViewMode('list')}
-              className={cn(
-                "flex-1 sm:flex-none px-4 py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest",
-                viewMode === 'list' ? "bg-primary-600 text-white shadow-lg shadow-primary-200 dark:shadow-none" : "text-slate-400 hover:text-slate-600"
-              )}
-            >
-              <ListIcon size={16} />
-              <span className="hidden sm:inline">List</span>
-            </button>
-            <button 
-              onClick={() => setViewMode('kanban')}
-              className={cn(
-                "flex-1 sm:flex-none px-4 py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest",
-                viewMode === 'kanban' ? "bg-primary-600 text-white shadow-lg shadow-primary-200 dark:shadow-none" : "text-slate-400 hover:text-slate-600"
-              )}
-            >
-              <LayoutGrid size={16} />
-              <span className="hidden sm:inline">Kanban</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Attention Items */}
-        {reminders.length > 0 && (
-          <section className="mb-10 overflow-hidden">
-            <div className="flex items-center gap-2 mb-4 px-1">
-              <AlertCircle size={16} className="text-amber-500" />
-              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Attention Required</h3>
-              <span className="ml-auto bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-full">{reminders.length}</span>
-            </div>
-            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
-              {reminders.map(lead => (
-                <Card key={lead.id} className="min-w-[280px] md:min-w-[320px] p-4 border-l-4 border-amber-500 bg-white dark:bg-slate-900 snap-center shadow-md">
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-bold text-slate-900 dark:text-slate-100">{lead.name}</h4>
-                    <Badge variant={lead.stage === 'Report Sent' ? 'success' : 'warning'}>
-                        {lead.stage === 'New' ? 'Overdue' : 
-                         lead.stage === 'Test Sent' ? 'Nudge' : 
-                         lead.stage === 'Report Sent' ? 'Review' : 
-                         !lead.feesPaid ? 'Fees' : 'Follow-up'}
-                    </Badge>
-                  </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-4 line-clamp-2">
-                    {lead.stage === 'New' ? 'Lead hasn\'t converted in 4 days. Time for a call.' : 
-                     lead.stage === 'Test Sent' ? 'Test link sent over 48h ago. Nudge for completion.' :
-                     lead.stage === '1:1 Complete' ? 'Counseling done. Prepare and send the report.' :
-                     lead.stage === 'Report Sent' ? 'Report sent 2 days ago. Ask for a Google review.' :
-                     !lead.feesPaid ? 'Student is active but professional fees are pending.' :
-                     'Action required for this student profile.'}
-                  </p>
-                  <div className="flex gap-2 mt-auto">
-                    <Button size="sm" variant="outline" className="flex-1 rounded-xl text-[10px]" onClick={() => setSelectedLead(lead)}>Details</Button>
-                    <Button size="sm" className="flex-1 rounded-xl text-[10px]" onClick={() => {
-                        if (lead.stage === 'Report Sent') {
-                            window.open(getWhatsAppLink(lead, 'review'), '_blank');
-                        } else {
-                            window.open(getWhatsAppLink(lead, 'followup'), '_blank');
-                        }
-                    }}>
-                        {lead.stage === 'Report Sent' ? 'Ask Review' : 'WhatsApp'}
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* View Content */}
-        <div className="relative">
-            {error && (
-                <div className="p-4 mb-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-2xl text-red-600 text-xs font-bold">
-                    Error: {error}. Please check your Sheet ID or Google permissions.
-                </div>
-            )}
-            {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
-                {[1, 2, 3].map(i => (
-                <div key={i} className="h-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem]" />
-                ))}
-            </div>
-            ) : (
-            viewMode === 'kanban' ? (
-                <KanbanView 
-                leads={leads} 
-                stages={STAGES} 
-                onLeadClick={setSelectedLead} 
-                searchQuery={searchQuery}
-                />
-            ) : (
-                <ListView 
-                leads={filteredLeads} 
-                onLeadClick={setSelectedLead} 
-                />
-            )
-            )}
-        </div>
-      </main>
-
-      {/* Mobile Bottom Navigation */}
-      <BottomNav 
-        selectedStage={selectedStage}
-        setSelectedStage={setSelectedStage}
-        onAddClick={() => setIsAddModalOpen(true)}
-      />
-
-      {/* Overlays */}
-      <LeadDrawer 
-        lead={selectedLead} 
-        onClose={() => setSelectedLead(null)} 
-        onUpdate={updateLead}
-        onDelete={deleteLead}
-        stages={STAGES}
-      />
-
-      {/* Modern Add Modal */}
-      <AnimatePresence>
-        {isAddModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsAddModalOpen(false)} className="absolute inset-0 bg-slate-950/80 backdrop-blur-md" />
-            <motion.div 
-                initial={{ scale: 0.9, opacity: 0, y: 20 }} 
-                animate={{ scale: 1, opacity: 1, y: 0 }} 
-                exit={{ scale: 0.9, opacity: 0, y: 20 }} 
-                className="relative bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-lg p-8 shadow-2xl overflow-hidden border border-white/20"
-            >
-               <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-primary-600" />
-               <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h3 className="text-2xl font-black dark:text-white tracking-tight">New Inquiry</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Add a student to your pipeline.</p>
-                </div>
-                <Button variant="ghost" className="rounded-full w-12 h-12 p-0 bg-slate-50 dark:bg-slate-800" onClick={() => setIsAddModalOpen(false)}>
-                  <X size={24} />
-                </Button>
-               </div>
-               
-               <form className="space-y-4" onSubmit={async (e) => {
-                 e.preventDefault();
-                 const fd = new FormData(e.currentTarget);
-                 try {
-                    await addLead({
-                        name: fd.get('name') as string,
-                        phone: fd.get('phone') as string,
-                        email: fd.get('email') as string,
-                        grade: fd.get('grade') as string,
-                        board: fd.get('board') as string,
-                    });
-                    setIsAddModalOpen(false);
-                 } catch (err) {
-                    alert('Failed to add lead. Check your sheet ID and permissions.');
-                 }
-               }}>
-                  <div className="space-y-4">
-                    <div className="group">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Full Name</label>
-                        <input name="name" required placeholder="Student Name" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
-                    </div>
-                    <div className="group">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Contact Number</label>
-                        <input name="phone" required placeholder="+91 00000 00000" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
-                    </div>
-                    <div className="group">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Email Address</label>
-                        <input name="email" placeholder="example@mail.com" type="email" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="group">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Grade</label>
-                            <input name="grade" placeholder="e.g. 10th" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
+                <main className="flex-1 px-4 py-6 md:py-10 md:px-10 max-w-7xl mx-auto w-full overflow-hidden">
+                    {/* Header */}
+                    <header className="flex flex-col gap-6 mb-8">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => setIsSidebarOpen(true)}
+                            className="lg:hidden p-2.5 -ml-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm text-slate-600 dark:text-slate-400 active:scale-95 transition-all"
+                        >
+                            <Menu size={20} />
+                        </button>
+                        <div>
+                            <div className="flex items-center gap-3">
+                                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none">
+                                {activeTab === 'today' ? "Today's Agenda" : 
+                                 activeTab === 'templates' ? 'Message Templates' : 
+                                 activeTab === 'lost' ? 'Lost Deals' : 
+                                 activeTab === 'analysis' ? 'Business Analysis' :
+                                 (selectedStage === 'All' ? 'Pipeline' : selectedStage)}
+                                </h1>
+                                {activeTab === 'leads' && reminders.length > 0 && selectedStage === 'All' && (
+                                    <div className="flex items-center justify-center min-w-[24px] h-6 px-1.5 bg-red-500 text-white text-[10px] font-black rounded-full">
+                                        {reminders.length}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                                <Sparkles size={12} className="text-primary-500" />
+                                <p className="text-[10px] md:text-xs text-slate-500 font-bold uppercase tracking-widest">EduCompass CRM</p>
+                            </div>
                         </div>
-                        <div className="group">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Board</label>
-                            <input name="board" placeholder="e.g. CBSE" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="w-10 h-10 p-0 rounded-xl">
+                            <Settings size={18} />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => fetchLeads()} className="w-10 h-10 p-0 rounded-xl">
+                            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+                        </Button>
+                        {activeTab === 'leads' && (
+                            <>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={handleSyncContacts} 
+                                className={cn("h-10 px-4 rounded-xl hidden md:flex gap-2 text-xs font-bold", isSyncing && "opacity-50")}
+                                disabled={isSyncing}
+                            >
+                                <Sparkles size={16} className={isSyncing ? 'animate-spin' : ''} />
+                                {isSyncing ? 'Syncing...' : 'Sync Contacts'}
+                            </Button>
+                            <Button className="hidden md:flex" onClick={() => setIsAddModalOpen(true)}>
+                                <Plus size={18} />
+                                Add Lead
+                            </Button>
+                            </>
+                        )}
                         </div>
                     </div>
-                  </div>
-                  <Button type="submit" className="w-full py-5 text-lg font-black rounded-2xl mt-6 shadow-xl shadow-primary-200 dark:shadow-none">Create Lead Profile</Button>
-               </form>
-            </motion.div>
-          </div>
+
+                    {activeTab === 'leads' && <StatGrid leads={leads} />}
+                    </header>
+
+                    {activeTab === 'leads' && (
+                    <>
+                        {/* Action Bar */}
+                        <div className="flex items-center gap-2 md:gap-4 mb-8">
+                        <div className="relative flex-1 group">
+                            <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={16} />
+                            <input 
+                            type="text" 
+                            placeholder="Search..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 md:pl-12 pr-4 py-2.5 md:py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs md:text-sm outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 shadow-sm transition-all dark:placeholder:text-slate-600"
+                            />
+                        </div>
+                        
+                        <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-1 shadow-sm shrink-0">
+                            <button 
+                            onClick={() => setViewMode('list')}
+                            className={cn(
+                                "p-2 md:px-4 md:py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest",
+                                viewMode === 'list' ? "bg-primary-600 text-white shadow-lg shadow-primary-200 dark:shadow-none" : "text-slate-400 hover:text-slate-600"
+                            )}
+                            >
+                            <ListIcon size={16} />
+                            <span className="hidden md:inline">List</span>
+                            </button>
+                            <button 
+                            onClick={() => setViewMode('kanban')}
+                            className={cn(
+                                "p-2 md:px-4 md:py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest",
+                                viewMode === 'kanban' ? "bg-primary-600 text-white shadow-lg shadow-primary-200 dark:shadow-none" : "text-slate-400 hover:text-slate-600"
+                            )}
+                            >
+                            <LayoutGrid size={16} />
+                            <span className="hidden md:inline">Kanban</span>
+                            </button>
+                        </div>
+                        </div>
+
+                        {/* Attention Items */}
+                        {reminders.length > 0 && (
+                        <section className="mb-10 overflow-hidden">
+                            <div className="flex items-center gap-2 mb-4 px-1">
+                            <AlertCircle size={16} className="text-amber-500" />
+                            <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Attention Required</h3>
+                            <span className="ml-auto bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-full">{reminders.length}</span>
+                            </div>
+                            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
+                            {reminders.map(lead => (
+                                <Card key={lead.id} className="min-w-[280px] md:min-w-[320px] p-4 border-l-4 border-amber-500 bg-white dark:bg-slate-900 snap-center shadow-md">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h4 className="font-bold text-slate-900 dark:text-slate-100">{lead.name}</h4>
+                                    <Badge variant={lead.stage === 'Report sent' ? 'success' : 'warning'}>
+                                        {lead.stage === 'New' ? 'Overdue' : 
+                                        lead.stage === 'Test sent' ? 'Nudge' : 
+                                        lead.stage === 'Report sent' ? 'Review' : 
+                                        !lead.feesPaid ? 'Fees' : 'Follow-up'}
+                                    </Badge>
+                                </div>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-4 line-clamp-2">
+                                    {lead.stage === 'New' ? 'Lead hasn\'t converted in 4 days. Time for a call.' : 
+                                    lead.stage === 'Test sent' ? 'Test link sent over 48h ago. Nudge for completion.' :
+                                    lead.stage === 'Session complete' ? 'Counseling done. Prepare and send the report.' :
+                                    lead.stage === 'Report sent' ? 'Report sent 2 days ago. Ask for a Google review.' :
+                                    !lead.feesPaid ? 'Student is active but professional fees are pending.' :
+                                    'Action required for this student profile.'}
+                                </p>
+                                <div className="flex gap-2 mt-auto">
+                                    <Button size="sm" variant="outline" className="flex-1 rounded-xl text-[10px]" onClick={() => setSelectedLead(lead)}>Details</Button>
+                                    <Button size="sm" className="flex-1 rounded-xl text-[10px]" onClick={() => {
+                                        if (lead.stage === 'Report sent') {
+                                            window.open(getWhatsAppLink(lead, 'review'), '_blank');
+                                        } else {
+                                            window.open(getWhatsAppLink(lead, 'followup'), '_blank');
+                                        }
+                                    }}>
+                                        {lead.stage === 'Report sent' ? 'Ask Review' : 'WhatsApp'}
+                                    </Button>
+                                </div>
+                                </Card>
+                            ))}
+                            </div>
+                        </section>
+                        )}
+
+                        {/* View Content */}
+                        <div className="relative">
+                            {error && (
+                                <div className="p-4 mb-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-2xl text-red-600 text-xs font-bold">
+                                    Error: {error}. Please check your Sheet ID or Google permissions.
+                                </div>
+                            )}
+                            {loading ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+                                {[1, 2, 3].map(i => (
+                                <div key={i} className="h-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem]" />
+                                ))}
+                            </div>
+                            ) : (
+                            viewMode === 'kanban' ? (
+                                <KanbanView 
+                                leads={leads} 
+                                stages={STAGES.filter(s => s !== 'Lost')} 
+                                onLeadClick={setSelectedLead} 
+                                searchQuery={searchQuery}
+                                />
+                            ) : (
+                                <ListView 
+                                leads={filteredLeads} 
+                                onLeadClick={setSelectedLead} 
+                                />
+                            )
+                            )}
+                        </div>
+                    </>
+                    )}
+
+                    {activeTab === 'today' && <TodayView leads={leads} />}
+                    {activeTab === 'templates' && <TemplatesView sheetId={sheetId!} />}
+                    {activeTab === 'lost' && <LostLeadsView leads={leads} updateLead={updateLead} />}
+                    {activeTab === 'analysis' && <AnalysisView leads={leads} />}
+                </main>
+
+                {/* Mobile Bottom Navigation */}
+                <BottomNav 
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    onAddClick={() => setIsAddModalOpen(true)}
+                    onSyncClick={handleSyncContacts}
+                    isSyncing={isSyncing}
+                />
+
+                {/* Overlays */}
+                <LeadDrawer 
+                    lead={selectedLead} 
+                    onClose={() => setSelectedLead(null)} 
+                    onUpdate={updateLead}
+                    onDelete={deleteLead}
+                    fetchLeads={fetchLeads}
+                    stages={STAGES}
+                />
+
+                {/* Modern Add Modal */}
+                <AnimatePresence mode="wait">
+                    {isAddModalOpen && (
+                    <motion.div 
+                        key="add-modal-backdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-950/80 backdrop-blur-sm"
+                    >
+                        <motion.div 
+                            key="add-modal-content"
+                            initial={{ scale: 0.95, opacity: 0 }} 
+                            animate={{ scale: 1, opacity: 1 }} 
+                            exit={{ scale: 0.95, opacity: 0 }} 
+                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-lg p-8 shadow-2xl overflow-hidden border border-white/20"
+                        >
+                        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-400 to-primary-600" />
+                        <div className="flex items-center justify-between mb-8">
+                            <div>
+                            <h3 className="text-2xl font-black dark:text-white tracking-tight">New Inquiry</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Add a student to your pipeline.</p>
+                            </div>
+                            <Button variant="ghost" className="rounded-full w-12 h-12 p-0 bg-slate-50 dark:bg-slate-800" onClick={() => setIsAddModalOpen(false)}>
+                            <X size={24} />
+                            </Button>
+                        </div>
+                        
+                        <form className="space-y-4" onSubmit={async (e) => {
+                            e.preventDefault();
+                            const fd = new FormData(e.currentTarget);
+                            try {
+                                await addLead({
+                                    name: fd.get('name') as string,
+                                    phone: fd.get('phone') as string,
+                                    email: fd.get('email') as string,
+                                    grade: fd.get('grade') as string,
+                                    board: fd.get('board') as string,
+                                });
+                                setIsAddModalOpen(false);
+                            } catch (err) {
+                                alert('Failed to add lead. Check your sheet ID and permissions.');
+                            }
+                        }}>
+                            <div className="space-y-4">
+                                <div className="group">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Full Name</label>
+                                    <input name="name" required placeholder="Student Name" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
+                                </div>
+                                <div className="group">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Contact Number</label>
+                                    <input name="phone" required placeholder="+91 00000 00000" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
+                                </div>
+                                <div className="group">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Email Address</label>
+                                    <input name="email" placeholder="example@mail.com" type="email" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="group">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Grade</label>
+                                        <input name="grade" placeholder="e.g. 10th" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
+                                    </div>
+                                    <div className="group">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Board</label>
+                                        <input name="board" placeholder="e.g. CBSE" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
+                                    </div>
+                                </div>
+                            </div>
+                            <Button type="submit" className="w-full py-5 text-lg font-black rounded-2xl mt-6 shadow-xl shadow-primary-200 dark:shadow-none">Create Lead Profile</Button>
+                        </form>
+                        </motion.div>
+                    </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
         )}
-      </AnimatePresence>
     </div>
   );
 }

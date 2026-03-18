@@ -1,11 +1,20 @@
 "use client";
 
-import { signIn, signOut } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { Button } from "./ui/Button";
 import { GraduationCap, LogIn, UserCircle } from "lucide-react";
 import { Card } from "./ui/Card";
+import { useEffect } from "react";
 
 export function LoginScreen() {
+  const { status } = useSession();
+  
+  useEffect(() => {
+    if (status === "authenticated") {
+        window.location.replace("/");
+    }
+  }, [status]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
       <Card className="w-full max-w-md p-10 text-center space-y-8 shadow-2xl border-white/20">
@@ -24,7 +33,10 @@ export function LoginScreen() {
                 Welcome back! Please sign in with your Google account to access your counseling dashboard and sync leads.
             </p>
             <Button 
-                onClick={() => signIn("google")} 
+                onClick={() => {
+                    sessionStorage.setItem('just_logged_in', 'true');
+                    signIn("google", { callbackUrl: "/", redirect: true });
+                }} 
                 className="w-full h-14 rounded-2xl bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-all font-bold gap-3"
             >
                 <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />

@@ -8,7 +8,10 @@ import {
   UserCircle,
   LayoutDashboard,
   Calendar,
-  LogOut
+  LogOut,
+  MessageSquare,
+  TrendingDown,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LeadStage } from '@/lib/types';
@@ -16,13 +19,13 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useSession, signOut } from "next-auth/react";
 
 interface SidebarProps {
-  selectedStage: LeadStage | 'All';
-  setSelectedStage: (stage: LeadStage | 'All') => void;
-  stages: LeadStage[];
+  activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis';
+  setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis') => void;
   onMobileClose?: () => void;
+  onPreferencesClick?: () => void;
 }
 
-export function Sidebar({ selectedStage, setSelectedStage, stages, onMobileClose }: SidebarProps) {
+export function Sidebar({ activeTab, setActiveTab, onMobileClose, onPreferencesClick }: SidebarProps) {
   const { data: session } = useSession();
   const NavButton = ({ 
     icon: Icon, 
@@ -82,33 +85,46 @@ export function Sidebar({ selectedStage, setSelectedStage, stages, onMobileClose
           <nav className="space-y-1">
             <NavButton 
               icon={LayoutDashboard} 
-              label="All Leads" 
-              isActive={selectedStage === 'All'} 
-              onClick={() => setSelectedStage('All')} 
+              label="Pipeline" 
+              isActive={activeTab === 'leads'} 
+              onClick={() => setActiveTab('leads')} 
             />
-          </nav>
-        </section>
-
-        <section>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4 px-4">Pipeline Stages</p>
-          <nav className="space-y-1">
-            {stages.map(stage => (
-              <NavButton 
-                key={stage}
-                icon={Users} 
-                label={stage} 
-                isActive={selectedStage === stage} 
-                onClick={() => setSelectedStage(stage)} 
-              />
-            ))}
+            <NavButton 
+              icon={BarChart3} 
+              label="Analysis" 
+              isActive={activeTab === 'analysis'} 
+              onClick={() => setActiveTab('analysis')} 
+            />
+            <NavButton 
+              icon={Calendar} 
+              label="Today" 
+              isActive={activeTab === 'today'} 
+              onClick={() => setActiveTab('today')} 
+            />
+            <NavButton 
+              icon={TrendingDown} 
+              label="Deals Lost" 
+              isActive={activeTab === 'lost'} 
+              onClick={() => setActiveTab('lost')} 
+            />
           </nav>
         </section>
 
         <section>
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4 px-4">Settings</p>
           <nav className="space-y-1">
-            <NavButton icon={UserCircle} label="Profile" isActive={false} onClick={() => {}} />
-            <NavButton icon={Settings} label="Preferences" isActive={false} onClick={() => {}} />
+            <NavButton 
+              icon={MessageSquare} 
+              label="Message Templates" 
+              isActive={activeTab === 'templates'} 
+              onClick={() => setActiveTab('templates')} 
+            />
+            <NavButton 
+                icon={Settings} 
+                label="Database Setup" 
+                isActive={false} 
+                onClick={() => onPreferencesClick?.()} 
+            />
           </nav>
         </section>
       </div>

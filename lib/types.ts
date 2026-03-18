@@ -1,13 +1,15 @@
 export type LeadStage = 
   | 'New' 
-  | 'Converted' 
-  | 'Details Requested' 
-  | 'Test Sent' 
-  | 'Test Completed' 
-  | 'Appt Scheduled' 
-  | '1:1 Complete' 
-  | 'Report Sent' 
+  | 'Registration requested' 
+  | 'Registration done' 
+  | 'Test sent' 
+  | 'Test completed' 
+  | '1:1 scheduled' 
+  | 'Session complete' 
+  | 'Report sent'
   | 'Lost';
+
+export type LeadStatus = 'Open' | 'Won' | 'Lost';
 
 export interface Lead {
   // Basic & System
@@ -16,8 +18,10 @@ export interface Lead {
   phone: string;
   email: string;
   stage: LeadStage;
+  status: LeadStatus;
   inquiryDate: string;
   updatedAt: string;
+  lastStageUpdate?: string; // New field to track stage change duration
   googleContactId?: string;
 
   // From Registration Form
@@ -56,6 +60,8 @@ export interface Lead {
   convertedDate: string;
   reportPdfUrl?: string;
   communityJoined: boolean;
+  registrationToken?: string;
+  calendarEventId?: string;
 }
 
 export const TEST_LINKS: Record<string, string> = {

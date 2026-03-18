@@ -1,15 +1,19 @@
 import { Lead, TEST_LINKS } from './types';
 
 export const WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/example-group-link";
-export const REGISTRATION_FORM_LINK = "https://forms.gle/Cab1hdnxPz2t1P6r8";
 
 export function getWhatsAppLink(lead: Lead, type: 'onboarding' | 'test' | 'followup' | 'community' | 'review') {
   const phone = lead.phone.replace(/\D/g, '');
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
   let message = "";
 
   switch (type) {
     case 'onboarding':
-      message = `Hi ${lead.name}, this is Binal from EduCompass. Great to have you onboard! Please fill this registration form to share student details: ${REGISTRATION_FORM_LINK}`;
+      // Use internal registration flow
+      const token = lead.registrationToken || 'PENDING';
+      const formUrl = `${origin}/register/${token}`;
+      
+      message = `Hi ${lead.name}, this is Binal from EduCompass. Great to have you onboard! Please fill this registration form to share student details: ${formUrl}`;
       break;
     case 'test':
       const testLink = getTestLinkByGrade(lead.grade, lead.board);

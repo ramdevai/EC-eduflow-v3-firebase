@@ -29,7 +29,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { Lead, LeadStage } from '@/lib/types';
+import { Lead, LeadStage, FeesPaidStatus } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -63,7 +63,7 @@ interface LeadDrawerProps {
 export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages }: LeadDrawerProps) {
   const [activeSection, setActiveSection] = useState<string | null>('pipeline');
   const [localStage, setLocalStage] = useState<LeadStage | null>(null);
-  const [localFeesPaid, setLocalFeesPaid] = useState<boolean>(false);
+  const [localFeesPaid, setLocalFeesPaid] = useState<FeesPaidStatus>('Due');
   const [showRawData, setShowRawData] = useState(false);
   const [copied, setCopied] = useState(false);
   
@@ -338,13 +338,13 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                 <div className="flex gap-2">
                 <div className="flex-1 flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
                     <AlertCircle size={16} className="text-amber-500" />
-                    <select 
+                        <select 
                         className="flex-1 bg-transparent font-bold text-xs outline-none"
-                        value={localFeesPaid ? 'paid' : 'due'}
+                        value={localFeesPaid === 'Paid' ? 'paid' : 'due'}
                         onChange={(e) => {
-                            const isPaid = e.target.value === 'paid';
-                            setLocalFeesPaid(isPaid);
-                            onUpdate(lead.id, { feesPaid: isPaid });
+                            const status: FeesPaidStatus = e.target.value === 'paid' ? 'Paid' : 'Due';
+                            setLocalFeesPaid(status);
+                            onUpdate(lead.id, { feesPaid: status });
                         }}
                     >
                         <option value="due">Fees due</option>
@@ -381,11 +381,11 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                         <Check size={16} className={cn(localFeesPaid ? "text-emerald-500" : "text-slate-300")} />
                         <select 
                             className="flex-1 bg-transparent font-bold text-xs outline-none"
-                            value={localFeesPaid ? 'paid' : 'due'}
+                            value={localFeesPaid === 'Paid' ? 'paid' : 'due'}
                             onChange={(e) => {
-                                const isPaid = e.target.value === 'paid';
-                                setLocalFeesPaid(isPaid);
-                                onUpdate(lead.id, { feesPaid: isPaid });
+                                const status: FeesPaidStatus = e.target.value === 'paid' ? 'Paid' : 'Due';
+                                setLocalFeesPaid(status);
+                                onUpdate(lead.id, { feesPaid: status });
                             }}
                         >
                             <option value="due">Fees due</option>
@@ -410,11 +410,11 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                         <Check size={16} className={cn(localFeesPaid ? "text-emerald-500" : "text-slate-300")} />
                         <select 
                             className="flex-1 bg-transparent font-bold text-xs outline-none"
-                            value={localFeesPaid ? 'paid' : 'due'}
+                            value={localFeesPaid === 'Paid' ? 'paid' : 'due'}
                             onChange={(e) => {
-                                const isPaid = e.target.value === 'paid';
-                                setLocalFeesPaid(isPaid);
-                                onUpdate(lead.id, { feesPaid: isPaid });
+                                const status: FeesPaidStatus = e.target.value === 'paid' ? 'Paid' : 'Due';
+                                setLocalFeesPaid(status);
+                                onUpdate(lead.id, { feesPaid: status });
                             }}
                         >
                             <option value="due">Fees due</option>

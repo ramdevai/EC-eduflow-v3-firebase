@@ -1,5 +1,5 @@
 import { getSheetsClient } from './google';
-import { Lead, LeadStage, LeadStatus } from './types';
+import { Lead, LeadStage, LeadStatus, FeesPaidStatus, CommunityJoinedStatus } from './types';
 
 const RANGE = 'Leads!A2:AO';
 
@@ -36,56 +36,79 @@ export async function getAllLeads(spreadsheetId: string, accessToken: string): P
 }
 
 export async function addLead(spreadsheetId: string, accessToken: string, lead: Partial<Lead>): Promise<number> {
-  const sheets = await getSheetsClient(accessToken);
-  const leads = await getAllLeads(spreadsheetId, accessToken);
-  const newId = leads.length > 0 ? Math.max(...leads.map(l => l.id)) + 1 : 1;
+  const ids = await addLeads(spreadsheetId, accessToken, [lead]);
+  return ids[0];
+}
 
-  const row = mapLeadToRow({
-    ...lead,
-    id: newId,
-    inquiryDate: lead.inquiryDate || new Date().toISOString(),
-    stage: lead.stage || 'New',
-    status: lead.status || 'Open',
-    updatedAt: new Date().toISOString(),
-    registrationToken: lead.registrationToken || generateRegistrationToken(),
-    notes: lead.notes || '',
-    lastFollowUp: lead.lastFollowUp || '',
-    testLink: lead.testLink || '',
-    appointmentTime: lead.appointmentTime || '',
-    feesPaid: lead.feesPaid || false,
-    reportSentDate: lead.reportSentDate || '',
-    convertedDate: lead.convertedDate || '',
-    communityJoined: lead.communityJoined || false,
-  } as Lead);
+export async function addLeads(spreadsheetId: string, accessToken: string, leads: Partial<Lead>[]): Promise<number[]> {
+  if (leads.length === 0) return [];
+  const sheets = await getSheetsClient(accessToken);
+  const existingLeads = await getAllLeads(spreadsheetId, accessToken);
+  let nextId = existingLeads.length > 0 ? Math.max(...existingLeads.map(l => l.id).filter(id => !isNaN(id))) + 1 : 1;
+
+  const preparedLeads = leads.map(lead => {
+    const id = nextId++;
+    return {
+      ...lead,
+      id,
+      inquiryDate: lead.inquiryDate || new Date().toISOString(),
+      stage: lead.stage || 'New',
+      status: lead.status || 'Open',
+      updatedAt: new Date().toISOString(),
+      registrationToken: lead.registrationToken || generateRegistrationToken(),
+      notes: lead.notes || '',
+      lastFollowUp: lead.lastFollowUp || '',
+      testLink: lead.testLink || '',
+      appointmentTime: lead.appointmentTime || '',
+      feesPaid: lead.feesPaid || 'Due',
+      reportSentDate: lead.reportSentDate || '',
+      convertedDate: lead.convertedDate || '',
+      communityJoined: lead.communityJoined || 'No',
+    } as Lead;
+  });
+
+  const rows = preparedLeads.map(mapLeadToRow);
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: spreadsheetId,
     range: 'Leads!A:A',
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [row],
+      values: rows,
     },
   });
 
-  return newId;
+  return preparedLeads.map(l => l.id);
 }
 
 export async function updateLead(spreadsheetId: string, accessToken: string, id: number, updates: Partial<Lead>): Promise<void> {
+  await updateLeads(spreadsheetId, accessToken, [{ id, data: updates }]);
+}
+
+export async function updateLeads(spreadsheetId: string, accessToken: string, updates: { id: number; data: Partial<Lead> }[]): Promise<void> {
+  if (updates.length === 0) return;
   const sheets = await getSheetsClient(accessToken);
-  const leads = await getAllLeads(spreadsheetId, accessToken);
-  const index = leads.findIndex(l => l.id === id);
-  if (index === -1) throw new Error('Lead not found');
+  const existingLeads = await getAllLeads(spreadsheetId, accessToken);
 
-  const updatedLead = { ...leads[index], ...updates, updatedAt: new Date().toISOString() };
-  const row = mapLeadToRow(updatedLead);
-  const rowNumber = index + 2;
+  const data = updates.map(update => {
+    const index = existingLeads.findIndex(l => l.id === update.id);
+    if (index === -1) throw new Error(`Lead with ID ${update.id} not found`);
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: spreadsheetId,
-    range: `Leads!A${rowNumber}:AO${rowNumber}`,
-    valueInputOption: 'USER_ENTERED',
-    requestBody: {
+    const updatedLead = { ...existingLeads[index], ...update.data, updatedAt: new Date().toISOString() };
+    const row = mapLeadToRow(updatedLead);
+    const rowNumber = index + 2;
+
+    return {
+      range: `Leads!A${rowNumber}:AO${rowNumber}`,
       values: [row],
+    };
+  });
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: spreadsheetId,
+    requestBody: {
+      valueInputOption: 'USER_ENTERED',
+      data: data,
     },
   });
 }
@@ -268,6 +291,18 @@ export async function updateTemplate(spreadsheetId: string, accessToken: string,
 }
 
 function mapRowToLead(row: any[]): Lead {
+  const feesRaw = row[29];
+  let feesPaid: FeesPaidStatus = 'Due';
+  if (feesRaw === 'TRUE' || feesRaw === 'true' || feesRaw === true) feesPaid = 'Paid';
+  else if (feesRaw === 'FALSE' || feesRaw === 'false' || feesRaw === false) feesPaid = 'Due';
+  else if (feesRaw) feesPaid = feesRaw as FeesPaidStatus;
+
+  const commRaw = row[36];
+  let communityJoined: CommunityJoinedStatus = 'No';
+  if (commRaw === 'TRUE' || commRaw === 'true' || commRaw === true) communityJoined = 'Yes';
+  else if (commRaw === 'FALSE' || commRaw === 'false' || commRaw === false) communityJoined = 'No';
+  else if (commRaw) communityJoined = commRaw as CommunityJoinedStatus;
+
   return {
     id: parseInt(row[0]),
     name: row[1] || '',
@@ -298,14 +333,14 @@ function mapRowToLead(row: any[]): Lead {
     lastFollowUp: row[26] || '',
     testLink: row[27] || '',
     appointmentTime: row[28] || '',
-    feesPaid: row[29] === 'TRUE',
+    feesPaid: feesPaid,
     feesAmount: row[30] || '',
     paymentMode: row[31] || '',
     transactionId: row[32] || '',
     reportSentDate: row[33] || '',
     convertedDate: row[34] || '',
     reportPdfUrl: row[35] || '',
-    communityJoined: row[36] === 'TRUE',
+    communityJoined: communityJoined,
     registrationToken: row[37] || '',
     calendarEventId: row[38] || '',
     lastStageUpdate: row[39] || '',
@@ -344,17 +379,18 @@ function mapLeadToRow(lead: Lead): any[] {
     lead.lastFollowUp || '',
     lead.testLink || '',
     lead.appointmentTime || '',
-    lead.feesPaid ? 'TRUE' : 'FALSE',
+    lead.feesPaid || 'Due',
     lead.feesAmount || '',
     lead.paymentMode || '',
     lead.transactionId || '',
     lead.reportSentDate || '',
     lead.convertedDate || '',
     lead.reportPdfUrl || '',
-    lead.communityJoined ? 'TRUE' : 'FALSE',
+    lead.communityJoined || 'No',
     lead.registrationToken || '',
     lead.calendarEventId || '',
     lead.lastStageUpdate || '',
     lead.status || 'Open',
   ];
 }
+

@@ -11,6 +11,9 @@ export type LeadStage =
 
 export type LeadStatus = 'Open' | 'Won' | 'Lost';
 
+export type FeesPaidStatus = 'Paid' | 'Due' | 'Waived' | 'bad debt';
+export type CommunityJoinedStatus = 'Yes' | 'No';
+
 export interface Lead {
   // Basic & System
   id: number;
@@ -52,14 +55,14 @@ export interface Lead {
   lastFollowUp: string;
   testLink: string;
   appointmentTime: string;
-  feesPaid: boolean;
+  feesPaid: FeesPaidStatus;
   feesAmount?: string;
   paymentMode?: string;
   transactionId?: string;
   reportSentDate: string;
   convertedDate: string;
   reportPdfUrl?: string;
-  communityJoined: boolean;
+  communityJoined: CommunityJoinedStatus;
   registrationToken?: string;
   calendarEventId?: string;
 }

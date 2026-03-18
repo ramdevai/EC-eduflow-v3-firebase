@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPeopleClient } from '@/lib/google';
-import { getAllLeads, addLead } from '@/lib/db-sheets';
+import { getAllLeads, addLeads } from '@/lib/db-sheets';
 import { google } from 'googleapis';
 
 export async function GET(req: Request) {
@@ -30,28 +30,18 @@ export async function GET(req: Request) {
     const people = await getPeopleClient(token);
     const existingLeads = await getAllLeads(sheetId, token);
 
-    // 1. Search for "lead"
-    const searchResponse = await people.people.searchContacts({
-      query: 'lead',
-      readMask: 'names,emailAddresses,phoneNumbers,biographies,organizations',
-    });
-
-    const searchResults = searchResponse.data.results || [];
-    
-    // 2. Fetch Other Contacts (Light search)
+    // Fetch top 10 most recently modified "Other Contacts"
     const otherResponse = await people.otherContacts.list({
-      readMask: 'names,emailAddresses,phoneNumbers',
-      pageSize: 100,
+      readMask: 'metadata,names,emailAddresses,phoneNumbers,biographies,organizations',
+      pageSize: 10,
     });
 
-    const standardConnections = searchResults.map(r => r.person).filter((p): p is any => !!p);
     const otherConnections = otherResponse.data.otherContacts || [];
     
-    const allVisible = [...standardConnections, ...otherConnections];
     const processedIds = new Set<string>();
-    let addedCount = 0;
+    const leadsToAdd = [];
 
-    for (const person of allVisible) {
+    for (const person of otherConnections) {
       if (!person) continue;
       const name = person.names?.[0]?.displayName || '';
       const notes = person.biographies?.[0]?.value || '';
@@ -81,19 +71,31 @@ export async function GET(req: Request) {
           .replace(/[- ]+$/, '')
           .trim();
 
-        await addLead(sheetId, token, {
+        // Use contact saved date as inquiry date
+        const metadata = person.metadata?.sources?.[0];
+        const inquiryDate = metadata?.updateTime || new Date().toISOString();
+
+        leadsToAdd.push({
           name: cleanName || 'Unnamed Lead',
           email: person.emailAddresses?.[0]?.value || '',
           phone: phone,
           googleContactId: googleContactId,
           stage: 'New',
-          notes: notes ? `Notes: ${notes}` : 'Auto-synced via Cron',
-        } as any);
-        addedCount++;
+          inquiryDate: inquiryDate,
+          notes: notes || '',
+        });
       }
     }
 
-    return NextResponse.json({ success: true, added: addedCount, checked: processedIds.size });
+    if (leadsToAdd.length > 0) {
+      await addLeads(sheetId, token, leadsToAdd as any);
+    }
+
+    return NextResponse.json({ 
+        success: true, 
+        added: leadsToAdd.length, 
+        checked: processedIds.size 
+    });
   } catch (error: any) {
     console.error('Cron sync error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPeopleClient } from '@/lib/google';
-import { getAllLeads, addLead, updateLead, generateRegistrationToken } from '@/lib/db-sheets';
+import { getAllLeads, addLeads, updateLeads, generateRegistrationToken } from '@/lib/db-sheets';
 import { auth } from '@/lib/auth';
 import { validateEnv } from '@/lib/env-check';
 
@@ -28,47 +28,50 @@ export async function POST(req: Request) {
 
     const allVisible: any[] = [];
     
-    // 1. Fetch from 'My Contacts'
+    // 1. Fetch from 'My Contacts' - limit to 10
     try {
         const response = await people.people.connections.list({
           resourceName: 'people/me',
-          personFields: 'names,emailAddresses,phoneNumbers,biographies,organizations',
-          pageSize: 1000,
+          personFields: 'metadata,names,emailAddresses,phoneNumbers,biographies,organizations',
+          pageSize: 10,
           sortOrder: 'LAST_MODIFIED_DESCENDING',
         });
         if (response.data.connections) {
             allVisible.push(...response.data.connections);
         }
     } catch (e: any) {
-        console.warn('Failed to fetch standard contacts (check scopes):', e.message);
+        console.warn('Failed to fetch standard contacts:', e.message);
     }
     
-    // 2. Fetch Other Contacts
+    // 2. Fetch Other Contacts - limit to 10
     try {
         const otherResponse = await people.otherContacts.list({
-          readMask: 'names,emailAddresses,phoneNumbers',
-          pageSize: 100,
+          readMask: 'metadata,names,emailAddresses,phoneNumbers,biographies,organizations',
+          pageSize: 10,
         });
         if (otherResponse.data.otherContacts) {
             allVisible.push(...otherResponse.data.otherContacts);
         }
     } catch (e: any) {
-        console.warn('Failed to fetch other contacts (check scopes):', e.message);
+        console.warn('Failed to fetch other contacts:', e.message);
     }
     
     if (allVisible.length === 0) {
         return NextResponse.json({ 
             success: false, 
-            error: "Could not access your contacts. Please Sign Out and Sign In again to grant permissions." 
+            error: "No contacts found or access denied." 
         }, { status: 403 });
     }
 
     const processedIds = new Set<string>();
-    let addedCount = 0;
-    let updatedCount = 0;
-    const skipped = [];
+    const leadsToAdd = [];
+    const leadsToUpdate = [];
+    const skippedNames = [];
 
-    for (const person of allVisible) {
+    // Prioritize and keep only top 10 from the combined list
+    const topContacts = allVisible.slice(0, 10);
+
+    for (const person of topContacts) {
       if (!person) continue;
       const googleContactId = person.resourceName || '';
       if (!googleContactId || processedIds.has(googleContactId)) continue;
@@ -79,8 +82,6 @@ export async function POST(req: Request) {
       const org = person.organizations?.[0]?.name || '';
       
       const combined = `${name} ${notes} ${org}`.toLowerCase();
-      
-      // Flexible match for 'lead'
       if (!combined.includes('lead')) continue;
 
       const phone = person.phoneNumbers?.[0]?.value || '';
@@ -92,8 +93,10 @@ export async function POST(req: Request) {
         (phone && l.phone.replace(/\D/g, '') === phone.replace(/\D/g, ''))
       );
 
+      const metadata = person.metadata?.sources?.[0];
+      const inquiryDate = metadata?.updateTime || new Date().toISOString();
+
       if (!duplicate) {
-        // ... Clean and add new lead
         let cleanName = name
           .replace(/\[lead\]/gi, '')
           .replace(/\(lead\)/gi, '')
@@ -102,18 +105,17 @@ export async function POST(req: Request) {
           .replace(/[- ]+$/, '')
           .trim();
 
-        await addLead(sheetId, token, {
+        leadsToAdd.push({
           name: cleanName || 'Unnamed Lead',
           email: email,
           phone: phone,
           googleContactId: googleContactId,
           stage: 'New',
+          inquiryDate: inquiryDate,
           registrationToken: generateRegistrationToken(),
-          notes: notes ? `Contact Notes: ${notes}` : 'Imported from Google Contacts',
-        } as any);
-        addedCount++;
+          notes: notes || '',
+        });
       } else {
-        // UPDATE LOGIC: Check if anything changed or if we need to link the Google ID
         const normalizedSheetPhone = duplicate.phone.replace(/\D/g, '');
         const normalizedGooglePhone = phone.replace(/\D/g, '');
         
@@ -122,24 +124,33 @@ export async function POST(req: Request) {
         const idMissingOrChanged = duplicate.googleContactId !== googleContactId;
 
         if (phoneChanged || emailChanged || idMissingOrChanged) {
-            await updateLead(sheetId, token, duplicate.id, {
-                phone: phone || duplicate.phone,
-                email: email || duplicate.email,
-                googleContactId: googleContactId, // Link or update the ID
-                updatedAt: new Date().toISOString(),
+            leadsToUpdate.push({
+                id: duplicate.id,
+                data: {
+                    phone: phone || duplicate.phone,
+                    email: email || duplicate.email,
+                    googleContactId: googleContactId,
+                    updatedAt: new Date().toISOString(),
+                }
             });
-            updatedCount++;
         } else {
-            skipped.push(name);
+            skippedNames.push(name);
         }
       }
     }
 
+    if (leadsToAdd.length > 0) {
+      await addLeads(sheetId, token, leadsToAdd as any);
+    }
+    if (leadsToUpdate.length > 0) {
+      await updateLeads(sheetId, token, leadsToUpdate);
+    }
+
     return NextResponse.json({ 
         success: true, 
-        added: addedCount, 
-        updated: updatedCount,
-        skippedCount: skipped.length 
+        added: leadsToAdd.length, 
+        updated: leadsToUpdate.length,
+        skippedCount: skippedNames.length 
     });
   } catch (error: any) {
     console.error('Manual sync error:', error);

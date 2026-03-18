@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { addLead } from '@/lib/db-sheets';
+import { addLeads } from '@/lib/db-sheets';
 import { auth } from '@/lib/auth';
 import { LeadStage, LeadStatus } from '@/lib/types';
 
@@ -40,9 +40,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    for (const lead of SAMPLE_LEADS) {
-      await addLead(sheetId, session.accessToken, lead);
-    }
+    await addLeads(sheetId, session.accessToken, SAMPLE_LEADS as any);
     return NextResponse.json({ success: true, count: SAMPLE_LEADS.length });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

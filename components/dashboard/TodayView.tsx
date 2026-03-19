@@ -10,9 +10,10 @@ import { getWhatsAppLink } from '@/lib/messaging-utils';
 
 interface TodayViewProps {
   leads: Lead[];
+  templates?: any[];
 }
 
-export function TodayView({ leads }: TodayViewProps) {
+export function TodayView({ leads, templates }: TodayViewProps) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,9 +40,7 @@ export function TodayView({ leads }: TodayViewProps) {
   });
 
   const birthdayWish = (lead: Lead) => {
-    const phone = lead.phone.replace(/\D/g, '');
-    const message = `Hi ${lead.name}, wishing you a very Happy Birthday! 🎂 Hope you have a fantastic day ahead! - Binal from EduCompass`;
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+    window.open(getWhatsAppLink(lead, 'birthday', templates), '_blank');
   };
 
   return (

@@ -8,6 +8,8 @@ import { useEffect } from "react";
 
 export function LoginScreen() {
   const { status } = useSession();
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const error = searchParams?.get('error');
   
   useEffect(() => {
     if (status === "authenticated") {
@@ -29,6 +31,11 @@ export function LoginScreen() {
         </div>
 
         <div className="space-y-4">
+            {error && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-xl text-red-600 text-xs font-bold">
+                    {error === 'AccessDenied' ? 'Google Access Denied. Please ensure you grant permissions.' : `Sign in error: ${error}`}
+                </div>
+            )}
             <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
                 Welcome back! Please sign in with your Google account to access your counseling dashboard and sync leads.
             </p>

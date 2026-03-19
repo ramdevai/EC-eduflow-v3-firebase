@@ -154,8 +154,14 @@ export function TemplatesView({ sheetId }: TemplatesViewProps) {
                             <div className="flex gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
                                 <span>Placeholders:</span>
                                 <code className="text-primary-600 dark:text-primary-400">{'{name}'}</code>
-                                {template.id === 'onboarding' || template.id === 'test' ? (
+                                {template.id === 'onboarding' || template.id === 'followup' ? (
+                                    <code className="text-primary-600 dark:text-primary-400">{'{REGISTRATION_LINK}'}</code>
+                                ) : null}
+                                {template.id === 'test' || template.id === 'test_nudge' ? (
                                     <code className="text-primary-600 dark:text-primary-400">{'{url}'}</code>
+                                ) : null}
+                                {template.id === 'report_email' ? (
+                                    <code className="text-primary-600 dark:text-primary-400">{'{notes}'}</code>
                                 ) : null}
                             </div>
                         </Card>

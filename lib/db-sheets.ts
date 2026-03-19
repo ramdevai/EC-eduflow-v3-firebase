@@ -1,17 +1,8 @@
 import { getSheetsClient } from './google';
 import { Lead, LeadStage, LeadStatus, FeesPaidStatus, CommunityJoinedStatus } from './types';
+import { generateRegistrationToken } from './utils';
 
 const RANGE = 'Leads!A2:AO';
-
-export function generateRegistrationToken(): string {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let token = '';
-    for (let i = 0; i < 12; i++) {
-        token += chars.charAt(Math.floor(Math.random() * chars.length));
-        if ((i + 1) % 4 === 0 && i !== 11) token += '-';
-    }
-    return token;
-}
 
 export async function getAllLeads(spreadsheetId: string, accessToken: string): Promise<Lead[]> {
   if (!spreadsheetId) return [];
@@ -290,7 +281,7 @@ export async function updateTemplate(spreadsheetId: string, accessToken: string,
     }
 }
 
-function mapRowToLead(row: any[]): Lead {
+export function mapRowToLead(row: any[]): Lead {
   const feesRaw = row[29];
   let feesPaid: FeesPaidStatus = 'Due';
   if (feesRaw === 'TRUE' || feesRaw === 'true' || feesRaw === true) feesPaid = 'Paid';
@@ -303,6 +294,9 @@ function mapRowToLead(row: any[]): Lead {
   if (commRaw === 'TRUE' || commRaw === 'true' || commRaw === true) communityJoined = 'Yes';
   else if (commRaw === 'FALSE' || commRaw === 'false' || commRaw === false) communityJoined = 'No';
   else if (commRaw) communityJoined = commRaw as CommunityJoinedStatus;
+
+  const tokenRaw = row[37] || '';
+  const registrationToken = (tokenRaw === 'FALSE' || tokenRaw === 'false' || tokenRaw === 'TRUE' || tokenRaw === 'true' || tokenRaw === false || tokenRaw === true) ? '' : tokenRaw;
 
   return {
     id: parseInt(row[0]),
@@ -342,14 +336,14 @@ function mapRowToLead(row: any[]): Lead {
     convertedDate: row[34] || '',
     reportPdfUrl: row[35] || '',
     communityJoined: communityJoined,
-    registrationToken: row[37] || '',
+    registrationToken: registrationToken,
     calendarEventId: row[38] || '',
     lastStageUpdate: row[39] || '',
     status: (row[40] as LeadStatus) || 'Open',
   };
 }
 
-function mapLeadToRow(lead: Lead): any[] {
+export function mapLeadToRow(lead: Lead): any[] {
   return [
     lead.id,
     lead.name,

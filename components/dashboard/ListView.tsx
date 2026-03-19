@@ -14,6 +14,7 @@ interface ListViewProps {
 }
 
 export function ListView({ leads, onLeadClick }: ListViewProps) {
+
   const getStageVariant = (stage: string) => {
     const normalized = normalizeStage(stage);
     switch (normalized) {
@@ -73,6 +74,7 @@ export function ListView({ leads, onLeadClick }: ListViewProps) {
                       <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-slate-400">
                         <Phone size={10} /> {lead.phone}
                       </div>
+
                     </div>
                   </td>
                   <td className="p-4">

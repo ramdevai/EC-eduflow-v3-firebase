@@ -31,13 +31,14 @@ import {
   Pencil
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { Lead, LeadStage, FeesPaidStatus } from '@/lib/types';
+import { Lead, LeadStage, FeesPaidStatus, TEST_LINKS } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
-import { cn, normalizeStage } from '@/lib/utils';
-import { getWhatsAppLink, getEmailLink } from '@/lib/messaging-utils';
-import { RefreshCw } from 'lucide-react';
+import { cn, normalizeStage, generateRegistrationToken } from '@/lib/utils';
+import { getWhatsAppLink, getEmailLink, getTestLinkByGrade, getReportEmailData } from '@/lib/messaging-utils';
+import { RefreshCw, Sparkles } from 'lucide-react';
+import { EmailComposer } from './EmailComposer';
 
 const TEST_OPTIONS = [
   { name: "Career Analysis for 2nd to 7th class", url: "https://careertest.edumilestones.com/student-dashboard/suitability-registration/login/OTI2/as11" },
@@ -60,9 +61,10 @@ interface LeadDrawerProps {
   onDelete: (id: number) => void;
   fetchLeads: () => void;
   stages: LeadStage[];
+  templates?: any[];
 }
 
-export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages }: LeadDrawerProps) {
+export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates }: LeadDrawerProps) {
   const [activeSection, setActiveSection] = useState<string | null>('pipeline');
   const [localStage, setLocalStage] = useState<LeadStage | null>(null);
   const [localFeesPaid, setLocalFeesPaid] = useState<FeesPaidStatus>('Due');
@@ -73,6 +75,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
   const [showCalendar, setShowCalendar] = useState(false);
   const [busySlots, setBusySlots] = useState<any[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
+  const [isEmailComposerOpen, setIsEmailComposerOpen] = useState(false);
 
   // Sync local stage when lead changes
   React.useEffect(() => {
@@ -83,6 +86,18 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
         setShowCalendar(false);
     }
   }, [lead]);
+
+  // Auto-select test link if Registration done and no test link currently set
+  React.useEffect(() => {
+    if (!lead) return;
+    const stage = normalizeStage(lead.stage);
+    if (stage === 'Registration done' && (!lead.testLink || lead.testLink === 'FALSE')) {
+      const suggested = getTestLinkByGrade(lead.grade, lead.board);
+      if (suggested && suggested !== lead.testLink) {
+        onUpdate(lead.id, { testLink: suggested });
+      }
+    }
+  }, [lead?.id, lead?.stage, lead?.grade, lead?.board, lead?.testLink]);
 
   if (!lead) return null;
 
@@ -187,7 +202,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
     
     // Generate token if not exists
     if (!lead.registrationToken) {
-        const token = Math.random().toString(36).substring(2, 15);
+        const token = generateRegistrationToken();
         try {
             await onUpdate(lead.id, { 
                 registrationToken: token,
@@ -195,20 +210,26 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
             });
             // Construct link with the new token
             const tempLead = { ...lead, registrationToken: token };
-            window.open(getWhatsAppLink(tempLead, 'onboarding'), '_blank');
+            window.open(getWhatsAppLink(tempLead, 'onboarding', templates), '_blank');
         } catch (err) {
             alert('Failed to generate registration link');
         }
     } else {
-        window.open(getWhatsAppLink(lead, 'onboarding'), '_blank');
-        handleStageChange('Registration requested');
+        window.open(getWhatsAppLink(lead, 'onboarding', templates), '_blank');
+        if (normalizeStage(lead.stage) === 'New') {
+            handleStageChange('Registration requested');
+        }
     }
   };
 
-  const handleSendTestLink = (testUrl: string) => {
-    onUpdate(lead.id, { testLink: testUrl, stage: 'Test sent' });
+  const handleSendTestLink = () => {
+    if (!lead.testLink) {
+        alert('Please select a test link first.');
+        return;
+    }
+    onUpdate(lead.id, { stage: 'Test sent' });
     setLocalStage('Test sent');
-    window.open(getWhatsAppLink({ ...lead, testLink: testUrl }, 'test'), '_blank');
+    window.open(getWhatsAppLink(lead, 'test', templates), '_blank');
   };
 
   const toggleSection = (section: string) => {
@@ -290,7 +311,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
           <div className="space-y-4">
             <p className="text-[11px] text-slate-500 font-medium italic">Its been {connectionAge} days since you first connected with them.</p>
             <div className="grid grid-cols-1 gap-3">
-                <Button className="h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none" onClick={() => window.open(getWhatsAppLink(lead, 'followup'), '_blank')}>
+                <Button className="h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none" onClick={() => window.open(getWhatsAppLink(lead, 'followup', templates), '_blank')}>
                     <MessageSquare size={18} /> Send inquiry follow-up
                 </Button>
                 <Button variant="outline" className="h-14 rounded-2xl bg-white dark:bg-slate-900 gap-3 text-sm font-bold" onClick={handleSendOnboarding}>
@@ -306,12 +327,13 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
         return (
           <div className="space-y-4">
             <p className="text-[11px] text-slate-500 font-medium">Check with them if they need any help with registration</p>
-            <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none" onClick={() => window.open(getWhatsAppLink(lead, 'followup'), '_blank')}>
+            <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none" onClick={() => window.open(getWhatsAppLink(lead, 'followup', templates), '_blank')}>
                 Registration follow-up
             </Button>
           </div>
         );
       case 'Registration done':
+        const suggested = getTestLinkByGrade(lead.grade, lead.board);
         return (
           <div className="space-y-4">
             <div className="space-y-2">
@@ -321,7 +343,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                         className="w-full p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold text-sm outline-none focus:border-primary-500 appearance-none transition-all"
                         onChange={(e) => {
                             const val = e.target.value;
-                            if (val) handleSendTestLink(val);
+                            if (val) onUpdate(lead.id, { testLink: val });
                         }}
                         value={lead.testLink || ''}
                     >
@@ -332,7 +354,25 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                 </div>
                 {lead.testLink && <a href={lead.testLink} target="_blank" className="text-[10px] text-primary-600 hover:underline ml-2 truncate block">{lead.testLink}</a>}
             </div>
-            <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none" onClick={() => lead.testLink && handleSendTestLink(lead.testLink)}>
+
+            {/* Suggestion Note */}
+            {suggested ? (
+                <div className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/20 rounded-xl text-[10px] text-emerald-600 font-bold border border-emerald-100 dark:border-emerald-900/30">
+                    <Sparkles size={12} />
+                    Suggested based on Class {lead.grade || 'N/A'} ({lead.board || 'any'} board)
+                </div>
+            ) : (
+                <div className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 dark:bg-amber-950/20 rounded-xl text-[10px] text-amber-600 font-bold border border-amber-100 dark:border-amber-900/30">
+                    <AlertCircle size={12} />
+                    Unable to suggest: {!lead.grade && !lead.board ? "class and board missing" : !lead.grade ? "class missing" : !lead.board ? "board missing" : `no specific match for Class ${lead.grade} (${lead.board} board)`}
+                </div>
+            )}
+
+            <Button 
+                className="w-full h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none disabled:opacity-50" 
+                onClick={handleSendTestLink}
+                disabled={!lead.testLink}
+            >
                 Send assessment link
             </Button>
           </div>
@@ -341,7 +381,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
         return (
           <div className="space-y-4">
             <p className="text-[11px] text-slate-500 font-medium">Check with them if they need any help with the test</p>
-            <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none" onClick={() => window.open(getWhatsAppLink(lead, 'followup'), '_blank')}>
+            <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none" onClick={() => window.open(getWhatsAppLink(lead, 'test_nudge', templates), '_blank')}>
                 Nudge on test completion
             </Button>
           </div>
@@ -355,8 +395,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                 </Button>
                 {showCalendar && <SlotPicker />}
                 <Button variant="outline" className="h-14 rounded-2xl bg-white dark:bg-slate-900 gap-3 text-sm font-bold" onClick={() => {
-                    handleStageChange('Report sent');
-                    window.open(getEmailLink(lead), '_blank');
+                    setIsEmailComposerOpen(true);
                 }}>
                     Send report & close
                 </Button>
@@ -390,7 +429,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                 </Button>
                 <div className="flex gap-2">
                     {renderFeesDropdown()}
-                    <Button variant="outline" className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" onClick={() => window.open(getWhatsAppLink(lead, 'community'), '_blank')}>
+                    <Button variant="outline" className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" onClick={() => window.open(getWhatsAppLink(lead, 'community', templates), '_blank')}>
                         Community invite
                     </Button>
                 </div>
@@ -400,12 +439,12 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
       case 'Report sent':
         return (
             <div className="space-y-4">
-                <Button className="w-full h-14 rounded-2xl bg-primary-600 text-white gap-3 text-sm font-bold shadow-lg shadow-primary-100 dark:shadow-none" onClick={() => window.open(getEmailLink(lead), '_blank')}>
+                <Button className="w-full h-14 rounded-2xl bg-primary-600 text-white gap-3 text-sm font-bold shadow-lg shadow-primary-100 dark:shadow-none" onClick={() => setIsEmailComposerOpen(true)}>
                     Prepare & Resend Report
                 </Button>
                 <div className="flex gap-2">
                     {renderFeesDropdown()}
-                    <Button variant="outline" className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" onClick={() => window.open(getWhatsAppLink(lead, 'review'), '_blank')}>
+                    <Button variant="outline" className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" onClick={() => window.open(getWhatsAppLink(lead, 'review', templates), '_blank')}>
                         Ask Review
                     </Button>
                 </div>
@@ -743,10 +782,24 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
             {/* Sticky Mobile Actions */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 flex gap-3 z-[60]">
                <Button variant="outline" className="flex-1 h-14 rounded-2xl" onClick={onClose}>Close</Button>
-               <Button className="flex-1 h-14 rounded-2xl bg-primary-600 text-white" onClick={() => window.open(getWhatsAppLink(lead, 'followup'), '_blank')}>Quick WhatsApp</Button>
+               <Button className="flex-1 h-14 rounded-2xl bg-primary-600 text-white" onClick={() => window.open(getWhatsAppLink(lead, 'followup', templates), '_blank')}>Quick WhatsApp</Button>
             </div>
           </motion.div>
         </motion.div>
+      )}
+
+      {isEmailComposerOpen && lead && (
+        <EmailComposer 
+          lead={lead}
+          onClose={() => setIsEmailComposerOpen(false)}
+          onSuccess={() => {
+            setIsEmailComposerOpen(false);
+            handleStageChange('Report sent');
+            alert('Email sent successfully!');
+          }}
+          initialSubject={getReportEmailData(lead, templates).subject}
+          initialBody={getReportEmailData(lead, templates).body}
+        />
       )}
     </AnimatePresence>
   );

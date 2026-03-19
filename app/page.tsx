@@ -45,7 +45,7 @@ const STAGES: LeadStage[] = [
 
 export default function Dashboard() {
   const { data: session, status } = useSession();
-  const { leads, loading, error, sheetId, reminders, fetchLeads, updateLead, deleteLead, addLead, saveSheetId } = useLeads();
+  const { leads, templates, loading, error, sheetId, reminders, fetchLeads, updateLead, deleteLead, addLead, saveSheetId } = useLeads();
   
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,6 +58,13 @@ export default function Dashboard() {
 
   const [activeTab, setActiveTab] = useState<'leads' | 'today' | 'templates' | 'lost' | 'analysis'>('leads');
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  // Sync selectedLead with latest data from leads hook
+  const currentLead = useMemo(() => {
+    if (!selectedLead) return null;
+    return leads.find(l => l.id === selectedLead.id) || selectedLead;
+  }, [leads, selectedLead]);
+
   const [isInitializing, setIsInitializing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -560,6 +567,8 @@ export default function Dashboard() {
                                         <h4 className="font-bold text-slate-900 dark:text-slate-100">{lead.name}</h4>
                                         <Badge variant={lead.stage === 'Report sent' ? 'success' : 'warning'}>
                                             {                                        lead.stage === 'New' ? 'Overdue' : 
+                                            lead.stage === 'Registration requested' ? 'Follow-up' :
+                                            lead.stage === 'Registration done' ? 'Ready' :
                                             lead.stage === 'Test sent' ? 'Nudge' : 
                                             lead.stage === 'Report sent' ? 'Review' : 
                                             lead.feesPaid === 'Due' ? 'Fees' : 'Follow-up'}
@@ -567,6 +576,8 @@ export default function Dashboard() {
                                     </div>
                                     <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-4 line-clamp-2">
                                         {lead.stage === 'New' ? 'Lead hasn\'t converted in 4 days. Time for a call.' : 
+                                        lead.stage === 'Registration requested' ? 'Awaiting student details. Follow up on form completion.' :
+                                        lead.stage === 'Registration done' ? 'Student has shared details. Select and send the assessment link.' :
                                         lead.stage === 'Test sent' ? 'Test link sent over 48h ago. Nudge for completion.' :
                                         lead.stage === 'Session complete' ? 'Counseling done. Prepare and send the report.' :
                                         lead.stage === 'Report sent' ? 'Report sent 2 days ago. Ask for a Google review.' :
@@ -594,6 +605,8 @@ export default function Dashboard() {
                                                 e.stopPropagation();
                                                 if (lead.stage === 'Report sent') {
                                                     window.open(getWhatsAppLink(lead, 'review'), '_blank');
+                                                } else if (normalizeStage(lead.stage) === 'Test sent') {
+                                                    window.open(getWhatsAppLink(lead, 'test_nudge'), '_blank');
                                                 } else {
                                                     window.open(getWhatsAppLink(lead, 'followup'), '_blank');
                                                 }
@@ -613,8 +626,20 @@ export default function Dashboard() {
                         {/* View Content */}
                         <div className="relative">
                             {error && (
-                                <div className="p-4 mb-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-2xl text-red-600 text-xs font-bold">
-                                    Error: {error}. Please check your Sheet ID or Google permissions.
+                                <div className="p-4 mb-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-2xl flex items-center justify-between">
+                                    <div className="text-red-600 text-xs font-bold">
+                                        Error: {error}. Please check your Sheet ID or Google permissions.
+                                    </div>
+                                    {error.toLowerCase().includes('auth') && (
+                                        <Button 
+                                            size="sm" 
+                                            variant="outline" 
+                                            className="h-8 text-[10px] border-red-200 text-red-600 hover:bg-red-50"
+                                            onClick={() => window.location.reload()}
+                                        >
+                                            Sign In Again
+                                        </Button>
+                                    )}
                                 </div>
                             )}
                             {loading ? (
@@ -642,7 +667,7 @@ export default function Dashboard() {
                     </>
                     )}
 
-                    {activeTab === 'today' && <TodayView leads={leads} />}
+                    {activeTab === 'today' && <TodayView leads={leads} templates={templates} />}
                     {activeTab === 'templates' && <TemplatesView sheetId={sheetId!} />}
                     {activeTab === 'lost' && <LostLeadsView leads={leads} updateLead={updateLead} />}
                     {activeTab === 'analysis' && <AnalysisView leads={leads} />}
@@ -659,12 +684,13 @@ export default function Dashboard() {
 
                 {/* Overlays */}
                 <LeadDrawer 
-                    lead={selectedLead} 
+                    lead={currentLead} 
                     onClose={() => setSelectedLead(null)} 
                     onUpdate={updateLead}
                     onDelete={deleteLead}
                     fetchLeads={fetchLeads}
                     stages={STAGES}
+                    templates={templates}
                 />
 
                 {/* Modern Add Modal */}

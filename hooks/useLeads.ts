@@ -4,6 +4,7 @@ import { differenceInDays } from 'date-fns';
 
 export function useLeads() {
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sheetId, setSheetId] = useState<string | null>(null);
@@ -49,9 +50,26 @@ export function useLeads() {
     }
   }, [sheetId]);
 
+  const fetchTemplates = useCallback(async () => {
+    if (!sheetId) return;
+    try {
+      const res = await fetch('/api/templates', {
+        headers: { 'x-sheet-id': sheetId }
+      });
+      if (!res.ok) throw new Error('Failed to fetch templates');
+      const data = await res.json();
+      setTemplates(data);
+    } catch (err) {
+      console.error('Failed to fetch templates:', err);
+    }
+  }, [sheetId]);
+
   useEffect(() => {
-    if (sheetId) fetchLeads();
-  }, [sheetId, fetchLeads]);
+    if (sheetId) {
+      fetchLeads();
+      fetchTemplates();
+    }
+  }, [sheetId, fetchLeads, fetchTemplates]);
 
   const updateLead = async (id: number, updates: Partial<Lead>): Promise<void> => {
     if (!sheetId) return;
@@ -133,18 +151,30 @@ export function useLeads() {
 
     return leads.filter(lead => {
       const stage = normalizeStage(lead.stage);
-      if (lead.status === 'Lost' || stage === 'Registration requested') return false;
+      if (lead.status === 'Lost') return false;
       
       const inquiryDate = lead.inquiryDate ? new Date(lead.inquiryDate) : now;
       const daysSinceInquiry = differenceInDays(now, inquiryDate);
       
       // Rule A: New Lead not converted in 4 days
       if (stage === 'New' && daysSinceInquiry >= 4) return true;
+
+      // Rule G: Registration requested but not completed in 3 days
+      if (stage === 'Registration requested' && lead.updatedAt) {
+          const daysSinceReq = differenceInDays(now, new Date(lead.updatedAt));
+          if (daysSinceReq >= 3) return true;
+      }
       
       // Rule B: Test Sent but no completion nudge after 2 days
       if (stage === 'Test sent' && lead.updatedAt) {
         const daysSinceSent = differenceInDays(now, new Date(lead.updatedAt));
         if (daysSinceSent >= 2) return true;
+      }
+
+      // Rule F: Registration done but test not sent after 1 day
+      if (stage === 'Registration done' && lead.updatedAt) {
+        const daysSinceDone = differenceInDays(now, new Date(lead.updatedAt));
+        if (daysSinceDone >= 1) return true;
       }
 
       // Rule C: Session complete but report not sent after 1 day
@@ -172,11 +202,13 @@ export function useLeads() {
 
   return {
     leads,
+    templates,
     loading,
     error,
     sheetId,
     reminders,
     fetchLeads,
+    fetchTemplates,
     updateLead,
     deleteLead,
     addLead,

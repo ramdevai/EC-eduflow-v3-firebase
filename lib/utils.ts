@@ -26,3 +26,22 @@ export function normalizeStage(stage: string): string {
 
   return map[s] || stage;
 }
+
+export function generateRegistrationToken(): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let token = '';
+    for (let i = 0; i < 12; i++) {
+        token += chars.charAt(Math.floor(Math.random() * chars.length));
+        if ((i + 1) % 4 === 0 && i !== 11) token += '-';
+    }
+    return token;
+}
+
+export function generateWhatsAppLink(phone: string, message: string = ''): string {
+  const cleanPhone = phone.replace(/\D/g, '');
+  // Default to +91 if not specified (common for local projects)
+  const formattedPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+  
+  const encodedMessage = encodeURIComponent(message);
+  return `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+}

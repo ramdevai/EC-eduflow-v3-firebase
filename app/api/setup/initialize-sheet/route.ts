@@ -92,16 +92,18 @@ export async function POST(req: Request) {
             ...[
             ['onboarding', 'Onboarding Message', 'Hi {name}, this is Binal from EduCompass. Great to have you onboard! Please fill this registration form to share student details: [REGISTRATION_LINK]'],
             ['test', 'Assessment Link', 'Hi {name}, based on your details, here is the career assessment link: {url}. Please complete this before our 1:1 session.'],
+                ['test_nudge', 'Test Nudge', 'Hi {name}, hope you are doing well. Just a gentle nudge to complete the career assessment test so we can proceed with our 1:1 counseling session. Link: {url}'],
                 ['followup', 'Follow-up Message', 'Hi {name}, just checking in regarding your career counseling inquiry. Do you have any questions I can help with?'],
                 ['community', 'Community Invite', "Hi {name}, I'd like to invite you to the EduCompass Parents WhatsApp Community where I share important updates and form filling dates: https://chat.whatsapp.com/example-group-link"],
                 ['review', 'Google Review Request', 'Hi {name}, it was a pleasure counseling you. If you found the session helpful, I\'d really appreciate a quick review on Google: [YOUR_GOOGLE_REVIEW_LINK]'],
                 ['birthday', 'Birthday Wish', 'Hi {name}, wishing you a very Happy Birthday! 🎂 Hope you have a fantastic day ahead! - Binal from EduCompass'],
+                ['report_email', 'Report Email', "Dear Parent,\n\nPlease find attached the career counseling report for {name}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass"],
             ]
         ];
 
         await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
-            range: 'Templates!A1:C7',
+            range: 'Templates!A1:C9',
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: rows },
         });
@@ -120,14 +122,16 @@ export async function POST(req: Request) {
                 ['ID', 'Label', 'Message'],
             ['onboarding', 'Onboarding Message', 'Hi {name}, this is Binal from EduCompass. Great to have you onboard! Please fill this registration form to share student details: [REGISTRATION_LINK]'],
             ['test', 'Assessment Link', 'Hi {name}, based on your details, here is the career assessment link: {url}. Please complete this before our 1:1 session.'],
+                ['test_nudge', 'Test Nudge', 'Hi {name}, hope you are doing well. Just a gentle nudge to complete the career assessment test so we can proceed with our 1:1 counseling session. Link: {url}'],
                 ['followup', 'Follow-up Message', 'Hi {name}, just checking in regarding your career counseling inquiry. Do you have any questions I can help with?'],
                 ['community', 'Community Invite', "Hi {name}, I'd like to invite you to the EduCompass Parents WhatsApp Community where I share important updates and form filling dates: https://chat.whatsapp.com/example-group-link"],
                 ['review', 'Google Review Request', 'Hi {name}, it was a pleasure counseling you. If you found the session helpful, I\'d really appreciate a quick review on Google: [YOUR_GOOGLE_REVIEW_LINK]'],
                 ['birthday', 'Birthday Wish', 'Hi {name}, wishing you a very Happy Birthday! 🎂 Hope you have a fantastic day ahead! - Binal from EduCompass'],
+                ['report_email', 'Report Email', "Dear Parent,\n\nPlease find attached the career counseling report for {name}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass"],
             ];
             await sheets.spreadsheets.values.update({
                 spreadsheetId: sheetId,
-                range: 'Templates!A1:C7',
+                range: 'Templates!A1:C9',
                 valueInputOption: 'USER_ENTERED',
                 requestBody: { values: rows },
             });

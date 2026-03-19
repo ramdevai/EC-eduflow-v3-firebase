@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPeopleClient } from '@/lib/google';
-import { getAllLeads, addLeads, updateLeads, generateRegistrationToken } from '@/lib/db-sheets';
+import { getAllLeads, addLeads, updateLeads } from '@/lib/db-sheets';
+import { generateRegistrationToken } from '@/lib/utils';
 import { auth } from '@/lib/auth';
 import { validateEnv } from '@/lib/env-check';
 

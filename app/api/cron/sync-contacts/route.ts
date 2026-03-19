@@ -30,18 +30,29 @@ export async function GET(req: Request) {
     const people = await getPeopleClient(token);
     const existingLeads = await getAllLeads(sheetId, token);
 
-    // Fetch top 10 most recently modified "Other Contacts"
+    // Fetch top 50 most recently modified "Other Contacts"
     const otherResponse = await people.otherContacts.list({
       readMask: 'metadata,names,emailAddresses,phoneNumbers,biographies,organizations',
-      pageSize: 10,
+      pageSize: 50,
     });
 
-    const otherConnections = otherResponse.data.otherContacts || [];
+    // Also check standard connections (people manually saved)
+    const connectionsResponse = await people.people.connections.list({
+      resourceName: 'people/me',
+      personFields: 'metadata,names,emailAddresses,phoneNumbers,biographies,organizations',
+      pageSize: 50,
+      sortOrder: 'LAST_MODIFIED_DESCENDING',
+    });
+
+    const allConnections = [
+      ...(otherResponse.data.otherContacts || []),
+      ...(connectionsResponse.data.connections || [])
+    ];
     
     const processedIds = new Set<string>();
     const leadsToAdd = [];
 
-    for (const person of otherConnections) {
+    for (const person of allConnections) {
       if (!person) continue;
       const name = person.names?.[0]?.displayName || '';
       const notes = person.biographies?.[0]?.value || '';

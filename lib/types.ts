@@ -11,7 +11,7 @@ export type LeadStage =
 
 export type LeadStatus = 'Open' | 'Won' | 'Lost';
 
-export type FeesPaidStatus = 'Paid' | 'Due' | 'Waived' | 'bad debt';
+export type FeesPaidStatus = 'Paid' | 'Due' | 'Waived' | 'Bad debt';
 export type CommunityJoinedStatus = 'Yes' | 'No';
 
 export interface Lead {

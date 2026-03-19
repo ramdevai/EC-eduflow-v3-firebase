@@ -33,7 +33,7 @@ export function StatGrid({ leads }: StatGridProps) {
     },
     {
       label: 'Fees Pending',
-      value: leads.filter(l => l.status !== 'Lost' && !l.feesPaid).length,
+      value: leads.filter(l => l.status !== 'Lost' && l.feesPaid === 'Due').length,
       icon: IndianRupee,
       color: 'text-red-600',
       bg: 'bg-red-50 dark:bg-red-900/20',

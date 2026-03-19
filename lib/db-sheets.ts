@@ -295,6 +295,7 @@ function mapRowToLead(row: any[]): Lead {
   let feesPaid: FeesPaidStatus = 'Due';
   if (feesRaw === 'TRUE' || feesRaw === 'true' || feesRaw === true) feesPaid = 'Paid';
   else if (feesRaw === 'FALSE' || feesRaw === 'false' || feesRaw === false) feesPaid = 'Due';
+  else if (feesRaw === 'bad debt') feesPaid = 'Bad debt';
   else if (feesRaw) feesPaid = feesRaw as FeesPaidStatus;
 
   const commRaw = row[36];

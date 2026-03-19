@@ -162,7 +162,7 @@ export function useLeads() {
 
       // Rule E: Fees Pending for active students (beyond Test Completed)
       const lateStages = ['Test completed', '1:1 scheduled', 'Session complete', 'Report sent'];
-      if (lateStages.includes(stage) && !lead.feesPaid) {
+      if (lateStages.includes(stage) && lead.feesPaid === 'Due') {
         return true;
       }
 

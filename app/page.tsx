@@ -546,39 +546,66 @@ export default function Dashboard() {
                             <span className="ml-auto bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-full">{reminders.length}</span>
                             </div>
                             <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0 snap-x">
-                            {reminders.map(lead => (
-                                <Card key={lead.id} className="min-w-[280px] md:min-w-[320px] p-4 border-l-4 border-amber-500 bg-white dark:bg-slate-900 snap-center shadow-md">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h4 className="font-bold text-slate-900 dark:text-slate-100">{lead.name}</h4>
-                                    <Badge variant={lead.stage === 'Report sent' ? 'success' : 'warning'}>
-                                        {lead.stage === 'New' ? 'Overdue' : 
-                                        lead.stage === 'Test sent' ? 'Nudge' : 
-                                        lead.stage === 'Report sent' ? 'Review' : 
-                                        !lead.feesPaid ? 'Fees' : 'Follow-up'}
-                                    </Badge>
-                                </div>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-4 line-clamp-2">
-                                    {lead.stage === 'New' ? 'Lead hasn\'t converted in 4 days. Time for a call.' : 
-                                    lead.stage === 'Test sent' ? 'Test link sent over 48h ago. Nudge for completion.' :
-                                    lead.stage === 'Session complete' ? 'Counseling done. Prepare and send the report.' :
-                                    lead.stage === 'Report sent' ? 'Report sent 2 days ago. Ask for a Google review.' :
-                                    !lead.feesPaid ? 'Student is active but professional fees are pending.' :
-                                    'Action required for this student profile.'}
-                                </p>
-                                <div className="flex gap-2 mt-auto">
-                                    <Button size="sm" variant="outline" className="flex-1 rounded-xl text-[10px]" onClick={() => setSelectedLead(lead)}>Details</Button>
-                                    <Button size="sm" className="flex-1 rounded-xl text-[10px]" onClick={() => {
-                                        if (lead.stage === 'Report sent') {
-                                            window.open(getWhatsAppLink(lead, 'review'), '_blank');
-                                        } else {
-                                            window.open(getWhatsAppLink(lead, 'followup'), '_blank');
-                                        }
-                                    }}>
-                                        {lead.stage === 'Report sent' ? 'Ask Review' : 'WhatsApp'}
-                                    </Button>
-                                </div>
-                                </Card>
-                            ))}
+                            {reminders.map(lead => {
+                                const stage = normalizeStage(lead.stage);
+                                const isFeesReminder = ['Test completed', '1:1 scheduled', 'Session complete', 'Report sent'].includes(stage) && lead.feesPaid === 'Due';
+
+                                return (
+                                    <Card 
+                                        key={lead.id} 
+                                        className="min-w-[280px] md:min-w-[320px] p-4 border-l-4 border-amber-500 bg-white dark:bg-slate-900 snap-center shadow-md cursor-pointer hover:border-amber-400 transition-colors"
+                                        onClick={() => setSelectedLead(lead)}
+                                    >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="font-bold text-slate-900 dark:text-slate-100">{lead.name}</h4>
+                                        <Badge variant={lead.stage === 'Report sent' ? 'success' : 'warning'}>
+                                            {                                        lead.stage === 'New' ? 'Overdue' : 
+                                            lead.stage === 'Test sent' ? 'Nudge' : 
+                                            lead.stage === 'Report sent' ? 'Review' : 
+                                            lead.feesPaid === 'Due' ? 'Fees' : 'Follow-up'}
+                                        </Badge>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-4 line-clamp-2">
+                                        {lead.stage === 'New' ? 'Lead hasn\'t converted in 4 days. Time for a call.' : 
+                                        lead.stage === 'Test sent' ? 'Test link sent over 48h ago. Nudge for completion.' :
+                                        lead.stage === 'Session complete' ? 'Counseling done. Prepare and send the report.' :
+                                        lead.stage === 'Report sent' ? 'Report sent 2 days ago. Ask for a Google review.' :
+                                        lead.feesPaid === 'Due' ? 'Student is active but professional fees are pending.' :
+                                        'Action required for this student profile.'}
+                                    </p>
+                                    <div className="flex gap-2 mt-auto">
+                                        {isFeesReminder ? (
+                                            <Button 
+                                                size="sm" 
+                                                variant="outline" 
+                                                className="flex-1 rounded-xl text-[10px] bg-emerald-50 hover:bg-emerald-100 border-emerald-100 text-emerald-600" 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    updateLead(lead.id, { feesPaid: 'Paid' });
+                                                }}
+                                            >
+                                                Mark Paid
+                                            </Button>
+                                        ) : null}
+                                        <Button 
+                                            size="sm" 
+                                            className="flex-1 rounded-xl text-[10px]" 
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (lead.stage === 'Report sent') {
+                                                    window.open(getWhatsAppLink(lead, 'review'), '_blank');
+                                                } else {
+                                                    window.open(getWhatsAppLink(lead, 'followup'), '_blank');
+                                                }
+                                            }}
+                                        >
+                                            {isFeesReminder ? 'Remind' : 
+                                             lead.stage === 'Report sent' ? 'Ask Review' : 'WhatsApp'}
+                                        </Button>
+                                    </div>
+                                    </Card>
+                                );
+                            })}
                             </div>
                         </section>
                         )}

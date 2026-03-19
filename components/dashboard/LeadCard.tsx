@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'motion/react';
-import { Phone, Mail, GraduationCap, ChevronRight, Clock, CreditCard } from 'lucide-react';
+import { Phone, Mail, GraduationCap, ChevronRight, Clock, CreditCard, AlertCircle, Ban, XCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Lead } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
@@ -58,11 +58,33 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
             <GraduationCap size={12} />
             {lead.grade || 'N/A'} • {lead.board || 'N/A'}
           </div>
-          {lead.feesPaid && (
-            <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-[10px] font-bold text-emerald-600">
-                <CreditCard size={10} />
-                Paid
-            </div>
+          {['1:1 scheduled', 'Session complete', 'Report sent'].includes(normalizeStage(lead.stage)) && (
+            <>
+              {lead.feesPaid === 'Paid' && (
+                <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 text-[10px] font-bold text-emerald-600">
+                    <CreditCard size={10} />
+                    Paid
+                </div>
+              )}
+              {lead.feesPaid === 'Due' && (
+                <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-[10px] font-bold text-amber-600">
+                    <AlertCircle size={10} />
+                    Due
+                </div>
+              )}
+              {lead.feesPaid === 'Waived' && (
+                <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[10px] font-bold text-slate-500">
+                    <Ban size={10} />
+                    Waived
+                </div>
+              )}
+              {lead.feesPaid === 'Bad debt' && (
+                <div className="flex items-center gap-1 px-1.5 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-[10px] font-bold text-red-600">
+                    <XCircle size={10} />
+                    Bad Debt
+                </div>
+              )}
+            </>
           )}
         </div>
 

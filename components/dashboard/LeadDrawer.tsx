@@ -26,6 +26,8 @@ import {
   Check,
   AlertCircle,
   Bell,
+  XCircle,
+  Ban,
   Pencil
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
@@ -256,7 +258,31 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
     </Card>
   );
 
-  const renderActionArea = () => {
+    const renderFeesDropdown = () => (
+        <div className="flex-1 flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+            {localFeesPaid === 'Paid' && <Check size={16} className="text-emerald-500" />}
+            {localFeesPaid === 'Due' && <AlertCircle size={16} className="text-amber-500" />}
+            {localFeesPaid === 'Waived' && <Ban size={16} className="text-slate-400" />}
+            {localFeesPaid === 'Bad debt' && <XCircle size={16} className="text-red-500" />}
+            
+            <select 
+                className="flex-1 bg-transparent font-bold text-xs outline-none"
+                value={localFeesPaid}
+                onChange={(e) => {
+                    const status = e.target.value as FeesPaidStatus;
+                    setLocalFeesPaid(status);
+                    onUpdate(lead.id, { feesPaid: status });
+                }}
+            >
+                <option value="Due">Fees Due</option>
+                <option value="Paid">Fees Paid</option>
+                <option value="Waived">Fees Waived</option>
+                <option value="Bad debt">Bad Debt</option>
+            </select>
+        </div>
+    );
+
+    const renderActionArea = () => {
     const stage = normalizeStage(currentStage);
     switch (stage) {
       case 'New':
@@ -336,21 +362,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                 </Button>
             </div>
                 <div className="flex gap-2">
-                <div className="flex-1 flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
-                    <AlertCircle size={16} className="text-amber-500" />
-                        <select 
-                        className="flex-1 bg-transparent font-bold text-xs outline-none"
-                        value={localFeesPaid === 'Paid' ? 'paid' : 'due'}
-                        onChange={(e) => {
-                            const status: FeesPaidStatus = e.target.value === 'paid' ? 'Paid' : 'Due';
-                            setLocalFeesPaid(status);
-                            onUpdate(lead.id, { feesPaid: status });
-                        }}
-                    >
-                        <option value="due">Fees due</option>
-                        <option value="paid">Fees paid</option>
-                    </select>
-                </div>
+                {renderFeesDropdown()}
                 <Button variant="outline" className="p-3 rounded-xl flex gap-2 text-xs font-bold">
                     <Bell size={16} /> Remind
                 </Button>
@@ -377,21 +389,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                     Mark session as complete
                 </Button>
                 <div className="flex gap-2">
-                    <div className="flex-1 flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
-                        <Check size={16} className={cn(localFeesPaid ? "text-emerald-500" : "text-slate-300")} />
-                        <select 
-                            className="flex-1 bg-transparent font-bold text-xs outline-none"
-                            value={localFeesPaid === 'Paid' ? 'paid' : 'due'}
-                            onChange={(e) => {
-                                const status: FeesPaidStatus = e.target.value === 'paid' ? 'Paid' : 'Due';
-                                setLocalFeesPaid(status);
-                                onUpdate(lead.id, { feesPaid: status });
-                            }}
-                        >
-                            <option value="due">Fees due</option>
-                            <option value="paid">Fees paid</option>
-                        </select>
-                    </div>
+                    {renderFeesDropdown()}
                     <Button variant="outline" className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" onClick={() => window.open(getWhatsAppLink(lead, 'community'), '_blank')}>
                         Community invite
                     </Button>
@@ -406,21 +404,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                     Prepare & Resend Report
                 </Button>
                 <div className="flex gap-2">
-                    <div className="flex-1 flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
-                        <Check size={16} className={cn(localFeesPaid ? "text-emerald-500" : "text-slate-300")} />
-                        <select 
-                            className="flex-1 bg-transparent font-bold text-xs outline-none"
-                            value={localFeesPaid === 'Paid' ? 'paid' : 'due'}
-                            onChange={(e) => {
-                                const status: FeesPaidStatus = e.target.value === 'paid' ? 'Paid' : 'Due';
-                                setLocalFeesPaid(status);
-                                onUpdate(lead.id, { feesPaid: status });
-                            }}
-                        >
-                            <option value="due">Fees due</option>
-                            <option value="paid">Fees paid</option>
-                        </select>
-                    </div>
+                    {renderFeesDropdown()}
                     <Button variant="outline" className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" onClick={() => window.open(getWhatsAppLink(lead, 'review'), '_blank')}>
                         Ask Review
                     </Button>

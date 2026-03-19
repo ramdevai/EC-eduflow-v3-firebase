@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getWhatsAppLink, getWebmailLink } from '@/lib/messaging-utils';
+import { getWhatsAppLink, getEmailLink } from '@/lib/messaging-utils';
 import { Lead } from '@/lib/types';
 
 describe('messaging utils', () => {
@@ -54,10 +54,10 @@ describe('messaging utils', () => {
     expect(decoded).toContain('careertest.edumilestones.com');
   });
 
-  it('should generate correct webmail link with subject and body', () => {
-    const link = getWebmailLink(mockLead);
+  it('should generate correct mailto link with subject and body', () => {
+    const link = getEmailLink(mockLead);
     const decoded = decodeURIComponent(link);
-    expect(decoded).toContain('https://webmail.educompass.in');
+    expect(decoded).toContain('mailto:john@example.com');
     expect(decoded).toContain('John Doe - Career Counseling Report');
     expect(decoded).toContain('Dear Parent');
   });

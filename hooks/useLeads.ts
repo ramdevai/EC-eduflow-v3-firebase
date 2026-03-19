@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Lead, LeadStage } from '@/lib/types';
 import { differenceInDays } from 'date-fns';
+import { normalizeStage } from '@/lib/utils';
 
 export function useLeads() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -136,18 +137,6 @@ export function useLeads() {
 
   const reminders = useMemo(() => {
     const now = new Date();
-    const normalizeStage = (stage: string): string => {
-      const map: Record<string, string> = {
-        'Converted': 'Registration requested',
-        'Details Requested': 'Registration done',
-        'Test Sent': 'Test sent',
-        'Test Completed': 'Test completed',
-        'Appt Scheduled': '1:1 scheduled',
-        '1:1 Complete': 'Session complete',
-        'Report Sent': 'Report sent',
-      };
-      return map[stage] || stage;
-    };
 
     return leads.filter(lead => {
       const stage = normalizeStage(lead.stage);
@@ -155,6 +144,12 @@ export function useLeads() {
       
       const inquiryDate = lead.inquiryDate ? new Date(lead.inquiryDate) : now;
       const daysSinceInquiry = differenceInDays(now, inquiryDate);
+      
+      // Rule E: Fees Pending for active students (beyond Test Completed) - Priority 1
+      const lateStages = ['Test completed', '1:1 scheduled', 'Session complete', 'Report sent'];
+      if (lateStages.includes(stage) && lead.feesPaid === 'Due') {
+        return true;
+      }
       
       // Rule A: New Lead not converted in 4 days
       if (stage === 'New' && daysSinceInquiry >= 4) return true;
@@ -188,12 +183,6 @@ export function useLeads() {
         const reportDate = new Date(lead.reportSentDate);
         const daysSinceReport = differenceInDays(now, reportDate);
         if (daysSinceReport >= 2) return true;
-      }
-
-      // Rule E: Fees Pending for active students (beyond Test Completed)
-      const lateStages = ['Test completed', '1:1 scheduled', 'Session complete', 'Report sent'];
-      if (lateStages.includes(stage) && lead.feesPaid === 'Due') {
-        return true;
       }
 
       return false;

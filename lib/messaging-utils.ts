@@ -5,7 +5,7 @@ export const WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/example-group-link
 
 export function getWhatsAppLink(
   lead: Lead, 
-  type: 'onboarding' | 'test' | 'test_nudge' | 'followup' | 'community' | 'review' | 'birthday',
+  type: 'onboarding' | 'test' | 'test_nudge' | 'followup' | 'community' | 'review' | 'birthday' | 'fees_reminder',
   templates?: any[]
 ) {
   const phone = lead.phone.replace(/\D/g, '');
@@ -26,6 +26,9 @@ export function getWhatsAppLink(
             break;
         case 'test_nudge':
             message = `Hi {name}, hope you are doing well. Just a gentle nudge to complete the career assessment test so we can proceed with our 1:1 counseling session. Link: {url}`;
+            break;
+        case 'fees_reminder':
+            message = `Hi {name}, just a gentle reminder regarding the professional fees for the career counseling session. Please ignore if already paid. Thanks!`;
             break;
         case 'community':
             message = `Hi {name}, I'd like to invite you to the EduCompass Parents WhatsApp Community where I share important updates and form filling dates: ${WHATSAPP_GROUP_LINK}`;

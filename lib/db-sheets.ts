@@ -142,10 +142,13 @@ export async function getLeadByToken(spreadsheetId: string, accessToken: string,
 const DEFAULT_TEMPLATES = [
     { id: 'onboarding', label: 'Onboarding Message', message: 'Hi {name}, this is Binal from EduCompass. Great to have you onboard! Please fill this registration form to share student details: [REGISTRATION_LINK]' },
     { id: 'test', label: 'Assessment Link', message: 'Hi {name}, based on your details, here is the career assessment link: {url}. Please complete this before our 1:1 session.' },
+    { id: 'test_nudge', label: 'Test Nudge', message: 'Hi {name}, hope you are doing well. Just a gentle nudge to complete the career assessment test so we can proceed with our 1:1 counseling session. Link: {url}' },
     { id: 'followup', label: 'Follow-up Message', message: 'Hi {name}, just checking in regarding your career counseling inquiry. Do you have any questions I can help with?' },
     { id: 'community', label: 'Community Invite', message: "Hi {name}, I'd like to invite you to the EduCompass Parents WhatsApp Community where I share important updates and form filling dates: https://chat.whatsapp.com/example-group-link" },
     { id: 'review', label: 'Google Review Request', message: 'Hi {name}, it was a pleasure counseling you. If you found the session helpful, I\'d really appreciate a quick review on Google: [YOUR_GOOGLE_REVIEW_LINK]' },
     { id: 'birthday', label: 'Birthday Wish', message: 'Hi {name}, wishing you a very Happy Birthday! 🎂 Hope you have a fantastic day ahead! - Binal from EduCompass' },
+    { id: 'report_email', label: 'Report Email', message: "Dear Parent,\n\nPlease find attached the career counseling report for {name}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass" },
+    { id: 'fees_reminder', label: 'Fees Reminder', message: 'Hi {name}, just a gentle reminder regarding the professional fees for the career counseling session. Please ignore if already paid. Thanks!' },
 ];
 
 async function ensureTemplatesSheet(spreadsheetId: string, accessToken: string) {

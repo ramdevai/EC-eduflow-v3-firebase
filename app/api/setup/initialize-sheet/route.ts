@@ -98,12 +98,13 @@ export async function POST(req: Request) {
                 ['review', 'Google Review Request', 'Hi {name}, it was a pleasure counseling you. If you found the session helpful, I\'d really appreciate a quick review on Google: [YOUR_GOOGLE_REVIEW_LINK]'],
                 ['birthday', 'Birthday Wish', 'Hi {name}, wishing you a very Happy Birthday! 🎂 Hope you have a fantastic day ahead! - Binal from EduCompass'],
                 ['report_email', 'Report Email', "Dear Parent,\n\nPlease find attached the career counseling report for {name}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass"],
+                ['fees_reminder', 'Fees Reminder', 'Hi {name}, just a gentle reminder regarding the professional fees for the career counseling session. Please ignore if already paid. Thanks!'],
             ]
         ];
 
         await sheets.spreadsheets.values.update({
             spreadsheetId: sheetId,
-            range: 'Templates!A1:C9',
+            range: 'Templates!A1:C10',
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: rows },
         });
@@ -128,10 +129,11 @@ export async function POST(req: Request) {
                 ['review', 'Google Review Request', 'Hi {name}, it was a pleasure counseling you. If you found the session helpful, I\'d really appreciate a quick review on Google: [YOUR_GOOGLE_REVIEW_LINK]'],
                 ['birthday', 'Birthday Wish', 'Hi {name}, wishing you a very Happy Birthday! 🎂 Hope you have a fantastic day ahead! - Binal from EduCompass'],
                 ['report_email', 'Report Email', "Dear Parent,\n\nPlease find attached the career counseling report for {name}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass"],
+                ['fees_reminder', 'Fees Reminder', 'Hi {name}, just a gentle reminder regarding the professional fees for the career counseling session. Please ignore if already paid. Thanks!'],
             ];
             await sheets.spreadsheets.values.update({
                 spreadsheetId: sheetId,
-                range: 'Templates!A1:C9',
+                range: 'Templates!A1:C10',
                 valueInputOption: 'USER_ENTERED',
                 requestBody: { values: rows },
             });

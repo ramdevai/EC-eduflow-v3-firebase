@@ -54,6 +54,12 @@ describe('messaging utils', () => {
     expect(decoded).toContain('careertest.edumilestones.com');
   });
 
+  it('should generate correct fees reminder link', () => {
+    const link = getWhatsAppLink(mockLead, 'fees_reminder');
+    const decoded = decodeURIComponent(link);
+    expect(decoded).toContain('professional fees');
+  });
+
   it('should generate correct mailto link with subject and body', () => {
     const link = getEmailLink(mockLead);
     const decoded = decodeURIComponent(link);

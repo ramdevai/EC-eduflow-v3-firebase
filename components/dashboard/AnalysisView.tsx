@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -8,13 +8,16 @@ import {
   ArrowDownCircle, 
   PieChart,
   Target,
-  ArrowRight
+  ArrowRight,
+  Layers,
+  Activity,
+  ArrowDown
 } from 'lucide-react';
 import { Lead, LeadStage } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { normalizeStage } from '@/lib/utils';
+import { cn, normalizeStage } from '@/lib/utils';
 import { motion } from 'motion/react';
 import { formatDistanceToNow, parseISO, differenceInDays } from 'date-fns';
 
@@ -33,6 +36,7 @@ const STAGE_GROUPS = {
 const STAGE_ORDER = ['Inquiry', 'Registration', 'Testing', 'Counseling', 'Won'];
 
 export function AnalysisView({ leads }: AnalysisViewProps) {
+  const [funnelView, setFunnelView] = useState<'bars' | 'pyramid' | 'steps'>('bars');
   const stats = useMemo(() => {
     const total = leads.length;
     if (total === 0) return null;
@@ -124,10 +128,9 @@ export function AnalysisView({ leads }: AnalysisViewProps) {
             <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl flex items-center justify-center text-emerald-600">
               <TrendingUp size={20} />
             </div>
-            <Badge variant="success" className="text-[10px] font-black">{stats.totalConversion}%</Badge>
           </div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Conversion Rate</p>
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white leading-none">Overall</h3>
+          <h3 className="text-2xl font-black text-slate-900 dark:text-white leading-none">{stats.totalConversion}%</h3>
         </Card>
 
         <Card className="p-6 border-b-4 border-blue-500">
@@ -163,53 +166,148 @@ export function AnalysisView({ leads }: AnalysisViewProps) {
 
       {/* Visual Funnel */}
       <Card className="p-8">
-        <div className="flex items-center gap-2 mb-8">
-          <BarChart3 className="text-primary-600" size={20} />
-          <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Conversion Funnel</h3>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="text-primary-600" size={20} />
+            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400">Conversion Funnel</h3>
+          </div>
+          
+          <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl gap-1">
+            <button 
+              onClick={() => setFunnelView('bars')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                funnelView === 'bars' ? "bg-white dark:bg-slate-800 text-primary-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+              )}
+            >
+              Bars
+            </button>
+            <button 
+              onClick={() => setFunnelView('pyramid')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                funnelView === 'pyramid' ? "bg-white dark:bg-slate-800 text-primary-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+              )}
+            >
+              Pyramid
+            </button>
+            <button 
+              onClick={() => setFunnelView('steps')}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                funnelView === 'steps' ? "bg-white dark:bg-slate-800 text-primary-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+              )}
+            >
+              Steps
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          {stats.funnelData.map((stage, i) => {
-            const nextStage = stats.funnelData[i + 1];
-            const percentage = (stage.reached / stats.total * 100).toFixed(0);
+        {funnelView === 'bars' && (
+          <div className="space-y-6">
+            {stats.funnelData.map((stage, i) => {
+              const percentage = (stage.reached / stats.total * 100).toFixed(0);
 
-            return (
-              <div key={stage.label} className="relative">
-                <div className="flex items-center gap-4 mb-2">
-                  <div className="w-32 text-right">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{stage.label}</span>
-                  </div>
-                  <div className="flex-1 h-12 bg-slate-50 dark:bg-slate-800/50 rounded-2xl overflow-hidden relative border border-slate-100 dark:border-slate-800">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${percentage}%` }}
-                      transition={{ duration: 1, delay: i * 0.1 }}
-                      className={`h-full ${stage.color} opacity-80`}
-                    />
-                    <div className="absolute inset-0 flex items-center justify-between px-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-black text-slate-900 dark:text-white">{stage.reached} Reached</span>
-                        {stage.activeAt > 0 && (
-                          <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
-                            {stage.activeAt} Active
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        {parseFloat(stage.dropRate) > 0 && (
-                          <span className="text-[9px] font-black text-red-500 uppercase tracking-widest mr-4">
-                            {stage.dropRate}% Lost here
-                          </span>
-                        )}
-                        <span className="text-[10px] font-bold text-slate-500">{percentage}%</span>
+              return (
+                <div key={stage.label} className="relative">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="w-32 text-right">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{stage.label}</span>
+                    </div>
+                    <div className="flex-1 h-12 bg-slate-50 dark:bg-slate-800/50 rounded-2xl overflow-hidden relative border border-slate-100 dark:border-slate-800">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percentage}%` }}
+                        transition={{ duration: 1, delay: i * 0.1 }}
+                        className={`h-full ${stage.color} opacity-80`}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-between px-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-black text-slate-900 dark:text-white">{stage.reached} Reached</span>
+                          {stage.activeAt > 0 && (
+                            <span className="text-[9px] font-bold text-blue-500 uppercase tracking-widest bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                              {stage.activeAt} Active
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          {parseFloat(stage.dropRate) > 0 && (
+                            <span className="text-[9px] font-black text-red-500 uppercase tracking-widest mr-4">
+                              {stage.dropRate}% Lost here
+                            </span>
+                          )}
+                          <span className="text-[10px] font-bold text-slate-500">{percentage}%</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        )}
+
+        {funnelView === 'pyramid' && (
+          <div className="flex flex-col items-center gap-2 max-w-xl mx-auto py-4">
+            {stats.funnelData.map((stage, i) => {
+              const widthPerc = Math.max(20, (stage.reached / stats.total * 100)).toFixed(0);
+              return (
+                <motion.div 
+                  key={stage.label}
+                  initial={{ opacity: 0, scaleX: 0 }}
+                  animate={{ opacity: 1, scaleX: 1 }}
+                  transition={{ delay: i * 0.1 }}
+                  className={cn(
+                    "h-16 flex items-center justify-center relative rounded-xl border border-white/10 shadow-lg",
+                    stage.color
+                  )}
+                  style={{ width: `${widthPerc}%` }}
+                >
+                  <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-black uppercase text-white/60 tracking-widest">{stage.label}</span>
+                    <span className="text-sm font-black text-white">{stage.reached}</span>
+                  </div>
+                  <div className="absolute -right-16 top-1/2 -translate-y-1/2 text-slate-400 hidden md:block">
+                     <span className="text-[10px] font-bold">{(stage.reached / stats.total * 100).toFixed(0)}%</span>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+
+        {funnelView === 'steps' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 py-4">
+            {stats.funnelData.slice(0, -1).map((stage, i) => {
+              const nextStage = stats.funnelData[i + 1];
+              const conversion = stage.reached > 0 ? ((nextStage.reached / stage.reached) * 100).toFixed(1) : '0';
+              return (
+                <div key={stage.label} className="relative flex flex-col gap-3">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-3">{stage.label} to {nextStage.label}</p>
+                    <div className="flex items-end justify-between">
+                      <h4 className="text-2xl font-black text-primary-600">{conversion}%</h4>
+                      <Activity size={16} className="text-slate-300 mb-1" />
+                    </div>
+                  </div>
+                  {i < stats.funnelData.length - 2 && (
+                    <div className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 hidden lg:block text-slate-300">
+                      <ArrowRight size={16} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {/* Final Outcome Card */}
+            <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl">
+              <p className="text-[9px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest mb-3">Overall Efficiency</p>
+              <div className="flex items-end justify-between">
+                <h4 className="text-2xl font-black text-emerald-600">{stats.totalConversion}%</h4>
+                <Target size={16} className="text-emerald-400 mb-1" />
               </div>
-            );
-          })}
-        </div>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Stagnant Leads & Source Distribution */}

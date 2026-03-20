@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Users, UserPlus, CheckCircle2, IndianRupee } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
@@ -8,7 +8,7 @@ interface StatGridProps {
   leads: Lead[];
 }
 
-export function StatGrid({ leads }: StatGridProps) {
+export const StatGrid = memo(function StatGrid({ leads }: StatGridProps) {
   const stats = [
     {
       label: 'Total Leads',
@@ -19,7 +19,10 @@ export function StatGrid({ leads }: StatGridProps) {
     },
     {
       label: 'Active Leads',
-      value: leads.filter(l => l.status !== 'Lost').length,
+      value: leads.filter(l => {
+        const stage = normalizeStage(l.stage);
+        return l.status === 'Open' && stage !== 'Report sent' && stage !== 'Lost';
+      }).length,
       icon: UserPlus,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50 dark:bg-emerald-900/20',
@@ -55,4 +58,4 @@ export function StatGrid({ leads }: StatGridProps) {
       ))}
     </div>
   );
-}
+});

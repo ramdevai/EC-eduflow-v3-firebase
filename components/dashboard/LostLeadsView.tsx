@@ -15,7 +15,8 @@ import {
   PieChart,
   Target
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
+import { normalizeStage, safeFormat } from '@/lib/utils';
 
 interface LostLeadsViewProps {
   leads: Lead[];
@@ -157,7 +158,7 @@ export function LostLeadsView({ leads, updateLead }: LostLeadsViewProps) {
                   </td>
                   <td className="px-6 py-4">
                     <p className="text-xs font-medium text-slate-600 dark:text-slate-400">
-                      {lead.updatedAt ? format(parseISO(lead.updatedAt), 'MMM d, yyyy') : 'N/A'}
+                      {safeFormat(lead.updatedAt)}
                     </p>
                   </td>
                   <td className="px-6 py-4 text-right">

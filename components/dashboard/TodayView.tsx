@@ -5,8 +5,9 @@ import { Lead } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Calendar, Cake, MessageSquare, Clock, ExternalLink, Loader2 } from 'lucide-react';
-import { format, parseISO, isToday } from 'date-fns';
+import { format, isToday } from 'date-fns';
 import { getWhatsAppLink } from '@/lib/messaging-utils';
+import { safeFormat, safeParseISO } from '@/lib/utils';
 
 interface TodayViewProps {
   leads: Lead[];
@@ -34,7 +35,7 @@ export function TodayView({ leads, templates }: TodayViewProps) {
 
   const birthdaysToday = leads.filter(lead => {
     if (!lead.dob) return false;
-    const dob = new Date(lead.dob);
+    const dob = safeParseISO(lead.dob);
     const today = new Date();
     return dob.getDate() === today.getDate() && dob.getMonth() === today.getMonth();
   });
@@ -64,7 +65,7 @@ export function TodayView({ leads, templates }: TodayViewProps) {
                 <div className="flex justify-between items-start mb-3">
                   <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{event.summary}</h4>
                   <div className="text-[10px] font-black uppercase tracking-widest text-primary-600 bg-primary-50 px-2 py-0.5 rounded">
-                    {event.start?.dateTime ? format(parseISO(event.start.dateTime), 'h:mm a') : 'All Day'}
+                    {event.start?.dateTime ? safeFormat(event.start.dateTime, 'h:mm a') : 'All Day'}
                   </div>
                 </div>
                 {event.description && <p className="text-xs text-slate-500 mb-4 line-clamp-2">{event.description}</p>}

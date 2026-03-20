@@ -1,6 +1,6 @@
 import { getSheetsClient } from './google';
 import { Lead, LeadStage, LeadStatus, FeesPaidStatus, CommunityJoinedStatus } from './types';
-import { generateRegistrationToken } from './utils';
+import { generateRegistrationToken, safeFormat } from './utils';
 
 const RANGE = 'Leads!A2:AO';
 
@@ -42,10 +42,10 @@ export async function addLeads(spreadsheetId: string, accessToken: string, leads
     return {
       ...lead,
       id,
-      inquiryDate: lead.inquiryDate || new Date().toISOString(),
+      inquiryDate: safeFormat(lead.inquiryDate || new Date()),
       stage: lead.stage || 'New',
       status: lead.status || 'Open',
-      updatedAt: new Date().toISOString(),
+      updatedAt: safeFormat(new Date()),
       registrationToken: lead.registrationToken || generateRegistrationToken(),
       notes: lead.notes || '',
       lastFollowUp: lead.lastFollowUp || '',
@@ -85,7 +85,7 @@ export async function updateLeads(spreadsheetId: string, accessToken: string, up
     const index = existingLeads.findIndex(l => l.id === update.id);
     if (index === -1) throw new Error(`Lead with ID ${update.id} not found`);
 
-    const updatedLead = { ...existingLeads[index], ...update.data, updatedAt: new Date().toISOString() };
+    const updatedLead = { ...existingLeads[index], ...update.data, updatedAt: safeFormat(new Date()) };
     const row = mapLeadToRow(updatedLead);
     const rowNumber = index + 2;
 
@@ -353,12 +353,12 @@ export function mapLeadToRow(lead: Lead): any[] {
     lead.phone,
     lead.email,
     lead.stage,
-    lead.inquiryDate,
-    lead.updatedAt,
+    safeFormat(lead.inquiryDate),
+    safeFormat(lead.updatedAt),
     lead.googleContactId || '',
     lead.address || '',
     lead.gender || '',
-    lead.dob || '',
+    safeFormat(lead.dob),
     lead.grade || '',
     lead.board || '',
     lead.school || '',
@@ -381,13 +381,13 @@ export function mapLeadToRow(lead: Lead): any[] {
     lead.feesAmount || '',
     lead.paymentMode || '',
     lead.transactionId || '',
-    lead.reportSentDate || '',
-    lead.convertedDate || '',
+    safeFormat(lead.reportSentDate),
+    safeFormat(lead.convertedDate),
     lead.reportPdfUrl || '',
     lead.communityJoined || 'No',
     lead.registrationToken || '',
     lead.calendarEventId || '',
-    lead.lastStageUpdate || '',
+    safeFormat(lead.lastStageUpdate),
     lead.status || 'Open',
   ];
 }

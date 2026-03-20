@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { memo } from 'react';
 import { 
   Users, 
   GraduationCap, 
@@ -19,13 +19,14 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useSession, signOut } from "next-auth/react";
 
 interface SidebarProps {
-  activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis';
-  setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis') => void;
+  activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers';
+  setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers') => void;
   onMobileClose?: () => void;
   onPreferencesClick?: () => void;
+  customerCount?: number;
 }
 
-export function Sidebar({ activeTab, setActiveTab, onMobileClose, onPreferencesClick }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobileClose, onPreferencesClick, customerCount }: SidebarProps) {
   const { data: session } = useSession();
   const NavButton = ({ 
     icon: Icon, 
@@ -90,6 +91,13 @@ export function Sidebar({ activeTab, setActiveTab, onMobileClose, onPreferencesC
               onClick={() => setActiveTab('leads')} 
             />
             <NavButton 
+              icon={Users} 
+              label="All Customers" 
+              isActive={activeTab === 'customers'} 
+              onClick={() => setActiveTab('customers')} 
+              count={customerCount}
+            />
+            <NavButton 
               icon={BarChart3} 
               label="Analysis" 
               isActive={activeTab === 'analysis'} 
@@ -147,4 +155,4 @@ export function Sidebar({ activeTab, setActiveTab, onMobileClose, onPreferencesC
       </div>
     </aside>
   );
-}
+});

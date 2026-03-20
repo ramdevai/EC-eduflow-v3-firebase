@@ -15,7 +15,8 @@ import {
   Database,
   ExternalLink,
   Link as LinkIcon,
-  ChevronRight
+  ChevronRight,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSession } from "next-auth/react";
@@ -31,10 +32,12 @@ import { BottomNav } from '@/components/dashboard/BottomNav';
 import { TodayView } from '@/components/dashboard/TodayView';
 import { TemplatesView } from '@/components/dashboard/TemplatesView';
 import { LostLeadsView } from '@/components/dashboard/LostLeadsView';
+import { ImportModal } from '@/components/dashboard/ImportModal';
+import { SearchBar } from '@/components/dashboard/SearchBar';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { cn, normalizeStage } from '@/lib/utils';
+import { cn, normalizeStage, safeFormat } from '@/lib/utils';
 import { getWhatsAppLink } from '@/lib/messaging-utils';
 import { LoginScreen } from '@/components/LoginScreen';
 
@@ -55,8 +58,9 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<'leads' | 'today' | 'templates' | 'lost' | 'analysis'>('leads');
+  const [activeTab, setActiveTab] = useState<'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers'>('leads');
   const [isSyncing, setIsSyncing] = useState(false);
   
   // Sync selectedLead with latest data from leads hook
@@ -235,16 +239,33 @@ export default function Dashboard() {
   };
 
   const filteredLeads = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
+    const isSearchActive = query.length > 0;
+
     return leads.filter(lead => {
-      const matchesSearch = lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          lead.phone.includes(searchQuery) ||
-                          (lead.email && lead.email.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesStage = selectedStage === 'All' || normalizeStage(lead.stage) === selectedStage;
+      const matchesSearch = !isSearchActive || 
+                          lead.name.toLowerCase().includes(query) ||
+                          lead.phone.includes(query) ||
+                          (lead.email && lead.email.toLowerCase().includes(query));
+
+      const normalized = normalizeStage(lead.stage);
+      const matchesStage = selectedStage === 'All' || normalized === selectedStage;
       
-      if (activeTab === 'lost') return lead.stage === 'Lost';
-      return matchesSearch && matchesStage && lead.stage !== 'Lost';
+      if (activeTab === 'lost') return lead.stage === 'Lost' && matchesSearch;
+      if (activeTab === 'customers') return normalized === 'Report sent' && matchesSearch;
+      
+      // Default 'leads' tab: hide Lost and Report sent
+      return matchesSearch && matchesStage && lead.stage !== 'Lost' && normalized !== 'Report sent';
     });
   }, [leads, searchQuery, selectedStage, activeTab]);
+
+  const customerCount = useMemo(() => {
+    return leads.filter(l => normalizeStage(l.stage) === 'Report sent').length;
+  }, [leads]);
+
+  const kanbanStages = useMemo(() => 
+    STAGES.filter(s => s !== 'Lost' && s !== 'Report sent'),
+  []);
 
   // Main Render Logic
   return (
@@ -370,7 +391,19 @@ export default function Dashboard() {
                                             </p>
                                         </div>
                                         
-                                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800/50">
+                                        <div className="pt-4 border-t border-slate-100 dark:border-slate-800/50 space-y-4">
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-full h-12 rounded-xl text-xs gap-2 border-primary-100 text-primary-600 hover:bg-primary-50"
+                                                onClick={() => {
+                                                    setIsSettingsOpen(false);
+                                                    setIsImportModalOpen(true);
+                                                }}
+                                            >
+                                                <Download size={14} />
+                                                Import from External Sheet
+                                            </Button>
+
                                             <Button 
                                                 variant="outline" 
                                                 className="w-full h-12 rounded-xl text-[10px] gap-2 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-primary-600 transition-all"
@@ -426,6 +459,7 @@ export default function Dashboard() {
                                     setActiveTab={setActiveTab} 
                                     onMobileClose={() => setIsSidebarOpen(false)}
                                     onPreferencesClick={() => setIsSettingsOpen(true)}
+                                    customerCount={customerCount}
                                 />
                             </motion.div>
                         </motion.div>
@@ -438,6 +472,7 @@ export default function Dashboard() {
                         activeTab={activeTab} 
                         setActiveTab={setActiveTab} 
                         onPreferencesClick={() => setIsSettingsOpen(true)}
+                        customerCount={customerCount}
                     />
                 </div>
 
@@ -458,6 +493,7 @@ export default function Dashboard() {
                                 {activeTab === 'today' ? "Today's Agenda" : 
                                  activeTab === 'templates' ? 'Message Templates' : 
                                  activeTab === 'lost' ? 'Lost Deals' : 
+                                 activeTab === 'customers' ? 'All Customers' :
                                  activeTab === 'analysis' ? 'Business Analysis' :
                                  (selectedStage === 'All' ? 'Pipeline' : selectedStage)}
                                 </h1>
@@ -505,47 +541,44 @@ export default function Dashboard() {
                     {activeTab === 'leads' && <StatGrid leads={leads} />}
                     </header>
 
-                    {activeTab === 'leads' && (
+                    {(activeTab === 'leads' || activeTab === 'customers') && (
                     <>
                         {/* Action Bar */}
                         <div className="flex items-center gap-2 md:gap-4 mb-8">
-                        <div className="relative flex-1 group">
-                            <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors" size={16} />
-                            <input 
-                            type="text" 
-                            placeholder="Search..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 md:pl-12 pr-4 py-2.5 md:py-3.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs md:text-sm outline-none focus:ring-4 focus:ring-primary-500/10 focus:border-primary-500 shadow-sm transition-all dark:placeholder:text-slate-600"
-                            />
-                        </div>
+                        <SearchBar 
+                            placeholder={activeTab === 'customers' ? "Search customers..." : "Search leads..."}
+                            onSearch={setSearchQuery}
+                            initialValue={searchQuery}
+                        />
                         
-                        <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-1 shadow-sm shrink-0">
-                            <button 
-                            onClick={() => setViewMode('list')}
-                            className={cn(
-                                "p-2 md:px-4 md:py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest",
-                                viewMode === 'list' ? "bg-primary-600 text-white shadow-lg shadow-primary-200 dark:shadow-none" : "text-slate-400 hover:text-slate-600"
-                            )}
-                            >
-                            <ListIcon size={16} />
-                            <span className="hidden md:inline">List</span>
-                            </button>
-                            <button 
-                            onClick={() => setViewMode('kanban')}
-                            className={cn(
-                                "p-2 md:px-4 md:py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest",
-                                viewMode === 'kanban' ? "bg-primary-600 text-white shadow-lg shadow-primary-200 dark:shadow-none" : "text-slate-400 hover:text-slate-600"
-                            )}
-                            >
-                            <LayoutGrid size={16} />
-                            <span className="hidden md:inline">Kanban</span>
-                            </button>
-                        </div>
+                        {activeTab === 'leads' && (
+                            <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-1 shadow-sm shrink-0">
+                                <button 
+                                onClick={() => setViewMode('list')}
+                                className={cn(
+                                    "p-2 md:px-4 md:py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest",
+                                    viewMode === 'list' ? "bg-primary-600 text-white shadow-lg shadow-primary-200 dark:shadow-none" : "text-slate-400 hover:text-slate-600"
+                                )}
+                                >
+                                <ListIcon size={16} />
+                                <span className="hidden md:inline">List</span>
+                                </button>
+                                <button 
+                                onClick={() => setViewMode('kanban')}
+                                className={cn(
+                                    "p-2 md:px-4 md:py-2 rounded-xl transition-all flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest",
+                                    viewMode === 'kanban' ? "bg-primary-600 text-white shadow-lg shadow-primary-200 dark:shadow-none" : "text-slate-400 hover:text-slate-600"
+                                )}
+                                >
+                                <LayoutGrid size={16} />
+                                <span className="hidden md:inline">Kanban</span>
+                                </button>
+                            </div>
+                        )}
                         </div>
 
                         {/* Attention Items */}
-                        {reminders.length > 0 && (
+                        {activeTab === 'leads' && reminders.length > 0 && (
                         <section className="mb-10 overflow-hidden">
                             <div className="flex items-center gap-2 mb-4 px-1">
                             <AlertCircle size={16} className="text-amber-500" />
@@ -653,29 +686,38 @@ export default function Dashboard() {
                                         </Button>
                                     )}
                                 </div>
-                            )}
-                            {loading ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
-                                {[1, 2, 3].map(i => (
-                                <div key={i} className="h-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem]" />
-                                ))}
-                            </div>
-                            ) : (
-                            viewMode === 'kanban' ? (
-                                <KanbanView 
-                                leads={leads} 
-                                stages={STAGES.filter(s => s !== 'Lost')} 
-                                onLeadClick={setSelectedLead} 
-                                searchQuery={searchQuery}
-                                />
-                            ) : (
+                             )}
+                             {loading ? (
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+                                 {[1, 2, 3].map(i => (
+                                 <div key={i} className="h-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[2rem]" />
+                                 ))}
+                             </div>
+                             ) : (
+                             activeTab === 'customers' ? (
                                 <ListView 
-                                leads={filteredLeads} 
-                                onLeadClick={setSelectedLead} 
+                                    leads={filteredLeads} 
+                                    onLeadClick={setSelectedLead} 
                                 />
-                            )
-                            )}
+                             ) : (
+                                viewMode === 'kanban' ? (
+                                <KanbanView 
+                                    leads={leads} 
+                                    stages={kanbanStages} 
+                                    onLeadClick={setSelectedLead} 
+                                    searchQuery={searchQuery}
+                                />
+
+                                ) : (
+                                    <ListView 
+                                    leads={filteredLeads} 
+                                    onLeadClick={setSelectedLead} 
+                                    />
+                                )
+                             )
+                             )}
                         </div>
+
                     </>
                     )}
 
@@ -707,6 +749,15 @@ export default function Dashboard() {
 
                 {/* Modern Add Modal */}
                 <AnimatePresence mode="wait">
+                    {isImportModalOpen && (
+                        <ImportModal 
+                            sheetId={sheetId!} 
+                            onClose={() => setIsImportModalOpen(false)} 
+                            onSuccess={() => {
+                                fetchLeads();
+                            }}
+                        />
+                    )}
                     {isAddModalOpen && (
                     <motion.div 
                         key="add-modal-backdrop"

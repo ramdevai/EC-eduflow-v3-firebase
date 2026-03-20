@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { memo } from 'react';
 import { Lead, LeadStage } from '@/lib/types';
 import { LeadCard } from './LeadCard';
 import { normalizeStage } from '@/lib/utils';
@@ -12,7 +12,7 @@ interface KanbanViewProps {
   searchQuery: string;
 }
 
-export function KanbanView({ leads, stages, onLeadClick, searchQuery }: KanbanViewProps) {
+export const KanbanView = memo(function KanbanView({ leads, stages, onLeadClick, searchQuery }: KanbanViewProps) {
   return (
     <div className="flex gap-6 overflow-x-auto pb-8 no-scrollbar min-h-[600px] -mx-4 px-4 sm:mx-0 sm:px-0">
       {stages.map(stage => {
@@ -50,4 +50,4 @@ export function KanbanView({ leads, stages, onLeadClick, searchQuery }: KanbanVi
       })}
     </div>
   );
-}
+});

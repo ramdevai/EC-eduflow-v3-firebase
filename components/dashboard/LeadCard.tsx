@@ -3,11 +3,10 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Phone, Mail, GraduationCap, ChevronRight, Clock, CreditCard, AlertCircle, Ban, XCircle } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
 import { Lead } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { cn, normalizeStage } from '@/lib/utils';
+import { cn, normalizeStage, safeFormat } from '@/lib/utils';
 
 interface LeadCardProps {
   lead: Lead;
@@ -91,7 +90,7 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
         <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
             <Clock size={12} />
-            {lead.inquiryDate ? format(parseISO(lead.inquiryDate), 'MMM d, yyyy') : 'N/A'}
+            {safeFormat(lead.inquiryDate)}
           </div>
           <ChevronRight size={14} className="text-slate-300 dark:text-slate-600 group-hover:text-primary-500 transform group-hover:translate-x-0.5 transition-all" />
         </div>

@@ -30,12 +30,12 @@ import {
   Ban,
   Pencil
 } from 'lucide-react';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { differenceInDays } from 'date-fns';
 import { Lead, LeadStage, FeesPaidStatus, TEST_LINKS } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
-import { cn, normalizeStage, generateRegistrationToken } from '@/lib/utils';
+import { cn, normalizeStage, generateRegistrationToken, safeParseISO, safeFormat, toInputFormat } from '@/lib/utils';
 import { getWhatsAppLink, getEmailLink, getTestLinkByGrade, getReportEmailData } from '@/lib/messaging-utils';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import { EmailComposer } from './EmailComposer';
@@ -102,8 +102,8 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
   if (!lead) return null;
 
   const currentStage = localStage || (normalizeStage(lead.stage) as LeadStage);
-  const connectionAge = lead.inquiryDate ? differenceInDays(new Date(), new Date(lead.inquiryDate)) : 0;
-  const stageAge = lead.lastStageUpdate ? differenceInDays(new Date(), new Date(lead.lastStageUpdate)) : 0;
+  const connectionAge = lead.inquiryDate ? differenceInDays(new Date(), safeParseISO(lead.inquiryDate)) : 0;
+  const stageAge = lead.lastStageUpdate ? differenceInDays(new Date(), safeParseISO(lead.lastStageUpdate)) : 0;
 
   const fetchAvailability = async () => {
     setLoadingCalendar(true);
@@ -267,8 +267,8 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                         onClick={() => handleSchedule(slot)}
                         className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-[10px] font-bold hover:border-primary-500 transition-all text-left shadow-sm"
                     >
-                        {format(parseISO(slot), 'EEE, MMM d')}
-                        <div className="text-primary-600 text-xs">{format(parseISO(slot), 'h:mm a')}</div>
+                        {safeFormat(slot, 'EEE, dd MMM yyyy')}
+                        <div className="text-primary-600 text-xs">{safeFormat(slot, 'h:mm a')}</div>
                     </button>
                 ))}
                 {generateFreeSlots(busySlots).length === 0 && (
@@ -291,8 +291,10 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                 value={localFeesPaid}
                 onChange={(e) => {
                     const status = e.target.value as FeesPaidStatus;
-                    setLocalFeesPaid(status);
-                    onUpdate(lead.id, { feesPaid: status });
+                    if (status !== lead.feesPaid) {
+                        setLocalFeesPaid(status);
+                        onUpdate(lead.id, { feesPaid: status });
+                    }
                 }}
             >
                 <option value="Due">Fees Due</option>
@@ -343,7 +345,9 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                         className="w-full p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold text-sm outline-none focus:border-primary-500 appearance-none transition-all"
                         onChange={(e) => {
                             const val = e.target.value;
-                            if (val) onUpdate(lead.id, { testLink: val });
+                            if (val && val !== lead.testLink) {
+                                onUpdate(lead.id, { testLink: val });
+                            }
                         }}
                         value={lead.testLink || ''}
                     >
@@ -415,8 +419,8 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                     <div className="flex items-center gap-3">
                         <Calendar size={20} className="text-primary-600" />
                         <div>
-                            <p className="text-sm font-bold">{lead.appointmentTime ? format(parseISO(lead.appointmentTime), 'EEE, MMM d') : 'No time set'}</p>
-                            <p className="text-xs font-medium text-primary-600">{lead.appointmentTime ? format(parseISO(lead.appointmentTime), 'h:mm a') : ''}</p>
+                            <p className="text-sm font-bold">{lead.appointmentTime ? safeFormat(lead.appointmentTime, 'EEE, dd MMM yyyy') : 'No time set'}</p>
+                            <p className="text-xs font-medium text-primary-600">{lead.appointmentTime ? safeFormat(lead.appointmentTime, 'h:mm a') : ''}</p>
                         </div>
                     </div>
                     <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-full transition-colors shadow-sm" onClick={fetchAvailability}>
@@ -499,7 +503,11 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                 <div className="group">
                     <input 
                         defaultValue={lead.name} 
-                        onBlur={(e) => onUpdate(lead.id, { name: e.target.value })}
+                        onBlur={(e) => {
+                            if (e.target.value !== lead.name) {
+                                onUpdate(lead.id, { name: e.target.value });
+                            }
+                        }}
                         className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight w-full bg-transparent border-b border-transparent focus:border-primary-500 outline-none transition-all"
                     />
                 </div>
@@ -543,7 +551,11 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                             <div className="flex gap-2">
                                 <input 
                                     defaultValue={lead.phone} 
-                                    onBlur={(e) => onUpdate(lead.id, { phone: e.target.value })}
+                                    onBlur={(e) => {
+                                        if (e.target.value !== lead.phone) {
+                                            onUpdate(lead.id, { phone: e.target.value });
+                                        }
+                                    }}
                                     className="flex-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm font-bold outline-none focus:border-primary-500"
                                 />
                                 <Button variant="outline" className="w-10 h-10 p-0 rounded-xl" onClick={() => window.open(`tel:${lead.phone}`)}>
@@ -556,7 +568,11 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                             <div className="flex gap-2">
                                 <input 
                                     defaultValue={lead.email} 
-                                    onBlur={(e) => onUpdate(lead.id, { email: e.target.value })}
+                                    onBlur={(e) => {
+                                        if (e.target.value !== lead.email) {
+                                            onUpdate(lead.id, { email: e.target.value });
+                                        }
+                                    }}
                                     className="flex-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm font-bold outline-none focus:border-primary-500"
                                 />
                                 <Button variant="outline" className="w-10 h-10 p-0 rounded-xl" onClick={() => window.open(`mailto:${lead.email}`)}>
@@ -568,7 +584,16 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Inquiry Date</label>
-                            <input type="date" value={lead.inquiryDate ? lead.inquiryDate.split('T')[0] : ''} disabled className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold" />
+                            <input 
+                                type="date" 
+                                defaultValue={toInputFormat(lead.inquiryDate)} 
+                                onBlur={(e) => {
+                                    if (e.target.value !== toInputFormat(lead.inquiryDate)) {
+                                        onUpdate(lead.id, { inquiryDate: safeFormat(e.target.value) });
+                                    }
+                                }}
+                                className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold" 
+                            />
                         </div>
                         <div className="space-y-2">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Source</label>
@@ -588,25 +613,66 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                     <div className="grid grid-cols-2 gap-4">
                         <div className="group">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Grade/Class</label>
-                            <input defaultValue={lead.grade} onBlur={(e) => onUpdate(lead.id, { grade: e.target.value })} className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all" />
+                            <input 
+                                defaultValue={lead.grade} 
+                                onBlur={(e) => {
+                                    if (e.target.value !== lead.grade) {
+                                        onUpdate(lead.id, { grade: e.target.value });
+                                    }
+                                }} 
+                                className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all" 
+                            />
                         </div>
                         <div className="group">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Board</label>
-                            <input defaultValue={lead.board} onBlur={(e) => onUpdate(lead.id, { board: e.target.value })} className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all" />
+                            <input 
+                                defaultValue={lead.board} 
+                                onBlur={(e) => {
+                                    if (e.target.value !== lead.board) {
+                                        onUpdate(lead.id, { board: e.target.value });
+                                    }
+                                }} 
+                                className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all" 
+                            />
                         </div>
                     </div>
                     <div className="group">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">School Name</label>
-                        <input defaultValue={lead.school} onBlur={(e) => onUpdate(lead.id, { school: e.target.value })} className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all" />
+                        <input 
+                            defaultValue={lead.school} 
+                            onBlur={(e) => {
+                                if (e.target.value !== lead.school) {
+                                    onUpdate(lead.id, { school: e.target.value });
+                                }
+                            }} 
+                            className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all" 
+                        />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="group">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Date of Birth</label>
-                            <input type="date" defaultValue={lead.dob} onBlur={(e) => onUpdate(lead.id, { dob: e.target.value })} className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all" />
+                            <input 
+                                type="date" 
+                                defaultValue={toInputFormat(lead.dob)} 
+                                onBlur={(e) => {
+                                    if (e.target.value !== toInputFormat(lead.dob)) {
+                                        onUpdate(lead.id, { dob: safeFormat(e.target.value) });
+                                    }
+                                }} 
+                                className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all" 
+                            />
                         </div>
                         <div className="group">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Gender</label>
-                            <select defaultValue={lead.gender} onChange={(e) => onUpdate(lead.id, { gender: e.target.value })} className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all appearance-none">
+                            <select 
+                                defaultValue={lead.gender} 
+                                onChange={(e) => {
+                                    if (e.target.value !== lead.gender) {
+                                        onUpdate(lead.id, { gender: e.target.value });
+                                    }
+                                }} 
+                                className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all appearance-none"
+                            >
                                 <option value="">Select...</option>
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
@@ -615,7 +681,15 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                     </div>
                     <div className="group">
                         <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Hobbies</label>
-                        <textarea defaultValue={lead.hobbies} onBlur={(e) => onUpdate(lead.id, { hobbies: e.target.value })} className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold outline-none border border-slate-200 dark:border-slate-800 focus:border-primary-500 transition-all resize-none min-h-[80px]" />
+                        <textarea 
+                            defaultValue={lead.hobbies} 
+                            onBlur={(e) => {
+                                if (e.target.value !== lead.hobbies) {
+                                    onUpdate(lead.id, { hobbies: e.target.value });
+                                }
+                            }} 
+                            className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold outline-none border border-slate-200 dark:border-slate-800 focus:border-primary-500 transition-all resize-none min-h-[80px]" 
+                        />
                     </div>
                   </motion.div>
                 )}
@@ -627,18 +701,72 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                     <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl space-y-4">
                         <p className="text-[10px] font-black uppercase tracking-widest text-primary-600">Father's Details</p>
                         <div className="grid grid-cols-2 gap-4">
-                            <input placeholder="Name" defaultValue={lead.fatherName} onBlur={(e) => onUpdate(lead.id, { fatherName: e.target.value })} className="p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" />
-                            <input placeholder="Phone" defaultValue={lead.fatherPhone} onBlur={(e) => onUpdate(lead.id, { fatherPhone: e.target.value })} className="p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" />
+                            <input 
+                                placeholder="Name" 
+                                defaultValue={lead.fatherName} 
+                                onBlur={(e) => {
+                                    if (e.target.value !== lead.fatherName) {
+                                        onUpdate(lead.id, { fatherName: e.target.value });
+                                    }
+                                }} 
+                                className="p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" 
+                            />
+                            <input 
+                                placeholder="Phone" 
+                                defaultValue={lead.fatherPhone} 
+                                onBlur={(e) => {
+                                    if (e.target.value !== lead.fatherPhone) {
+                                        onUpdate(lead.id, { fatherPhone: e.target.value });
+                                    }
+                                }} 
+                                className="p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" 
+                            />
                         </div>
-                        <input placeholder="Occupation" defaultValue={lead.fatherOccupation} onBlur={(e) => onUpdate(lead.id, { fatherOccupation: e.target.value })} className="w-full p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" />
+                        <input 
+                            placeholder="Occupation" 
+                            defaultValue={lead.fatherOccupation} 
+                            onBlur={(e) => {
+                                if (e.target.value !== lead.fatherOccupation) {
+                                    onUpdate(lead.id, { fatherOccupation: e.target.value });
+                                }
+                            }} 
+                            className="w-full p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" 
+                        />
                     </div>
                     <div className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl space-y-4">
                         <p className="text-[10px] font-black uppercase tracking-widest text-pink-600">Mother's Details</p>
                         <div className="grid grid-cols-2 gap-4">
-                            <input placeholder="Name" defaultValue={lead.motherName} onBlur={(e) => onUpdate(lead.id, { motherName: e.target.value })} className="p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" />
-                            <input placeholder="Phone" defaultValue={lead.motherPhone} onBlur={(e) => onUpdate(lead.id, { motherPhone: e.target.value })} className="p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" />
+                            <input 
+                                placeholder="Name" 
+                                defaultValue={lead.motherName} 
+                                onBlur={(e) => {
+                                    if (e.target.value !== lead.motherName) {
+                                        onUpdate(lead.id, { motherName: e.target.value });
+                                    }
+                                }} 
+                                className="p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" 
+                            />
+                            <input 
+                                placeholder="Phone" 
+                                defaultValue={lead.motherPhone} 
+                                onBlur={(e) => {
+                                    if (e.target.value !== lead.motherPhone) {
+                                        onUpdate(lead.id, { motherPhone: e.target.value });
+                                    }
+                                }} 
+                                className="p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" 
+                            />
                         </div>
-                        <input placeholder="Occupation" defaultValue={lead.motherOccupation} onBlur={(e) => onUpdate(lead.id, { motherOccupation: e.target.value })} className="w-full p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" />
+                        <input 
+                            placeholder="Occupation" 
+                            defaultValue={lead.motherOccupation} 
+                            onBlur={(e) => {
+                                if (e.target.value !== lead.motherOccupation) {
+                                    onUpdate(lead.id, { motherOccupation: e.target.value });
+                                }
+                            }} 
+                            className="w-full p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" 
+                        />
                     </div>
                   </motion.div>
                 )}
@@ -654,7 +782,11 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                         </div>
                         <textarea 
                             defaultValue={lead.notes} 
-                            onBlur={(e) => onUpdate(lead.id, { notes: e.target.value })} 
+                            onBlur={(e) => {
+                                if (e.target.value !== lead.notes) {
+                                    onUpdate(lead.id, { notes: e.target.value });
+                                }
+                            }} 
                             placeholder="Type session recommendations here..."
                             className="w-full p-5 bg-slate-50 dark:bg-slate-900 rounded-3xl text-sm font-medium border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all resize-none min-h-[200px]" 
                         />
@@ -663,13 +795,30 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                          <div className="group">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Assessment URL</label>
                             <div className="flex gap-2">
-                                <input defaultValue={lead.testLink} onBlur={(e) => onUpdate(lead.id, { testLink: e.target.value })} className="flex-1 p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-xs font-mono outline-none border border-slate-200 dark:border-slate-800 focus:border-primary-500" />
+                                <input 
+                                    defaultValue={lead.testLink} 
+                                    onBlur={(e) => {
+                                        if (e.target.value !== lead.testLink) {
+                                            onUpdate(lead.id, { testLink: e.target.value });
+                                        }
+                                    }} 
+                                    className="flex-1 p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-xs font-mono outline-none border border-slate-200 dark:border-slate-800 focus:border-primary-500" 
+                                />
                                 <Button variant="outline" className="rounded-2xl" onClick={() => window.open(lead.testLink, '_blank')} disabled={!lead.testLink}><ExternalLink size={16}/></Button>
                             </div>
                         </div>
                         <div className="group">
                             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Report PDF Link</label>
-                            <input defaultValue={lead.reportPdfUrl} onBlur={(e) => onUpdate(lead.id, { reportPdfUrl: e.target.value })} placeholder="Paste edumilestones report link here..." className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-xs font-mono outline-none border border-slate-200 dark:border-slate-800 focus:border-primary-500" />
+                            <input 
+                                defaultValue={lead.reportPdfUrl} 
+                                onBlur={(e) => {
+                                    if (e.target.value !== lead.reportPdfUrl) {
+                                        onUpdate(lead.id, { reportPdfUrl: e.target.value });
+                                    }
+                                }} 
+                                placeholder="Paste edumilestones report link here..." 
+                                className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-xs font-mono outline-none border border-slate-200 dark:border-slate-800 focus:border-primary-500" 
+                            />
                         </div>
                     </div>
                   </motion.div>

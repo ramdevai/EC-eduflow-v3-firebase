@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, memo } from 'react';
 import { 
   BarChart3, 
   TrendingUp, 
@@ -17,9 +17,10 @@ import { Lead, LeadStage } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { cn, normalizeStage } from '@/lib/utils';
+import { cn, normalizeStage, safeParseISO, safeFormat } from '@/lib/utils';
 import { motion } from 'motion/react';
-import { formatDistanceToNow, parseISO, differenceInDays } from 'date-fns';
+import { formatDistanceToNow, differenceInDays } from 'date-fns';
+
 
 interface AnalysisViewProps {
   leads: Lead[];
@@ -35,8 +36,9 @@ const STAGE_GROUPS = {
 
 const STAGE_ORDER = ['Inquiry', 'Registration', 'Testing', 'Counseling', 'Won'];
 
-export function AnalysisView({ leads }: AnalysisViewProps) {
+export const AnalysisView = memo(function AnalysisView({ leads }: AnalysisViewProps) {
   const [funnelView, setFunnelView] = useState<'bars' | 'pyramid' | 'steps'>('bars');
+
   const stats = useMemo(() => {
     const total = leads.length;
     if (total === 0) return null;
@@ -81,11 +83,11 @@ export function AnalysisView({ leads }: AnalysisViewProps) {
     const stagnantLeads = activeLeads.filter(l => {
       const dateStr = l.lastStageUpdate || l.updatedAt || l.inquiryDate;
       if (!dateStr) return false;
-      return differenceInDays(new Date(), parseISO(dateStr)) >= 7;
+      return differenceInDays(new Date(), safeParseISO(dateStr)) >= 7;
     }).sort((a, b) => {
       const dateA = a.lastStageUpdate || a.updatedAt || a.inquiryDate;
       const dateB = b.lastStageUpdate || b.updatedAt || b.inquiryDate;
-      return differenceInDays(new Date(), parseISO(dateA)) - differenceInDays(new Date(), parseISO(dateB));
+      return differenceInDays(new Date(), safeParseISO(dateA)) - differenceInDays(new Date(), safeParseISO(dateB));
     }).reverse();
 
     // Conversion Rates
@@ -327,7 +329,7 @@ export function AnalysisView({ leads }: AnalysisViewProps) {
                 <div>
                   <p className="text-xs font-bold text-slate-900 dark:text-white">{lead.name}</p>
                   <p className="text-[10px] text-slate-500 font-medium">
-                    {lead.stage} • {formatDistanceToNow(parseISO(lead.lastStageUpdate || lead.updatedAt || lead.inquiryDate))} in stage
+                    {lead.stage} • {formatDistanceToNow(safeParseISO(lead.lastStageUpdate || lead.updatedAt || lead.inquiryDate))} in stage
                   </p>
                 </div>
                 <Badge variant="warning" className="text-[9px] font-bold border-amber-200 text-amber-600 bg-amber-50">Nudge</Badge>
@@ -408,5 +410,5 @@ export function AnalysisView({ leads }: AnalysisViewProps) {
       </Card>
     </div>
   );
-}
+});
 

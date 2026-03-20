@@ -11,8 +11,8 @@ import { cn } from '@/lib/utils';
 import { LeadStage } from '@/lib/types';
 
 interface BottomNavProps {
-  activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis';
-  setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis') => void;
+  activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers';
+  setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers') => void;
   onAddClick: () => void;
   onSyncClick: () => void;
   isSyncing?: boolean;

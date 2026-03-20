@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google';
 import { getLeadByToken, updateLead } from '@/lib/db-sheets';
 import { google } from 'googleapis';
+import { toInputFormat, safeFormat } from '@/lib/utils';
 
 async function getSystemAccessToken() {
     const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
@@ -57,7 +58,7 @@ export async function GET(
         grade: lead.grade,
         board: lead.board,
         address: lead.address,
-        dob: lead.dob,
+        dob: toInputFormat(lead.dob),
         gender: lead.gender,
         school: lead.school,
         hobbies: lead.hobbies,
@@ -101,8 +102,9 @@ export async function POST(
     // Update the lead with form data and EXPIRE the token
     const updates = {
         ...body,
+        dob: safeFormat(body.dob), // Ensure Indian format in DB
         stage: lead.stage === 'Registration requested' ? 'Registration done' : lead.stage,
-        updatedAt: new Date().toISOString(),
+        updatedAt: safeFormat(new Date()),
         registrationToken: '' // Clear token so link expires
     };
 

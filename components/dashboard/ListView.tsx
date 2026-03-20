@@ -1,19 +1,19 @@
 "use client";
 
-import React from 'react';
-import { format, parseISO } from 'date-fns';
+import React, { memo } from 'react';
 import { MoreVertical, Phone, Mail, Clock } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
-import { cn, normalizeStage } from '@/lib/utils';
+import { cn, normalizeStage, safeFormat } from '@/lib/utils';
 import { LeadCard } from './LeadCard';
+
 
 interface ListViewProps {
   leads: Lead[];
   onLeadClick: (lead: Lead) => void;
 }
 
-export function ListView({ leads, onLeadClick }: ListViewProps) {
+export const ListView = memo(function ListView({ leads, onLeadClick }: ListViewProps) {
 
   const getStageVariant = (stage: string) => {
     const normalized = normalizeStage(stage);
@@ -51,7 +51,7 @@ export function ListView({ leads, onLeadClick }: ListViewProps) {
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
                 <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">#</th>
-                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Lead Details</th>
+                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Student name</th>
                 <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
                 <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Education</th>
                 <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Date</th>
@@ -77,8 +77,8 @@ export function ListView({ leads, onLeadClick }: ListViewProps) {
 
                     </div>
                   </td>
-                  <td className="p-4">
-                    <Badge variant={getStageVariant(lead.stage)}>{normalizeStage(lead.stage)}</Badge>
+                  <td className="p-4 whitespace-nowrap">
+                    <Badge variant={getStageVariant(lead.stage)} className="whitespace-nowrap">{normalizeStage(lead.stage)}</Badge>
                   </td>
                   <td className="p-4">
                     <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">{lead.grade || 'N/A'}</div>
@@ -87,7 +87,7 @@ export function ListView({ leads, onLeadClick }: ListViewProps) {
                   <td className="p-4">
                     <div className="flex items-center gap-1.5 text-xs text-slate-500">
                       <Clock size={14} className="text-slate-300" />
-                      {format(parseISO(lead.inquiryDate), 'MMM d, yyyy')}
+                      {safeFormat(lead.inquiryDate)}
                     </div>
                   </td>
                   <td className="p-4 text-right">
@@ -109,4 +109,4 @@ export function ListView({ leads, onLeadClick }: ListViewProps) {
       )}
     </div>
   );
-}
+});

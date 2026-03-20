@@ -1,8 +1,70 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { parseISO, isValid, format, parse } from 'date-fns';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+export function safeParseISO(dateStr: string | undefined | null): Date {
+  if (!dateStr) return new Date();
+  
+  const str = dateStr.trim();
+
+  // 1. Try standard parseISO
+  try {
+    const parsed = parseISO(str);
+    if (isValid(parsed)) return parsed;
+  } catch (e) {}
+
+  // 2. Try Indian Format (DD/MM/YYYY)
+  try {
+    const indianParsed = parse(str, 'dd/MM/yyyy', new Date());
+    if (isValid(indianParsed)) return indianParsed;
+  } catch (e) {}
+  
+  // 3. Try Indian Format with time (DD/MM/YYYY HH:mm:ss)
+  try {
+    const indianDateTimeParsed = parse(str, 'dd/MM/yyyy HH:mm:ss', new Date());
+    if (isValid(indianDateTimeParsed)) return indianDateTimeParsed;
+  } catch (e) {}
+
+  // 4. Try dd MMM yyyy Format
+  try {
+    const mmmParsed = parse(str, 'dd MMM yyyy', new Date());
+    if (isValid(mmmParsed)) return mmmParsed;
+  } catch (e) {}
+
+  // 5. Try native Date constructor (handles MM/DD/YYYY or YYYY/MM/DD)
+  try {
+    const native = new Date(str);
+    if (isValid(native)) return native;
+  } catch (e) {}
+
+  // 5. Try Google Serial Date (numeric)
+  if (!isNaN(Number(str))) {
+    const excelEpoch = new Date(1899, 11, 30);
+    const days = Number(str);
+    const result = new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000);
+    if (isValid(result)) return result;
+  }
+  
+  // Fallback to now
+  return new Date();
+}
+
+export function safeFormat(date: string | Date | undefined | null, formatStr: string = 'dd MMM yyyy'): string {
+  if (!date) return '';
+  const dateObj = typeof date === 'string' ? safeParseISO(date) : date;
+  return format(dateObj, formatStr);
+}
+
+/**
+ * Converts any date string to YYYY-MM-DD for HTML inputs
+ */
+export function toInputFormat(dateStr: string | undefined | null): string {
+  if (!dateStr) return '';
+  return format(safeParseISO(dateStr), 'yyyy-MM-dd');
 }
 
 export function normalizeStage(stage: string): string {

@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Users, UserPlus, CheckCircle2, IndianRupee } from 'lucide-react';
+import { UserPlus, CheckCircle2, IndianRupee } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { normalizeStage } from '@/lib/utils';
@@ -10,13 +10,6 @@ interface StatGridProps {
 
 export const StatGrid = memo(function StatGrid({ leads }: StatGridProps) {
   const stats = [
-    {
-      label: 'Total Leads',
-      value: leads.length,
-      icon: Users,
-      color: 'text-blue-600',
-      bg: 'bg-blue-50 dark:bg-blue-900/20',
-    },
     {
       label: 'Active Leads',
       value: leads.filter(l => {

@@ -43,6 +43,7 @@ import { DrawerProfileForm } from './drawer/DrawerProfileForm';
 import { DrawerFamilyForm } from './drawer/DrawerFamilyForm';
 import { DrawerCounselingForm } from './drawer/DrawerCounselingForm';
 import { DrawerPipelineForm } from './drawer/DrawerPipelineForm';
+import { DrawerFeesForm } from './drawer/DrawerFeesForm';
 
 const TEST_OPTIONS = [
   { name: "Career Analysis for 2nd to 7th class", url: "https://careertest.edumilestones.com/student-dashboard/suitability-registration/login/OTI2/as11" },
@@ -71,7 +72,7 @@ interface LeadDrawerProps {
 export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates }: LeadDrawerProps) {
   // Use state derived initially from props, so we don't need a useEffect to sync it, avoiding a double-render.
   // Because app/page.tsx mounts this component using `key={currentLead.id}`, this state will be fresh for every new lead.
-  const [activeSection, setActiveSection] = useState<string | null>('pipeline');
+  const [activeSection, setActiveSection] = useState<string | null>(null);
   const [localStage, setLocalStage] = useState<LeadStage | null>(null);
   const [localFeesPaid, setLocalFeesPaid] = useState<FeesPaidStatus>(lead.feesPaid || 'Due');
   const [showRawData, setShowRawData] = useState(false);
@@ -95,6 +96,8 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   }, [lead.id, lead.stage, lead.grade, lead.board, lead.testLink, onUpdate]);
 
   const currentStage = localStage || (normalizeStage(lead.stage) as LeadStage);
+  const normalizedCurrentStage = normalizeStage(currentStage);
+  const isSessionDone = normalizedCurrentStage === 'Session complete' || normalizedCurrentStage === 'Report sent';
   const connectionAge = lead.inquiryDate ? differenceInDays(new Date(), safeParseISO(lead.inquiryDate)) : 0;
   const stageAge = lead.lastStageUpdate ? differenceInDays(new Date(), safeParseISO(lead.lastStageUpdate)) : 0;
 
@@ -226,12 +229,18 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   };
 
   const toggleSection = (section: string) => {
-    setActiveSection(activeSection === section ? null : section);
+    setActiveSection((prev) => (prev === section ? null : section));
   };
 
   const SectionHeader = ({ id, title, icon: Icon }: { id: string, title: string, icon: any }) => (
-    <button 
-      onClick={() => toggleSection(id)}
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSection(id);
+      }}
       className="w-full flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl mb-2 transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
     >
       <div className="flex items-center gap-3">
@@ -272,31 +281,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     </Card>
   );
 
-    const renderFeesDropdown = () => (
-        <div className="flex-1 flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
-            {localFeesPaid === 'Paid' && <Check size={16} className="text-emerald-500" />}
-            {localFeesPaid === 'Due' && <AlertCircle size={16} className="text-amber-500" />}
-            {localFeesPaid === 'Waived' && <Ban size={16} className="text-slate-400" />}
-            {localFeesPaid === 'Bad debt' && <XCircle size={16} className="text-red-500" />}
-            
-            <select 
-                className="flex-1 bg-transparent font-bold text-xs outline-none"
-                value={localFeesPaid}
-                onChange={(e) => {
-                    const status = e.target.value as FeesPaidStatus;
-                    if (status !== lead.feesPaid) {
-                        setLocalFeesPaid(status);
-                        onUpdate(lead.id, { feesPaid: status });
-                    }
-                }}
-            >
-                <option value="Due">Fees Due</option>
-                <option value="Paid">Fees Paid</option>
-                <option value="Waived">Fees Waived</option>
-                <option value="Bad debt">Bad Debt</option>
-            </select>
-        </div>
-    );
+  const renderFeesDropdown = () => null; // Removed floating fees dropdowns per design update
 
     const renderActionArea = () => {
     const stage = normalizeStage(currentStage);
@@ -553,8 +538,15 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                     <DrawerCounselingForm lead={lead} onUpdate={onUpdate} />
                 )}
 
+                {/* Fees Section */}
+                <SectionHeader id="fees" title="Fees" icon={CreditCard} />
+                {activeSection === 'fees' && (
+                    <DrawerFeesForm lead={lead} onUpdate={onUpdate} />
+                )}
+
 
                 {/* Academic & Personal Section */}
+                {false && (<> 
                 <SectionHeader id="personal" title="Student Profile" icon={User} />
                 {activeSection === 'personal' && (
                   <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-1 pb-4 space-y-4">
@@ -835,22 +827,25 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                   </motion.div>
                 )}
                 */}
+                </> )}
               </div>
 
               {/* Danger Zone */}
               <div className="pt-10 border-t border-slate-100 dark:border-slate-800 space-y-4">
-                <Button 
-                    variant="outline" 
-                    className="w-full h-12 rounded-xl gap-3 text-xs font-bold text-red-500 border-red-100 dark:border-red-900/20 hover:bg-red-50 dark:hover:bg-red-900/10" 
-                    onClick={() => {
-                        if (confirm('Mark this lead as Lost?')) {
-                            onUpdate(lead.id, { status: 'Lost' });
-                            onClose();
-                        }
-                    }}
-                >
-                    <X size={18} /> Mark Lead as Lost
-                </Button>
+                {!isSessionDone && (
+                  <Button 
+                      variant="outline" 
+                      className="w-full h-12 rounded-xl gap-3 text-xs font-bold text-red-500 border-red-100 dark:border-red-900/20 hover:bg-red-50 dark:hover:bg-red-900/10" 
+                      onClick={() => {
+                          if (confirm('Mark this lead as Lost?')) {
+                              onUpdate(lead.id, { status: 'Lost' });
+                              onClose();
+                          }
+                      }}
+                  >
+                      <X size={18} /> Mark Lead as Lost
+                  </Button>
+                )}
 
                 <Button 
                     variant="outline" 
@@ -866,18 +861,20 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                     </pre>
                 )}
 
-                <Button 
-                    variant="danger" 
-                    className="w-full h-14 rounded-2xl gap-3 text-sm font-black uppercase tracking-[0.2em]"
-                    onClick={() => {
-                        if (confirm('Permanently delete this student profile?')) {
-                            onDelete(lead.id);
-                            onClose();
-                        }
-                    }}
-                >
-                    <Trash2 size={18} /> Delete Student Record
-                </Button>
+                {!isSessionDone && (
+                  <Button 
+                      variant="danger" 
+                      className="w-full h-14 rounded-2xl gap-3 text-sm font-black uppercase tracking-[0.2em]"
+                      onClick={() => {
+                          if (confirm('Permanently delete this student profile?')) {
+                              onDelete(lead.id);
+                              onClose();
+                          }
+                      }}
+                  >
+                      <Trash2 size={18} /> Delete Student Record
+                  </Button>
+                )}
               </div>
             </div>
 

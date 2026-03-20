@@ -22,12 +22,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useSession } from "next-auth/react";
 import { useLeads } from '@/hooks/useLeads';
 import { Lead, LeadStage } from '@/lib/types';
+import dynamic from 'next/dynamic';
 import { Sidebar } from '@/components/dashboard/Sidebar';
 import { StatGrid } from '@/components/dashboard/StatGrid';
 import { KanbanView } from '@/components/dashboard/KanbanView';
 import { ListView } from '@/components/dashboard/ListView';
 import { AnalysisView } from '@/components/dashboard/AnalysisView';
-import { LeadDrawer } from '@/components/dashboard/LeadDrawer';
+// ...
+const LeadDrawer = dynamic(() => import('@/components/dashboard/LeadDrawer').then(mod => mod.LeadDrawer), { ssr: false });
+
 import { BottomNav } from '@/components/dashboard/BottomNav';
 import { TodayView } from '@/components/dashboard/TodayView';
 import { TemplatesView } from '@/components/dashboard/TemplatesView';
@@ -737,15 +740,20 @@ export default function Dashboard() {
                 />
 
                 {/* Overlays */}
-                <LeadDrawer 
-                    lead={currentLead} 
-                    onClose={() => setSelectedLead(null)} 
-                    onUpdate={updateLead}
-                    onDelete={deleteLead}
-                    fetchLeads={fetchLeads}
-                    stages={STAGES}
-                    templates={templates}
-                />
+                <AnimatePresence>
+                    {currentLead && (
+                        <LeadDrawer 
+                            key={`lead-drawer-${currentLead.id}`}
+                            lead={currentLead} 
+                            onClose={() => setSelectedLead(null)} 
+                            onUpdate={updateLead}
+                            onDelete={deleteLead}
+                            fetchLeads={fetchLeads}
+                            stages={STAGES}
+                            templates={templates}
+                        />
+                    )}
+                </AnimatePresence>
 
                 {/* Modern Add Modal */}
                 <AnimatePresence mode="wait">

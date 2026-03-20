@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { Lead, LeadStage } from '@/lib/types';
 import { LeadCard } from './LeadCard';
 import { normalizeStage } from '@/lib/utils';
@@ -13,14 +13,18 @@ interface KanbanViewProps {
 }
 
 export const KanbanView = memo(function KanbanView({ leads, stages, onLeadClick, searchQuery }: KanbanViewProps) {
+  const filteredData = useMemo(() => {
+    return stages.map(stage => ({
+      stage,
+      stageLeads: leads
+        .filter(l => normalizeStage(l.stage) === stage)
+        .filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    }));
+  }, [leads, stages, searchQuery]);
+
   return (
     <div className="flex gap-6 overflow-x-auto pb-8 no-scrollbar min-h-[600px] -mx-4 px-4 sm:mx-0 sm:px-0">
-      {stages.map(stage => {
-        const stageLeads = leads
-          .filter(l => normalizeStage(l.stage) === stage)
-          .filter(l => l.name.toLowerCase().includes(searchQuery.toLowerCase()));
-
-        return (
+      {filteredData.map(({ stage, stageLeads }) => (
           <div key={stage} className="flex-shrink-0 w-80">
             <div className="flex items-center justify-between mb-4 px-2">
               <div className="flex items-center gap-2">
@@ -32,7 +36,7 @@ export const KanbanView = memo(function KanbanView({ leads, stages, onLeadClick,
               </div>
             </div>
             <div className="space-y-4">
-              {stageLeads.map(lead => (
+              {stageLeads.map((lead: Lead) => (
                 <LeadCard 
                   key={lead.id} 
                   lead={lead} 
@@ -46,8 +50,8 @@ export const KanbanView = memo(function KanbanView({ leads, stages, onLeadClick,
               )}
             </div>
           </div>
-        );
-      })}
+        )
+      )}
     </div>
   );
 });

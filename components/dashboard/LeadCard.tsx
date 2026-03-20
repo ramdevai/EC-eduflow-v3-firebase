@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { memo } from 'react';
 import { motion } from 'motion/react';
 import { Phone, Mail, GraduationCap, ChevronRight, Clock, CreditCard, AlertCircle, Ban, XCircle } from 'lucide-react';
 import { Lead } from '@/lib/types';
@@ -14,7 +14,7 @@ interface LeadCardProps {
   layoutId?: string;
 }
 
-export function LeadCard({ lead, onClick }: LeadCardProps) {
+export const LeadCard = memo(function LeadCard({ lead, onClick }: LeadCardProps) {
   const getStageVariant = (stage: string) => {
     const normalized = normalizeStage(stage);
     switch (normalized) {
@@ -97,4 +97,4 @@ export function LeadCard({ lead, onClick }: LeadCardProps) {
       </Card>
     </div>
   );
-}
+});

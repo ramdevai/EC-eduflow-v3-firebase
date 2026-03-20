@@ -1,9 +1,10 @@
 "use client";
 
-import React, { memo } from 'react';
+import React, { memo, useState, useMemo } from 'react';
 import { MoreVertical, Phone, Mail, Clock } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { cn, normalizeStage, safeFormat } from '@/lib/utils';
 import { LeadCard } from './LeadCard';
 
@@ -14,7 +15,10 @@ interface ListViewProps {
 }
 
 export const ListView = memo(function ListView({ leads, onLeadClick }: ListViewProps) {
-
+  const [visibleCount, setVisibleCount] = useState(50);
+  
+  const displayedLeads = useMemo(() => leads.slice(0, visibleCount), [leads, visibleCount]);
+  
   const getStageVariant = (stage: string) => {
     const normalized = normalizeStage(stage);
     switch (normalized) {
@@ -35,7 +39,7 @@ export const ListView = memo(function ListView({ leads, onLeadClick }: ListViewP
     <div className="space-y-4">
       {/* Mobile Card List */}
       <div className="grid grid-cols-1 gap-4 md:hidden">
-        {leads.map((lead) => (
+        {displayedLeads.map((lead: Lead) => (
           <LeadCard 
             key={lead.id} 
             lead={lead} 
@@ -59,7 +63,7 @@ export const ListView = memo(function ListView({ leads, onLeadClick }: ListViewP
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-              {leads.map((lead, idx) => (
+              {displayedLeads.map((lead: Lead, idx: number) => (
                 <tr 
                   key={lead.id}
                   onClick={() => onLeadClick(lead)}
@@ -74,7 +78,6 @@ export const ListView = memo(function ListView({ leads, onLeadClick }: ListViewP
                       <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-slate-400">
                         <Phone size={10} /> {lead.phone}
                       </div>
-
                     </div>
                   </td>
                   <td className="p-4 whitespace-nowrap">
@@ -102,6 +105,14 @@ export const ListView = memo(function ListView({ leads, onLeadClick }: ListViewP
         </div>
       </div>
 
+      {visibleCount < leads.length && (
+        <div className="text-center pt-4">
+          <Button variant="outline" onClick={() => setVisibleCount(prev => prev + 50)}>
+            Load More Leads ({leads.length - visibleCount} remaining)
+          </Button>
+        </div>
+      )}
+
       {leads.length === 0 && (
         <div className="p-12 text-center text-slate-400 italic text-sm">
           No leads found matching your criteria.
@@ -110,3 +121,4 @@ export const ListView = memo(function ListView({ leads, onLeadClick }: ListViewP
     </div>
   );
 });
+

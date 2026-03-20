@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -39,6 +39,10 @@ import { cn, normalizeStage, generateRegistrationToken, safeParseISO, safeFormat
 import { getWhatsAppLink, getEmailLink, getTestLinkByGrade, getReportEmailData } from '@/lib/messaging-utils';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import { EmailComposer } from './EmailComposer';
+import { DrawerProfileForm } from './drawer/DrawerProfileForm';
+import { DrawerFamilyForm } from './drawer/DrawerFamilyForm';
+import { DrawerCounselingForm } from './drawer/DrawerCounselingForm';
+import { DrawerPipelineForm } from './drawer/DrawerPipelineForm';
 
 const TEST_OPTIONS = [
   { name: "Career Analysis for 2nd to 7th class", url: "https://careertest.edumilestones.com/student-dashboard/suitability-registration/login/OTI2/as11" },
@@ -55,7 +59,7 @@ const TEST_OPTIONS = [
 ];
 
 interface LeadDrawerProps {
-  lead: Lead | null;
+  lead: Lead;
   onClose: () => void;
   onUpdate: (id: number, updates: Partial<Lead>) => void;
   onDelete: (id: number) => void;
@@ -64,10 +68,12 @@ interface LeadDrawerProps {
   templates?: any[];
 }
 
-export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates }: LeadDrawerProps) {
+export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates }: LeadDrawerProps) {
+  // Use state derived initially from props, so we don't need a useEffect to sync it, avoiding a double-render.
+  // Because app/page.tsx mounts this component using `key={currentLead.id}`, this state will be fresh for every new lead.
   const [activeSection, setActiveSection] = useState<string | null>('pipeline');
   const [localStage, setLocalStage] = useState<LeadStage | null>(null);
-  const [localFeesPaid, setLocalFeesPaid] = useState<FeesPaidStatus>('Due');
+  const [localFeesPaid, setLocalFeesPaid] = useState<FeesPaidStatus>(lead.feesPaid || 'Due');
   const [showRawData, setShowRawData] = useState(false);
   const [copied, setCopied] = useState(false);
   
@@ -77,19 +83,8 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [isEmailComposerOpen, setIsEmailComposerOpen] = useState(false);
 
-  // Sync local stage when lead changes
-  React.useEffect(() => {
-    if (lead) {
-        setLocalStage(normalizeStage(lead.stage) as LeadStage);
-        setLocalFeesPaid(lead.feesPaid);
-        setCopied(false);
-        setShowCalendar(false);
-    }
-  }, [lead]);
-
   // Auto-select test link if Registration done and no test link currently set
   React.useEffect(() => {
-    if (!lead) return;
     const stage = normalizeStage(lead.stage);
     if (stage === 'Registration done' && (!lead.testLink || lead.testLink === 'FALSE')) {
       const suggested = getTestLinkByGrade(lead.grade, lead.board);
@@ -97,9 +92,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
         onUpdate(lead.id, { testLink: suggested });
       }
     }
-  }, [lead?.id, lead?.stage, lead?.grade, lead?.board, lead?.testLink]);
-
-  if (!lead) return null;
+  }, [lead.id, lead.stage, lead.grade, lead.board, lead.testLink, onUpdate]);
 
   const currentStage = localStage || (normalizeStage(lead.stage) as LeadStage);
   const connectionAge = lead.inquiryDate ? differenceInDays(new Date(), safeParseISO(lead.inquiryDate)) : 0;
@@ -460,42 +453,41 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
   };
 
   return (
-    <AnimatePresence>
-      {lead && (
+    <>
+      <motion.div 
+        key="lead-drawer-overlay"
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        className="fixed inset-0 z-50 flex justify-end"
+      >
         <motion.div 
-          key="lead-drawer-overlay"
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          className="fixed inset-0 z-50 flex justify-end"
+          key="lead-drawer-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="absolute inset-0 bg-slate-900/60"
+        />
+        
+        <motion.div 
+          key="lead-drawer-content"
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
+          className="relative w-full md:max-w-2xl bg-white dark:bg-slate-950 h-full shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col will-change-transform"
         >
-          <motion.div 
-            key="lead-drawer-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-slate-900/60"
-          />
-          
-          <motion.div 
-            key="lead-drawer-content"
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
-            className="relative w-full md:max-w-2xl bg-white dark:bg-slate-950 h-full shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col will-change-transform"
-          >
-            <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-bold text-slate-900 dark:text-white">Student detail</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={onClose} className="rounded-full w-10 h-10 p-0">
-                    <X size={24} />
-                </Button>
-              </div>
+          <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-bold text-slate-900 dark:text-white">Student detail</span>
             </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={onClose} className="rounded-full w-10 h-10 p-0">
+                  <X size={24} />
+              </Button>
+            </div>
+          </div>
 
             <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 pb-24">
               {/* Header Info */}
@@ -540,68 +532,27 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                 {/* Pipeline Section */}
                 <SectionHeader id="pipeline" title="Pipeline" icon={Clock} />
                 {activeSection === 'pipeline' && (
-                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-1 pb-4 space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary-500" />
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Stage Duration: {stageAge} days</p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 block">Primary Phone</label>
-                            <div className="flex gap-2">
-                                <input 
-                                    defaultValue={lead.phone} 
-                                    onBlur={(e) => {
-                                        if (e.target.value !== lead.phone) {
-                                            onUpdate(lead.id, { phone: e.target.value });
-                                        }
-                                    }}
-                                    className="flex-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm font-bold outline-none focus:border-primary-500"
-                                />
-                                <Button variant="outline" className="w-10 h-10 p-0 rounded-xl" onClick={() => window.open(`tel:${lead.phone}`)}>
-                                    <Phone size={16} />
-                                </Button>
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 block">Email Address</label>
-                            <div className="flex gap-2">
-                                <input 
-                                    defaultValue={lead.email} 
-                                    onBlur={(e) => {
-                                        if (e.target.value !== lead.email) {
-                                            onUpdate(lead.id, { email: e.target.value });
-                                        }
-                                    }}
-                                    className="flex-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm font-bold outline-none focus:border-primary-500"
-                                />
-                                <Button variant="outline" className="w-10 h-10 p-0 rounded-xl" onClick={() => window.open(`mailto:${lead.email}`)}>
-                                    <Mail size={16} />
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Inquiry Date</label>
-                            <input 
-                                type="date" 
-                                defaultValue={toInputFormat(lead.inquiryDate)} 
-                                onBlur={(e) => {
-                                    if (e.target.value !== toInputFormat(lead.inquiryDate)) {
-                                        onUpdate(lead.id, { inquiryDate: safeFormat(e.target.value) });
-                                    }
-                                }}
-                                className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold" 
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Source</label>
-                            <input value={lead.source || 'Manual'} readOnly className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold" />
-                        </div>
-                    </div>
-                  </motion.div>
+                  <DrawerPipelineForm lead={lead} onUpdate={onUpdate} stageAge={stageAge} />
                 )}
+
+                {/* Academic & Personal Section */}
+                <SectionHeader id="personal" title="Student Profile" icon={User} />
+                {activeSection === 'personal' && (
+                  <DrawerProfileForm lead={lead} onUpdate={onUpdate} />
+                )}
+
+                {/* Family Section */}
+                <SectionHeader id="family" title="Family Information" icon={Heart} />
+                {activeSection === 'family' && (
+                  <DrawerFamilyForm lead={lead} onUpdate={onUpdate} />
+                )}
+                
+                {/* Counseling Section */}
+                <SectionHeader id="counseling" title="Counseling & Assessment" icon={MessageSquare} />
+                {activeSection === 'counseling' && (
+                    <DrawerCounselingForm lead={lead} onUpdate={onUpdate} />
+                )}
+
 
                 {/* Academic & Personal Section */}
                 <SectionHeader id="personal" title="Student Profile" icon={User} />
@@ -650,7 +601,9 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="group">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Date of Birth</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">
+                                Date of Birth {lead.dob ? `: ${safeFormat(lead.dob, 'dd MMM yyyy')}` : '(Not set)'}
+                            </label>
                             <input 
                                 type="date" 
                                 defaultValue={toInputFormat(lead.dob)} 
@@ -932,10 +885,9 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
             <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 flex gap-3 z-[60]">
                <Button variant="outline" className="flex-1 h-14 rounded-2xl" onClick={onClose}>Close</Button>
                <Button className="flex-1 h-14 rounded-2xl bg-primary-600 text-white" onClick={() => window.open(getWhatsAppLink(lead, 'followup', templates), '_blank')}>Quick WhatsApp</Button>
-            </div>
-          </motion.div>
+          </div>
         </motion.div>
-      )}
+      </motion.div>
 
       {isEmailComposerOpen && lead && (
         <EmailComposer 
@@ -950,6 +902,7 @@ export function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stag
           initialBody={getReportEmailData(lead, templates).body}
         />
       )}
-    </AnimatePresence>
+    </>
   );
-}
+});
+

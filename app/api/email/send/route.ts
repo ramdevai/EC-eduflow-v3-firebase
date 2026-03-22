@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
   try {
     const formData = await req.formData();
-    const to = formData.get('to') as string;
+    const to = formData.get('to') as string; // Could be a comma-separated list
     const subject = formData.get('subject') as string;
     const body = formData.get('body') as string;
     const file = formData.get('report') as File | null;

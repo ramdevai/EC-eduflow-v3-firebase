@@ -36,7 +36,7 @@ export function DrawerPipelineForm({ lead, onUpdate, stageAge }: Props) {
               </div>
           </div>
           <div className="space-y-1">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 block">Email Address</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 block">Student Email</label>
               <div className="flex gap-2">
                   <input 
                       defaultValue={lead.email} 
@@ -48,6 +48,43 @@ export function DrawerPipelineForm({ lead, onUpdate, stageAge }: Props) {
                       className="flex-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm font-bold outline-none focus:border-primary-500"
                   />
                   <Button variant="outline" className="w-10 h-10 p-0 rounded-xl" onClick={() => window.open(`mailto:${lead.email}`)}>
+                      <Mail size={16} />
+                  </Button>
+              </div>
+          </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 block">Father Email</label>
+              <div className="flex gap-2">
+                  <input 
+                      defaultValue={lead.fatherEmail} 
+                      onBlur={(e) => {
+                          if (e.target.value !== lead.fatherEmail) {
+                              onUpdate(lead.id, { fatherEmail: e.target.value });
+                          }
+                      }}
+                      className="flex-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-[10px] font-bold outline-none focus:border-primary-500"
+                  />
+                  <Button variant="outline" className="w-10 h-10 p-0 rounded-xl" onClick={() => lead.fatherEmail && window.open(`mailto:${lead.fatherEmail}`)} disabled={!lead.fatherEmail}>
+                      <Mail size={16} />
+                  </Button>
+              </div>
+          </div>
+          <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 block">Mother Email</label>
+              <div className="flex gap-2">
+                  <input 
+                      defaultValue={lead.motherEmail} 
+                      onBlur={(e) => {
+                          if (e.target.value !== lead.motherEmail) {
+                              onUpdate(lead.id, { motherEmail: e.target.value });
+                          }
+                      }}
+                      className="flex-1 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-[10px] font-bold outline-none focus:border-primary-500"
+                  />
+                  <Button variant="outline" className="w-10 h-10 p-0 rounded-xl" onClick={() => lead.motherEmail && window.open(`mailto:${lead.motherEmail}`)} disabled={!lead.motherEmail}>
                       <Mail size={16} />
                   </Button>
               </div>

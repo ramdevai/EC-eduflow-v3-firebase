@@ -21,9 +21,10 @@ interface EmailComposerProps {
   onSuccess: () => void;
   initialSubject: string;
   initialBody: string;
+  recipients: string[];
 }
 
-export function EmailComposer({ lead, onClose, onSuccess, initialSubject, initialBody }: EmailComposerProps) {
+export function EmailComposer({ lead, onClose, onSuccess, initialSubject, initialBody, recipients }: EmailComposerProps) {
   const [subject, setSubject] = useState(initialSubject);
   const [body, setBody] = useState(initialBody);
   const [file, setFile] = useState<File | null>(null);
@@ -46,7 +47,7 @@ export function EmailComposer({ lead, onClose, onSuccess, initialSubject, initia
     setError(null);
 
     const formData = new FormData();
-    formData.append('to', lead.email);
+    formData.append('to', recipients.join(', '));
     formData.append('subject', subject);
     formData.append('body', body);
     if (file) {
@@ -81,7 +82,7 @@ export function EmailComposer({ lead, onClose, onSuccess, initialSubject, initia
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">Send Career Report</h3>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">To: {lead.email}</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">To: {recipients.join(', ')}</p>
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} className="rounded-full w-10 h-10 p-0">

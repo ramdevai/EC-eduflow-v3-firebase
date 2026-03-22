@@ -19,7 +19,7 @@ import {
   Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useLeads } from '@/hooks/useLeads';
 import { Lead, LeadStage } from '@/lib/types';
 import dynamic from 'next/dynamic';
@@ -462,9 +462,23 @@ export default function Dashboard() {
                             {/* View Content */}
                             <div className="relative">
                                 {error && (
-                                    <div className="p-4 mb-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-2xl flex items-center justify-between">
-                                        <div className="text-red-600 text-xs font-bold">Error: {error}. Please check your Sheet ID or Google permissions.</div>
-                                        {error.toLowerCase().includes('auth') && <Button size="sm" variant="outline" className="h-8 text-[10px] border-red-200 text-red-600 hover:bg-red-50" onClick={() => window.location.reload()}>Sign In Again</Button>}
+                                    <div className="p-4 mb-6 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-2xl flex items-center justify-between gap-4">
+                                        <div className="text-red-600 text-xs font-bold leading-relaxed">
+                                            {error.toLowerCase().includes('auth') || error.toLowerCase().includes('credential') || error.toLowerCase().includes('token')
+                                                ? "Your Google session has expired or is invalid. Please sign in again to continue."
+                                                : `Error: ${error}. Please check your Sheet ID or Google permissions.`
+                                            }
+                                        </div>
+                                        {(error.toLowerCase().includes('auth') || error.toLowerCase().includes('credential') || error.toLowerCase().includes('token')) && (
+                                            <Button 
+                                                size="sm" 
+                                                variant="outline" 
+                                                className="h-9 px-4 text-[10px] font-black uppercase tracking-widest border-red-200 text-red-600 hover:bg-red-50 shrink-0 shadow-sm" 
+                                                onClick={() => signOut({ callbackUrl: '/' })}
+                                            >
+                                                Sign In Again
+                                            </Button>
+                                        )}
                                     </div>
                                 )}
                                 

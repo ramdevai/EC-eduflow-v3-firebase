@@ -89,6 +89,13 @@ export function getReportEmailData(lead: Lead, templates?: any[]) {
   const customTemplate = templates?.find(t => t.id === 'report_email');
   const subject = `{name} - Career Counseling Report`.replace(/{name}/g, lead.name);
   
+  // Collect all valid recipients
+  const recipients = [
+    lead.email,
+    lead.fatherEmail,
+    lead.motherEmail
+  ].filter(Boolean).map(e => e!.trim());
+
   let body = customTemplate?.message || `Dear Parent,
 
 Please find attached the career counseling report for {name}.
@@ -108,7 +115,7 @@ Founder, EduCompass`;
     .replace(/{name}/g, lead.name)
     .replace(/{notes}/g, lead.notes || '[Notes from your session]');
 
-  return { subject, body };
+  return { subject, body, recipients };
 }
 
 export function getEmailLink(lead: Lead, templates?: any[]) {

@@ -285,7 +285,7 @@ export default function RegistrationPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <input name="fatherName" defaultValue={formData.fatherName} required placeholder="Name" className="p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none" />
                         <input name="fatherPhone" defaultValue={formData.fatherPhone} required placeholder="Phone Number" className="p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none" />
-                        <input name="fatherEmail" defaultValue={formData.fatherEmail} required placeholder="Email Address" type="email" className="p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none" />
+                        <input name="fatherEmail" defaultValue={formData.fatherEmail} placeholder="Email Address (Optional)" type="email" className="p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none" />
                         <input name="fatherOccupation" defaultValue={formData.fatherOccupation} placeholder="Occupation" className="p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none" />
                     </div>
                 </div>
@@ -298,7 +298,7 @@ export default function RegistrationPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <input name="motherName" defaultValue={formData.motherName} required placeholder="Name" className="p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none" />
                         <input name="motherPhone" defaultValue={formData.motherPhone} required placeholder="Phone Number" className="p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none" />
-                        <input name="motherEmail" defaultValue={formData.motherEmail} required placeholder="Email Address" type="email" className="p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none" />
+                        <input name="motherEmail" defaultValue={formData.motherEmail} placeholder="Email Address (Optional)" type="email" className="p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none" />
                         <input name="motherOccupation" defaultValue={formData.motherOccupation} placeholder="Occupation" className="p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none" />
                     </div>
                 </div>

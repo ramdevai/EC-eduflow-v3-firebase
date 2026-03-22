@@ -902,6 +902,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
           }}
           initialSubject={getReportEmailData(lead, templates).subject}
           initialBody={getReportEmailData(lead, templates).body}
+          recipients={getReportEmailData(lead, templates).recipients}
         />
       )}
     </>

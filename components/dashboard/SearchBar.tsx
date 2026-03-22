@@ -29,6 +29,7 @@ export function SearchBar({ placeholder, onSearch, onFocusChange, initialValue =
   const handleClear = () => {
     setInput('');
     onSearch('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -41,6 +42,9 @@ export function SearchBar({ placeholder, onSearch, onFocusChange, initialValue =
         onFocus={() => {
           setIsFocused(true);
           onFocusChange?.(true);
+          if (!input) {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
         }}
         onBlur={() => {
           // Small delay to allow clicking the clear button before it hides/unfocuses

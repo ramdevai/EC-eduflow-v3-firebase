@@ -82,6 +82,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   const [showCalendar, setShowCalendar] = useState(false);
   const [busySlots, setBusySlots] = useState<any[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
   const [isEmailComposerOpen, setIsEmailComposerOpen] = useState(false);
 
   // Auto-select test link if Registration done and no test link currently set
@@ -121,6 +122,8 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   };
 
   const handleSchedule = async (startTime: string) => {
+    if (isScheduling) return;
+    setIsScheduling(true);
     try {
       const res = await fetch('/api/calendar/schedule', {
         method: 'POST',
@@ -137,6 +140,8 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
       setShowCalendar(false);
     } catch (err: any) {
       alert('Scheduling failed: ' + err.message);
+    } finally {
+      setIsScheduling(false);
     }
   };
 

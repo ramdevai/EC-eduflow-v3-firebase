@@ -148,7 +148,7 @@ export function TemplatesView({ sheetId }: TemplatesViewProps) {
                             <textarea 
                                 value={template.message}
                                 onChange={(e) => updateLocalTemplate(template.id, e.target.value)}
-                                className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-primary-500 transition-all min-h-[100px] resize-none"
+                                className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-primary-500 transition-all min-h-[100px] resize-y"
                                 placeholder={`Enter ${template.label}...`}
                             />
                             <div className="flex gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">

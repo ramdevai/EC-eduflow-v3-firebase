@@ -24,6 +24,15 @@ export async function POST(req: Request) {
     
     if (!lead) throw new Error('Lead not found');
 
+    // Simple idempotency: If lead already has an appointment at this exact time, skip creation
+    if (lead.appointmentTime === startTime && lead.calendarEventId) {
+        return NextResponse.json({ 
+            success: true, 
+            eventId: lead.calendarEventId,
+            message: 'Appointment already scheduled for this time'
+        });
+    }
+
     const event = await upsertCalendarEvent(
         token, 
         { name: lead.name, email: lead.email, id: lead.id }, 

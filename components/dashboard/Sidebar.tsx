@@ -133,6 +133,12 @@ export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobile
                 isActive={false} 
                 onClick={() => onPreferencesClick?.()} 
             />
+            <NavButton 
+                icon={LogOut} 
+                label="Sign Out" 
+                isActive={false} 
+                onClick={() => signOut()} 
+            />
           </nav>
         </section>
       </div>

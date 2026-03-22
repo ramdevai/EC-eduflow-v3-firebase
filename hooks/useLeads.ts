@@ -212,6 +212,10 @@ export function useLeads() {
       }
 
       return false;
+    }).sort((a, b) => {
+      const dateA = safeParseISO(a.updatedAt || a.inquiryDate);
+      const dateB = safeParseISO(b.updatedAt || b.inquiryDate);
+      return dateB.getTime() - dateA.getTime();
     });
   }, [leads]);
 

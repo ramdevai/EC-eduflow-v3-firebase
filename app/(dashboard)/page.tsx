@@ -101,6 +101,14 @@ export default function Dashboard() {
     try {
       const createRes = await fetch('/api/setup/create-sheet', { method: 'POST' });
       const createData = await createRes.json();
+      
+      if (createRes.status === 401) {
+        if (confirm(`${createData.error}\n\nWould you like to Sign Out now so you can log in again and fix this?`)) {
+          signOut({ callbackUrl: '/' });
+        }
+        return;
+      }
+      
       if (!createRes.ok) throw new Error(createData.error);
       const newSheetId = createData.sheetId;
       const initRes = await fetch('/api/setup/initialize-sheet', {
@@ -108,6 +116,14 @@ export default function Dashboard() {
         headers: { 'x-sheet-id': newSheetId }
       });
       const initData = await initRes.json();
+      
+      if (initRes.status === 401) {
+        if (confirm(`${initData.error}\n\nWould you like to Sign Out now so you can log in again and fix this?`)) {
+          signOut({ callbackUrl: '/' });
+        }
+        return;
+      }
+      
       if (!initRes.ok) throw new Error(initData.error);
       saveSheetId(newSheetId);
       alert('Workspace created and initialized successfully!');
@@ -138,6 +154,13 @@ export default function Dashboard() {
         });
         const data = await res.json();
         
+        if (res.status === 401) {
+            if (confirm(`${data.error}\n\nWould you like to Sign Out now so you can log in again and fix this?`)) {
+                signOut({ callbackUrl: '/' });
+            }
+            return;
+        }
+        
         if (!res.ok) {
             if (confirm(`${data.error}\n\nWould you like to run 'Fix sheet structure' now to repair these issues automatically? (No existing data will be lost)`)) {
                 setIsInitializing(true);
@@ -145,7 +168,16 @@ export default function Dashboard() {
                     method: 'POST',
                     headers: { 'x-sheet-id': id }
                 });
-                if (!initRes.ok) throw new Error('Failed to initialize sheet');
+                const initData = await initRes.json();
+                
+                if (initRes.status === 401) {
+                    if (confirm(`${initData.error}\n\nWould you like to Sign Out now so you can log in again and fix this?`)) {
+                        signOut({ callbackUrl: '/' });
+                    }
+                    return;
+                }
+                
+                if (!initRes.ok) throw new Error(initData.error || 'Failed to initialize sheet');
                 saveSheetId(id);
                 setIsSettingsOpen(false);
                 fetchLeads();
@@ -223,6 +255,14 @@ export default function Dashboard() {
         headers: { 'x-sheet-id': sheetId }
       });
       const data = await res.json();
+      
+      if (res.status === 401) {
+        if (confirm(`${data.error}\n\nWould you like to Sign Out now so you can log in again and fix this?`)) {
+          signOut({ callbackUrl: '/' });
+        }
+        return;
+      }
+      
       if (!res.ok) throw new Error(data.error);
       alert(data.message);
       fetchLeads();

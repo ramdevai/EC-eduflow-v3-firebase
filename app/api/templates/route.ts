@@ -18,12 +18,12 @@ export async function PATCH(req: Request) {
     if (!session?.accessToken || !sheetId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const { id, message } = await req.json();
-    if (!id || !message) {
-        return NextResponse.json({ error: 'ID and message are required' }, { status: 400 });
+    const { id, subject, message } = await req.json();
+    if (!id || (subject === undefined && message === undefined)) {
+        return NextResponse.json({ error: 'ID and either subject or message are required' }, { status: 400 });
     }
     try {
-        await updateTemplate(sheetId, session.accessToken, id, message);
+        await updateTemplate(sheetId, session.accessToken, id, { subject, message });
         return NextResponse.json({ success: true });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });

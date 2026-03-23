@@ -65,6 +65,7 @@ export interface Lead {
   communityJoined: CommunityJoinedStatus;
   registrationToken?: string;
   calendarEventId?: string;
+  communicateViaEmailOnly?: boolean;
 }
 
 export const TEST_LINKS: Record<string, string> = {

@@ -11,7 +11,10 @@ export async function POST(req: Request) {
 
   const session = await auth() as any;
   if (!session?.accessToken) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    return NextResponse.json({ 
+        error: 'Authentication failed. Please Sign Out and Sign In again to refresh your Google session.',
+        code: 'AUTH_REQUIRED' 
+    }, { status: 401 });
   }
 
   try {
@@ -41,6 +44,14 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error('Create sheet error:', error);
+    
+    if (error.code === 401 || error.message?.toLowerCase().includes('invalid authentication') || error.message?.toLowerCase().includes('credential')) {
+        return NextResponse.json({ 
+            error: 'Your Google Access Token has expired. Please Sign Out and Sign In again to continue.',
+            code: 'AUTH_EXPIRED'
+        }, { status: 401 });
+    }
+
     return NextResponse.json({ error: error.message || 'Failed to create sheet' }, { status: 500 });
   }
 }

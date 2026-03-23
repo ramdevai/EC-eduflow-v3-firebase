@@ -25,13 +25,15 @@ export async function GET(
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
-  const sheetId = process.env.GOOGLE_SHEET_ID;
+  const { searchParams } = new URL(req.url);
+  const sid = searchParams.get('sid');
+  const sheetId = sid || process.env.GOOGLE_SHEET_ID;
 
   if (!sheetId || sheetId === 'placeholder') {
     return NextResponse.json({ 
-        error: 'System not configured', 
-        details: 'GOOGLE_SHEET_ID is missing in .env.local on the server.' 
-    }, { status: 500 });
+        error: 'Registration form link is missing its context (Sheet ID).', 
+        details: 'GOOGLE_SHEET_ID is missing in .env and no sid was provided in the URL.' 
+    }, { status: 400 });
   }
 
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
@@ -84,14 +86,17 @@ export async function POST(
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
-  const sheetId = process.env.GOOGLE_SHEET_ID;
-
-  if (!sheetId || sheetId === 'placeholder') {
-    return NextResponse.json({ error: 'System not configured' }, { status: 500 });
-  }
-
+  const { searchParams } = new URL(req.url);
+  const sidParam = searchParams.get('sid');
+  
   try {
     const body = await req.json();
+    const sheetId = sidParam || body.sid || process.env.GOOGLE_SHEET_ID;
+
+    if (!sheetId || sheetId === 'placeholder') {
+      return NextResponse.json({ error: 'System not configured. Missing Sheet ID.' }, { status: 500 });
+    }
+
     const accessToken = await getSystemAccessToken();
     const lead = await getLeadByToken(sheetId, accessToken, token);
 
@@ -112,7 +117,10 @@ export async function POST(
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('Registration POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Registration POST failure:', error);
+    return NextResponse.json({ 
+      error: 'Registration submission failed', 
+      details: error.message 
+    }, { status: 500 });
   }
 }

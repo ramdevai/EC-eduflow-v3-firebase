@@ -81,7 +81,9 @@ export function EmailComposer({ lead, onClose, onSuccess, initialSubject, initia
               <Send size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Send Career Report</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                {subject.includes('Report') ? 'Send Career Report' : 'Compose Email'}
+              </h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">To: {recipients.join(', ')}</p>
             </div>
           </div>
@@ -167,12 +169,12 @@ export function EmailComposer({ lead, onClose, onSuccess, initialSubject, initia
             {sending ? (
               <>
                 <Loader2 className="animate-spin" size={20} />
-                Sending Report...
+                Sending...
               </>
             ) : (
               <>
                 <Send size={20} />
-                Send Email Now
+                Send Now
               </>
             )}
           </Button>

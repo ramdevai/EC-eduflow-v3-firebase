@@ -2,7 +2,7 @@ import { getSheetsClient } from './google';
 import { Lead, LeadStage, LeadStatus, FeesPaidStatus, CommunityJoinedStatus } from './types';
 import { generateRegistrationToken, safeFormat } from './utils';
 
-const RANGE = 'Leads!A2:AO';
+const RANGE = 'Leads!A2:AP';
 
 export async function getAllLeads(spreadsheetId: string, accessToken: string): Promise<Lead[]> {
   if (!spreadsheetId) return [];
@@ -90,7 +90,7 @@ export async function updateLeads(spreadsheetId: string, accessToken: string, up
     const rowNumber = index + 2;
 
     return {
-      range: `Leads!A${rowNumber}:AO${rowNumber}`,
+      range: `Leads!A${rowNumber}:AP${rowNumber}`,
       values: [row],
     };
   });
@@ -140,15 +140,15 @@ export async function getLeadByToken(spreadsheetId: string, accessToken: string,
 }
 
 const DEFAULT_TEMPLATES = [
-    { id: 'onboarding', label: 'Onboarding Message', message: 'Hi {name}, this is Binal from EduCompass. Great to have you onboard! Please fill this registration form to share student details: [REGISTRATION_LINK]' },
-    { id: 'test', label: 'Assessment Link', message: 'Hi {name}, based on your details, here is the career assessment link: {url}. Please complete this before our 1:1 session.' },
-    { id: 'test_nudge', label: 'Test Nudge', message: 'Hi {name}, hope you are doing well. Just a gentle nudge to complete the career assessment test so we can proceed with our 1:1 counseling session. Link: {url}' },
-    { id: 'followup', label: 'Follow-up Message', message: 'Hi {name}, just checking in regarding your career counseling inquiry. Do you have any questions I can help with?' },
-    { id: 'community', label: 'Community Invite', message: "Hi {name}, I'd like to invite you to the EduCompass Parents WhatsApp Community where I share important updates and form filling dates: https://chat.whatsapp.com/example-group-link" },
-    { id: 'review', label: 'Google Review Request', message: 'Hi {name}, it was a pleasure counseling you. If you found the session helpful, I\'d really appreciate a quick review on Google: [YOUR_GOOGLE_REVIEW_LINK]' },
-    { id: 'birthday', label: 'Birthday Wish', message: 'Hi {name}, wishing you a very Happy Birthday! 🎂 Hope you have a fantastic day ahead! - Binal from EduCompass' },
-    { id: 'report_email', label: 'Report Email', message: "Dear Parent,\n\nPlease find attached the career counseling report for {name}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass" },
-    { id: 'fees_reminder', label: 'Fees Reminder', message: 'Hi {name}, just a gentle reminder regarding the professional fees for the career counseling session. Please ignore if already paid. Thanks!' },
+    { id: 'onboarding', label: 'Onboarding Message', subject: 'Registration Form - EduCompass Career Counseling', message: 'Hi {name}, this is Binal from EduCompass. Great to have you onboard! Please fill this registration form to share student details: [REGISTRATION_LINK]' },
+    { id: 'test', label: 'Assessment Link', subject: 'Career Assessment Link - {name}', message: 'Hi {name}, based on your details, here is the career assessment link: {url}. Please complete this before our 1:1 session.' },
+    { id: 'test_nudge', label: 'Test Nudge', subject: 'Reminder: Career Assessment Pending', message: 'Hi {name}, hope you are doing well. Just a gentle nudge to complete the career assessment test so we can proceed with our 1:1 counseling session. Link: {url}' },
+    { id: 'followup', label: 'Follow-up Message', subject: 'Follow-up: Career Counseling Inquiry', message: 'Hi {name}, just checking in regarding your career counseling inquiry. Do you have any questions I can help with?' },
+    { id: 'community', label: 'Community Invite', subject: 'Invitation: EduCompass Parents Community', message: "Hi {name}, I'd like to invite you to the EduCompass Parents WhatsApp Community where I share important updates and form filling dates: https://chat.whatsapp.com/example-group-link" },
+    { id: 'review', label: 'Google Review Request', subject: 'How was your session? - Feedback Request', message: 'Hi {name}, it was a pleasure counseling you. If you found the session helpful, I\'d really appreciate a quick review on Google: [YOUR_GOOGLE_REVIEW_LINK]' },
+    { id: 'birthday', label: 'Birthday Wish', subject: 'Happy Birthday {name}! 🎂', message: 'Hi {name}, wishing you a very Happy Birthday! 🎂 Hope you have a fantastic day ahead! - Binal from EduCompass' },
+    { id: 'report_email', label: 'Report Email', subject: '{name} - Career Counseling Report', message: "Dear Parent,\n\nPlease find attached the career counseling report for {name}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass" },
+    { id: 'fees_reminder', label: 'Fees Reminder', subject: 'Professional Fees Reminder - EduCompass', message: 'Hi {name}, just a gentle reminder regarding the professional fees for the career counseling session. Please ignore if already paid. Thanks!' },
 ];
 
 async function ensureTemplatesSheet(spreadsheetId: string, accessToken: string) {
@@ -171,19 +171,19 @@ async function ensureTemplatesSheet(spreadsheetId: string, accessToken: string) 
     // Check if empty or missing headers
     const checkResponse = await sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: 'Templates!A1:C1',
+        range: 'Templates!A1:D1',
     });
     
     if (!checkResponse.data.values || checkResponse.data.values.length === 0) {
         // Populate with defaults if completely empty
         const rows = [
-            ['ID', 'Label', 'Message'],
-            ...DEFAULT_TEMPLATES.map(t => [t.id, t.label, t.message])
+            ['ID', 'Label', 'Subject', 'Message'],
+            ...DEFAULT_TEMPLATES.map(t => [t.id, t.label, t.subject, t.message])
         ];
         
         await sheets.spreadsheets.values.update({
             spreadsheetId,
-            range: 'Templates!A1:C',
+            range: 'Templates!A1:D',
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: rows },
         });
@@ -198,7 +198,7 @@ export async function getTemplates(spreadsheetId: string, accessToken: string): 
         try {
             response = await sheets.spreadsheets.values.get({
                 spreadsheetId: spreadsheetId,
-                range: 'Templates!A2:C20', 
+                range: 'Templates!A2:D20', 
             });
         } catch (e: any) {
             // If range doesn't exist, try to ensure sheet and return defaults
@@ -211,11 +211,27 @@ export async function getTemplates(spreadsheetId: string, accessToken: string): 
         if (rows.length === 0) return DEFAULT_TEMPLATES;
         
         // Merge with defaults
-        const sheetTemplates = rows.map(row => ({
-            id: row[0],
-            label: row[1] || row[0],
-            message: row[2] || ''
-        })).filter(t => t.id);
+        const sheetTemplates = rows.map(row => {
+            const id = row[0];
+            const label = row[1] || id;
+            
+            // If the row has 4 columns, index 2 is Subject and index 3 is Message
+            // If the row has 3 columns, index 2 is actually the Message (Legacy)
+            let subject = "";
+            let message = "";
+
+            if (row.length >= 4) {
+                subject = row[2] || "";
+                message = row[3] || "";
+            } else {
+                // Find default subject if we don't have one in the sheet yet
+                const def = DEFAULT_TEMPLATES.find(t => t.id === id);
+                subject = def?.subject || "";
+                message = row[2] || "";
+            }
+
+            return { id, label, subject, message };
+        }).filter(t => t.id);
 
         const finalTemplates = [...DEFAULT_TEMPLATES];
         sheetTemplates.forEach(st => {
@@ -234,7 +250,7 @@ export async function getTemplates(spreadsheetId: string, accessToken: string): 
     }
 }
 
-export async function updateTemplate(spreadsheetId: string, accessToken: string, id: string, message: string): Promise<void> {
+export async function updateTemplate(spreadsheetId: string, accessToken: string, id: string, updates: { subject?: string; message?: string }): Promise<void> {
     const sheets = await getSheetsClient(accessToken);
     
     let response;
@@ -261,24 +277,38 @@ export async function updateTemplate(spreadsheetId: string, accessToken: string,
     if (index !== -1) {
         // Update existing row
         const rowNumber = index + 2;
-        await sheets.spreadsheets.values.update({
-            spreadsheetId: spreadsheetId,
-            range: `Templates!C${rowNumber}`,
-            valueInputOption: 'USER_ENTERED',
-            requestBody: {
-                values: [[message]],
-            },
-        });
+        if (updates.subject !== undefined) {
+            await sheets.spreadsheets.values.update({
+                spreadsheetId: spreadsheetId,
+                range: `Templates!C${rowNumber}`,
+                valueInputOption: 'USER_ENTERED',
+                requestBody: {
+                    values: [[updates.subject]],
+                },
+            });
+        }
+        if (updates.message !== undefined) {
+            await sheets.spreadsheets.values.update({
+                spreadsheetId: spreadsheetId,
+                range: `Templates!D${rowNumber}`,
+                valueInputOption: 'USER_ENTERED',
+                requestBody: {
+                    values: [[updates.message]],
+                },
+            });
+        }
     } else {
         // Append new row if missing (use label from defaults)
         const def = DEFAULT_TEMPLATES.find(t => t.id === id);
         const label = def ? def.label : id;
+        const subject = updates.subject || (def ? def.subject : '');
+        const message = updates.message || (def ? def.message : '');
         await sheets.spreadsheets.values.append({
             spreadsheetId: spreadsheetId,
-            range: 'Templates!A:C',
+            range: 'Templates!A:D',
             valueInputOption: 'USER_ENTERED',
             requestBody: {
-                values: [[id, label, message]],
+                values: [[id, label, subject, message]],
             },
         });
     }
@@ -343,6 +373,7 @@ export function mapRowToLead(row: any[]): Lead {
     calendarEventId: row[38] || '',
     lastStageUpdate: row[39] || '',
     status: (row[40] as LeadStatus) || 'Open',
+    communicateViaEmailOnly: row[41] === 'TRUE' || row[41] === 'true' || row[41] === true,
   };
 }
 
@@ -389,6 +420,7 @@ export function mapLeadToRow(lead: Lead): any[] {
     lead.calendarEventId || '',
     safeFormat(lead.lastStageUpdate),
     lead.status || 'Open',
+    lead.communicateViaEmailOnly || false,
   ];
 }
 

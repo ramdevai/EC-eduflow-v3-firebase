@@ -36,7 +36,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { cn, normalizeStage, generateRegistrationToken, safeParseISO, safeFormat, toInputFormat } from '@/lib/utils';
-import { getWhatsAppLink, getEmailLink, getTestLinkByGrade, getReportEmailData } from '@/lib/messaging-utils';
+import { getWhatsAppLink, getEmailLink, getTestLinkByGrade, getReportEmailData, getEmailData, MessageType } from '@/lib/messaging-utils';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import { EmailComposer } from './EmailComposer';
 import { DrawerProfileForm } from './drawer/DrawerProfileForm';
@@ -83,7 +83,11 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   const [busySlots, setBusySlots] = useState<any[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
-  const [isEmailComposerOpen, setIsEmailComposerOpen] = useState(false);
+  const [emailComposerType, setEmailComposerType] = useState<MessageType | null>(null);
+
+  const openEmailComposer = (type: MessageType) => {
+    setEmailComposerType(type);
+  };
 
   // Auto-select test link if Registration done and no test link currently set
   React.useEffect(() => {
@@ -147,7 +151,8 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
 
   const handleCopyLink = () => {
     if (!lead.registrationToken) return;
-    const url = `${window.location.origin}/register/${lead.registrationToken}`;
+    const sheetId = localStorage.getItem('educompass_sheet_id');
+    const url = `${window.location.origin}/register/${lead.registrationToken}${sheetId ? `?sid=${sheetId}` : ''}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -201,33 +206,45 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   const handleSendOnboarding = async () => {
     if (!lead) return;
     
+    let currentToken = lead.registrationToken;
+    
     // Generate token if not exists
-    if (!lead.registrationToken) {
-        const token = generateRegistrationToken();
+    if (!currentToken) {
+        currentToken = generateRegistrationToken();
         try {
             await onUpdate(lead.id, { 
-                registrationToken: token,
+                registrationToken: currentToken,
                 stage: 'Registration requested'
             });
-            // Construct link with the new token
-            const tempLead = { ...lead, registrationToken: token };
-            window.open(getWhatsAppLink(tempLead, 'onboarding', templates), '_blank');
         } catch (err) {
             alert('Failed to generate registration link');
-        }
-    } else {
-        window.open(getWhatsAppLink(lead, 'onboarding', templates), '_blank');
-        if (normalizeStage(lead.stage) === 'New') {
-            handleStageChange('Registration requested');
+            return;
         }
     }
+
+    if (lead.communicateViaEmailOnly) {
+        setEmailComposerType('onboarding');
+        return;
+    }
+    
+    window.open(getWhatsAppLink(lead, 'onboarding', templates), '_blank');
+    if (normalizeStage(lead.stage) === 'New') {
+        handleStageChange('Registration requested');
+    }
   };
+
 
   const handleSendTestLink = () => {
     if (!lead.testLink) {
         alert('Please select a test link first.');
         return;
     }
+
+    if (lead.communicateViaEmailOnly) {
+        setEmailComposerType('test');
+        return;
+    }
+
     onUpdate(lead.id, { stage: 'Test sent' });
     setLocalStage('Test sent');
     window.open(getWhatsAppLink(lead, 'test', templates), '_blank');
@@ -296,11 +313,22 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
           <div className="space-y-4">
             <p className="text-[11px] text-slate-500 font-medium italic">Its been {connectionAge} days since you first connected with them.</p>
             <div className="grid grid-cols-1 gap-3">
-                <Button className="h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none" onClick={() => window.open(getWhatsAppLink(lead, 'followup', templates), '_blank')}>
-                    <MessageSquare size={18} /> Send inquiry follow-up
+                <Button 
+                    className={cn(
+                        "h-14 rounded-2xl text-white gap-3 text-sm font-bold shadow-lg dark:shadow-none",
+                        lead.communicateViaEmailOnly ? "bg-primary-600 shadow-primary-100" : "bg-emerald-500 shadow-emerald-100"
+                    )} 
+                    onClick={() => {
+                        if (lead.communicateViaEmailOnly) setEmailComposerType('followup');
+                        else window.open(getWhatsAppLink(lead, 'followup', templates), '_blank');
+                    }}
+                >
+                    {lead.communicateViaEmailOnly ? <Mail size={18} /> : <MessageSquare size={18} />}
+                    {lead.communicateViaEmailOnly ? "Email inquiry follow-up" : "Send inquiry follow-up"}
                 </Button>
                 <Button variant="outline" className="h-14 rounded-2xl bg-white dark:bg-slate-900 gap-3 text-sm font-bold" onClick={handleSendOnboarding}>
-                    <MessageSquare size={18} /> Send registration form
+                    {lead.communicateViaEmailOnly ? <Mail size={18} /> : <MessageSquare size={18} />}
+                    {lead.communicateViaEmailOnly ? "Email registration form" : "Send registration form"}
                 </Button>
                 <Button variant="outline" className="h-14 rounded-2xl bg-white dark:bg-slate-900 gap-3 text-sm font-bold" onClick={() => window.open(`tel:${lead.phone}`)}>
                     Call - {lead.phone}
@@ -312,8 +340,18 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
         return (
           <div className="space-y-4">
             <p className="text-[11px] text-slate-500 font-medium">Check with them if they need any help with registration</p>
-            <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none" onClick={() => window.open(getWhatsAppLink(lead, 'followup', templates), '_blank')}>
-                Registration follow-up
+            <Button 
+                className={cn(
+                    "w-full h-14 rounded-2xl text-white gap-3 text-sm font-bold shadow-lg dark:shadow-none",
+                    lead.communicateViaEmailOnly ? "bg-primary-600 shadow-primary-100" : "bg-emerald-500 shadow-emerald-100"
+                )}
+                onClick={() => {
+                    if (lead.communicateViaEmailOnly) setEmailComposerType('followup');
+                    else window.open(getWhatsAppLink(lead, 'followup', templates), '_blank');
+                }}
+            >
+                {lead.communicateViaEmailOnly ? <Mail size={18} /> : <MessageSquare size={18} />}
+                {lead.communicateViaEmailOnly ? "Email follow-up" : "Registration follow-up"}
             </Button>
           </div>
         );
@@ -356,11 +394,15 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
             )}
 
             <Button 
-                className="w-full h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none disabled:opacity-50" 
+                className={cn(
+                    "w-full h-14 rounded-2xl text-white gap-3 text-sm font-bold shadow-lg dark:shadow-none disabled:opacity-50",
+                    lead.communicateViaEmailOnly ? "bg-primary-600 shadow-primary-100" : "bg-emerald-500 shadow-emerald-100"
+                )}
                 onClick={handleSendTestLink}
                 disabled={!lead.testLink}
             >
-                Send assessment link
+                {lead.communicateViaEmailOnly ? <Mail size={18} /> : null}
+                {lead.communicateViaEmailOnly ? "Email assessment link" : "Send assessment link"}
             </Button>
           </div>
         );
@@ -368,8 +410,18 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
         return (
           <div className="space-y-4">
             <p className="text-[11px] text-slate-500 font-medium">Check with them if they need any help with the test</p>
-            <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none" onClick={() => window.open(getWhatsAppLink(lead, 'test_nudge', templates), '_blank')}>
-                Nudge on test completion
+            <Button 
+                className={cn(
+                    "w-full h-14 rounded-2xl text-white gap-3 text-sm font-bold shadow-lg dark:shadow-none",
+                    lead.communicateViaEmailOnly ? "bg-primary-600 shadow-primary-100" : "bg-emerald-500 shadow-emerald-100"
+                )}
+                onClick={() => {
+                    if (lead.communicateViaEmailOnly) setEmailComposerType('test_nudge');
+                    else window.open(getWhatsAppLink(lead, 'test_nudge', templates), '_blank');
+                }}
+            >
+                {lead.communicateViaEmailOnly ? <Mail size={18} /> : null}
+                {lead.communicateViaEmailOnly ? "Email nudge" : "Nudge on test completion"}
             </Button>
           </div>
         );
@@ -382,7 +434,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                 </Button>
                 {showCalendar && <SlotPicker />}
                 <Button variant="outline" className="h-14 rounded-2xl bg-white dark:bg-slate-900 gap-3 text-sm font-bold" onClick={() => {
-                    setIsEmailComposerOpen(true);
+                    setEmailComposerType('report_email');
                 }}>
                     Send report & close
                 </Button>
@@ -416,8 +468,16 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                 </Button>
                 <div className="flex gap-2">
                     {renderFeesDropdown()}
-                    <Button variant="outline" className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" onClick={() => window.open(getWhatsAppLink(lead, 'community', templates), '_blank')}>
-                        Community invite
+                    <Button 
+                        variant="outline" 
+                        className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" 
+                        onClick={() => {
+                            if (lead.communicateViaEmailOnly) setEmailComposerType('community');
+                            else window.open(getWhatsAppLink(lead, 'community', templates), '_blank');
+                        }}
+                    >
+                        {lead.communicateViaEmailOnly ? <Mail size={16} /> : <MessageSquare size={16} />}
+                        {lead.communicateViaEmailOnly ? "Email community invite" : "Community invite"}
                     </Button>
                 </div>
             </div>
@@ -426,13 +486,21 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
       case 'Report sent':
         return (
             <div className="space-y-4">
-                <Button className="w-full h-14 rounded-2xl bg-primary-600 text-white gap-3 text-sm font-bold shadow-lg shadow-primary-100 dark:shadow-none" onClick={() => setIsEmailComposerOpen(true)}>
-                    Prepare & Resend Report
+                <Button className="w-full h-14 rounded-2xl bg-primary-600 text-white gap-3 text-sm font-bold shadow-lg shadow-primary-100 dark:shadow-none" onClick={() => setEmailComposerType('report_email')}>
+                    Prepare & {normalizedCurrentStage === 'Report sent' ? 'Resend' : 'Send'} Report
                 </Button>
                 <div className="flex gap-2">
                     {renderFeesDropdown()}
-                    <Button variant="outline" className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" onClick={() => window.open(getWhatsAppLink(lead, 'review', templates), '_blank')}>
-                        Ask Review
+                    <Button 
+                        variant="outline" 
+                        className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" 
+                        onClick={() => {
+                            if (lead.communicateViaEmailOnly) setEmailComposerType('review');
+                            else window.open(getWhatsAppLink(lead, 'review', templates), '_blank');
+                        }}
+                    >
+                        {lead.communicateViaEmailOnly ? <Mail size={16} /> : <MessageSquare size={16} />}
+                        {lead.communicateViaEmailOnly ? "Email review request" : "Ask Review"}
                     </Button>
                 </div>
             </div>
@@ -526,7 +594,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                 )}
 
                 {/* Academic & Personal Section */}
-                <SectionHeader id="personal" title="Student Profile" icon={User} />
+                <SectionHeader id="personal" title="Student Information" icon={User} />
                 {activeSection === 'personal' && (
                   <DrawerProfileForm lead={lead} onUpdate={onUpdate} />
                 )}
@@ -552,7 +620,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
 
                 {/* Academic & Personal Section */}
                 {false && (<> 
-                <SectionHeader id="personal" title="Student Profile" icon={User} />
+                <SectionHeader id="personal" title="Student Information" icon={User} />
                 {activeSection === 'personal' && (
                   <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="px-1 pb-4 space-y-4">
                     <div className="flex items-center justify-between mb-2 px-2">
@@ -885,24 +953,29 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
 
             {/* Sticky Mobile Actions */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 flex gap-3 z-[60]">
-               <Button variant="outline" className="flex-1 h-14 rounded-2xl" onClick={onClose}>Close</Button>
-               <Button className="flex-1 h-14 rounded-2xl bg-primary-600 text-white" onClick={() => window.open(getWhatsAppLink(lead, 'followup', templates), '_blank')}>Quick WhatsApp</Button>
+               <Button variant="outline" className="w-full h-14 rounded-2xl" onClick={onClose}>Close Student Detail</Button>
           </div>
         </motion.div>
       </motion.div>
 
-      {isEmailComposerOpen && lead && (
+      {emailComposerType && lead && (
         <EmailComposer 
           lead={lead}
-          onClose={() => setIsEmailComposerOpen(false)}
+          onClose={() => setEmailComposerType(null)}
           onSuccess={() => {
-            setIsEmailComposerOpen(false);
-            handleStageChange('Report sent');
+            if (emailComposerType === 'report_email') {
+                handleStageChange('Report sent');
+            } else if (emailComposerType === 'test') {
+                handleStageChange('Test sent');
+            } else if (emailComposerType === 'onboarding' && normalizeStage(lead.stage) === 'New') {
+                handleStageChange('Registration requested');
+            }
+            setEmailComposerType(null);
             alert('Email sent successfully!');
           }}
-          initialSubject={getReportEmailData(lead, templates).subject}
-          initialBody={getReportEmailData(lead, templates).body}
-          recipients={getReportEmailData(lead, templates).recipients}
+          initialSubject={getEmailData(lead, emailComposerType, templates).subject}
+          initialBody={getEmailData(lead, emailComposerType, templates).body}
+          recipients={getEmailData(lead, emailComposerType, templates).recipients}
         />
       )}
     </>

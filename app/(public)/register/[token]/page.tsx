@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { 
   GraduationCap, 
   User, 
@@ -22,8 +22,10 @@ import { Card } from '@/components/ui/Card';
 
 export default function RegistrationPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const token = params.token as string;
+  const sid = searchParams.get('sid');
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -34,7 +36,8 @@ export default function RegistrationPage() {
   useEffect(() => {
     async function fetchLead() {
       try {
-        const res = await fetch(`/api/register/${token}`);
+        const url = `/api/register/${token}${sid ? `?sid=${sid}` : ''}`;
+        const res = await fetch(url);
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error || 'Failed to load registration form');
@@ -57,14 +60,19 @@ export default function RegistrationPage() {
     const data = Object.fromEntries(fd.entries());
 
     try {
-      const res = await fetch(`/api/register/${token}`, {
+      const url = `/api/register/${token}${sid ? `?sid=${sid}` : ''}`;
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, sid }),
       });
-      if (!res.ok) throw new Error('Submission failed');
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.details || errData.error || 'Submission failed');
+      }
       setSubmitted(true);
     } catch (err: any) {
+      console.error('Submission error:', err);
       alert(err.message);
     } finally {
       setSubmitting(false);

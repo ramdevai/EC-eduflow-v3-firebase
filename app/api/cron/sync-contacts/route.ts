@@ -10,7 +10,9 @@ export async function GET(req: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const sheetId = process.env.GOOGLE_SHEET_ID;
+  const { searchParams } = new URL(req.url);
+  const sid = searchParams.get('sid');
+  const sheetId = sid || process.env.GOOGLE_SHEET_ID;
   const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
 
   if (!sheetId || !refreshToken || refreshToken === 'placeholder' || sheetId === 'placeholder') {

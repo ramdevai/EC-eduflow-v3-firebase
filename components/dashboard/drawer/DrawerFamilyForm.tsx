@@ -25,6 +25,14 @@ export function DrawerFamilyForm({ lead, onUpdate }: Props) {
                 className="p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" 
             />
         </div>
+        <div className="grid grid-cols-1 gap-4">
+            <input 
+                placeholder="Father Email" 
+                defaultValue={lead.fatherEmail} 
+                onBlur={(e) => { if (e.target.value !== lead.fatherEmail) onUpdate(lead.id, { fatherEmail: e.target.value }); }} 
+                className="w-full p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" 
+            />
+        </div>
         <input 
             placeholder="Occupation" 
             defaultValue={lead.fatherOccupation} 
@@ -46,6 +54,14 @@ export function DrawerFamilyForm({ lead, onUpdate }: Props) {
                 defaultValue={lead.motherPhone} 
                 onBlur={(e) => { if (e.target.value !== lead.motherPhone) onUpdate(lead.id, { motherPhone: e.target.value }); }} 
                 className="p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" 
+            />
+        </div>
+        <div className="grid grid-cols-1 gap-4">
+            <input 
+                placeholder="Mother Email" 
+                defaultValue={lead.motherEmail} 
+                onBlur={(e) => { if (e.target.value !== lead.motherEmail) onUpdate(lead.id, { motherEmail: e.target.value }); }} 
+                className="w-full p-3 bg-white dark:bg-slate-800 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-800 outline-none focus:border-primary-500 shadow-sm" 
             />
         </div>
         <input 

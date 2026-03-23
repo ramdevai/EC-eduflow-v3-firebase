@@ -8,6 +8,7 @@ import { MessageSquare, Save, Loader2, RefreshCw, ExternalLink } from 'lucide-re
 interface Template {
     id: string;
     label: string;
+    subject: string;
     message: string;
 }
 
@@ -49,7 +50,7 @@ export function TemplatesView({ sheetId }: TemplatesViewProps) {
         if (sheetId) fetchTemplates();
     }, [sheetId]);
 
-    const handleSave = async (id: string, message: string) => {
+    const handleSave = async (id: string, subject: string, message: string) => {
         setSaving(id);
         try {
             const res = await fetch('/api/templates', {
@@ -58,7 +59,7 @@ export function TemplatesView({ sheetId }: TemplatesViewProps) {
                     'Content-Type': 'application/json',
                     'x-sheet-id': sheetId 
                 },
-                body: JSON.stringify({ id, message }),
+                body: JSON.stringify({ id, subject, message }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to save template');
@@ -73,8 +74,8 @@ export function TemplatesView({ sheetId }: TemplatesViewProps) {
         }
     };
 
-    const updateLocalTemplate = (id: string, newMessage: string) => {
-        setTemplates(prev => prev.map(t => t.id === id ? { ...t, message: newMessage } : t));
+    const updateLocalTemplate = (id: string, updates: Partial<Template>) => {
+        setTemplates(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
     };
 
     return (
@@ -129,7 +130,7 @@ export function TemplatesView({ sheetId }: TemplatesViewProps) {
                                 <Button 
                                     size="sm" 
                                     className="h-8 rounded-lg gap-2 text-[10px] uppercase font-black tracking-widest"
-                                    onClick={() => handleSave(template.id, template.message)}
+                                    onClick={() => handleSave(template.id, template.subject, template.message)}
                                     disabled={saving === template.id}
                                 >
                                     {saving === template.id ? (
@@ -145,12 +146,25 @@ export function TemplatesView({ sheetId }: TemplatesViewProps) {
                                     )}
                                 </Button>
                             </div>
-                            <textarea 
-                                value={template.message}
-                                onChange={(e) => updateLocalTemplate(template.id, e.target.value)}
-                                className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-primary-500 transition-all min-h-[100px] resize-y"
-                                placeholder={`Enter ${template.label}...`}
-                            />
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Email Subject</label>
+                                <input 
+                                    value={template.subject}
+                                    onChange={(e) => updateLocalTemplate(template.id, { subject: e.target.value })}
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold outline-none focus:border-primary-500 transition-all"
+                                    placeholder="Enter email subject..."
+                                />
+                                <p className="text-[9px] text-slate-400 ml-2 italic">* Subjects are only used for Email communication.</p>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Message Body (Email & WhatsApp)</label>
+                                <textarea 
+                                    value={template.message}
+                                    onChange={(e) => updateLocalTemplate(template.id, { message: e.target.value })}
+                                    className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-primary-500 transition-all min-h-[100px] resize-y"
+                                    placeholder={`Enter ${template.label}...`}
+                                />
+                            </div>
                             <div className="flex gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
                                 <span>Placeholders:</span>
                                 <code className="text-primary-600 dark:text-primary-400">{'{name}'}</code>

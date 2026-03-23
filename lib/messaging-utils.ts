@@ -3,18 +3,21 @@ import { normalizeStage } from './utils';
 
 export const WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/example-group-link";
 
-export function getWhatsAppLink(
-  lead: Lead, 
-  type: 'onboarding' | 'test' | 'test_nudge' | 'followup' | 'community' | 'review' | 'birthday' | 'fees_reminder',
-  templates?: any[]
-) {
-  const phone = lead.phone.replace(/\D/g, '');
+export type MessageType = 'onboarding' | 'test' | 'test_nudge' | 'followup' | 'community' | 'review' | 'birthday' | 'fees_reminder' | 'report_email';
+
+export function getMessageBody(
+  lead: Lead,
+  type: MessageType,
+  templates?: any[],
+  sheetId?: string | null
+): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  
+  const sid = sheetId || (typeof window !== 'undefined' ? localStorage.getItem('educompass_sheet_id') : null);
+
   // Try to find custom template from sheet
   const customTemplate = templates?.find(t => t.id === type);
   let message = customTemplate?.message || "";
-  
+
   // If no custom template, use defaults
   if (!message) {
     switch (type) {
@@ -46,20 +49,23 @@ export function getWhatsAppLink(
         case 'birthday':
             message = `Hi {name}, wishing you a very Happy Birthday! 🎂 Hope you have a fantastic day ahead! - Binal from EduCompass`;
             break;
+        case 'report_email':
+            message = `Dear Parent,\n\nPlease find attached the career counseling report for {name}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass`;
+            break;
     }
-
   }
 
   // Replace placeholders
   const token = lead.registrationToken || 'PENDING';
-  const registrationLink = `${origin}/register/${token}`;
+  const registrationLink = `${origin}/register/${token}${sid ? `?sid=${sid}` : ''}`;
   
   // Use lead.testLink if provided, else attempt suggestion, else default
   const testLink = lead.testLink || getTestLinkByGrade(lead.grade, lead.board) || TEST_LINKS["8th-10th"];
 
   message = message
     .replace(/{name}/g, lead.name)
-    .replace(/\[name\]/g, lead.name);
+    .replace(/\[name\]/g, lead.name)
+    .replace(/{notes}/g, lead.notes || '[Notes from your session]');
 
   // Smart placeholder replacement based on message type and intent
   if (type === 'onboarding' || (type === 'followup' && normalizeStage(lead.stage) === 'Registration requested')) {
@@ -81,14 +87,70 @@ export function getWhatsAppLink(
     .replace(/{REGISTRATION_LINK}/g, registrationLink)
     .replace(/\[REGISTRATION_LINK\]/g, registrationLink);
 
+  return message;
+}
+
+export function getWhatsAppLink(
+  lead: Lead, 
+  type: MessageType,
+  templates?: any[],
+  sheetId?: string | null
+) {
+  const phone = lead.phone.replace(/\D/g, '');
+  const message = getMessageBody(lead, type, templates, sheetId);
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
-
-export function getReportEmailData(lead: Lead, templates?: any[]) {
-  const customTemplate = templates?.find(t => t.id === 'report_email');
-  const subject = `{name} - Career Counseling Report`.replace(/{name}/g, lead.name);
+export function getEmailData(
+  lead: Lead,
+  type: MessageType,
+  templates?: any[],
+  sheetId?: string | null
+) {
+  const body = getMessageBody(lead, type, templates, sheetId);
   
+  // Try to find custom subject from template
+  const customTemplate = templates?.find(t => t.id === type);
+  let subject = customTemplate?.subject || "";
+
+  if (!subject) {
+    // Default subjects for different types
+    switch (type) {
+      case 'onboarding':
+          subject = `Registration Form - EduCompass Career Counseling`;
+          break;
+      case 'test':
+          subject = `Career Assessment Link - {name}`;
+          break;
+      case 'test_nudge':
+          subject = `Reminder: Career Assessment Pending`;
+          break;
+      case 'fees_reminder':
+          subject = `Professional Fees Reminder - EduCompass`;
+          break;
+      case 'community':
+          subject = `Invitation: EduCompass Parents Community`;
+          break;
+      case 'followup':
+          subject = `Follow-up: Career Counseling Inquiry`;
+          break;
+      case 'review':
+          subject = `How was your session? - Feedback Request`;
+          break;
+      case 'birthday':
+          subject = `Happy Birthday {name}! 🎂`;
+          break;
+      case 'report_email':
+          subject = `{name} - Career Counseling Report`;
+          break;
+    }
+  }
+
+  // Replace placeholders in subject
+  subject = subject
+    .replace(/{name}/g, lead.name)
+    .replace(/\[name\]/g, lead.name);
+
   // Collect all valid recipients
   const recipients = [
     lead.email,
@@ -96,27 +158,13 @@ export function getReportEmailData(lead: Lead, templates?: any[]) {
     lead.motherEmail
   ].filter(Boolean).map(e => e!.trim());
 
-  let body = customTemplate?.message || `Dear Parent,
-
-Please find attached the career counseling report for {name}.
-
-Based on our 1:1 session, we discussed the following career choices and recommendations:
-{notes}
-
-[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]
-
-If you have any questions, feel free to reach out.
-
-Best regards,
-Binal
-Founder, EduCompass`;
-
-  body = body
-    .replace(/{name}/g, lead.name)
-    .replace(/{notes}/g, lead.notes || '[Notes from your session]');
-
   return { subject, body, recipients };
 }
+
+export function getReportEmailData(lead: Lead, templates?: any[]) {
+  return getEmailData(lead, 'report_email', templates);
+}
+
 
 export function getEmailLink(lead: Lead, templates?: any[]) {
   const { subject, body } = getReportEmailData(lead, templates);

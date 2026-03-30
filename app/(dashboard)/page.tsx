@@ -78,6 +78,12 @@ export default function Dashboard() {
   const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
+    if ((session as any)?.error === "RefreshAccessTokenError") {
+        signOut({ callbackUrl: '/' });
+    }
+  }, [session]);
+
+  useEffect(() => {
     if (status === "authenticated" && mounted) {
       if (window.location.search || window.location.hash) {
           window.history.replaceState(null, '', '/');

@@ -142,3 +142,6 @@ To allow the CRM to sync contacts in the background (even when you are logged ou
 *   **Cause:** You are logging in with an email that isn't on the "Test Users" list.
 *   **Fix:** Go to **OAuth Consent Screen > Test Users** and add your Gmail address. Click **Advanced > Go to EduCompass CRM (unsafe)** to proceed.
 
+
+## Miscelleneous 
+Modern testing environment uses Vitest. Run the tests anytime using npm run test. This is in dev mode

@@ -10,14 +10,21 @@ async function getSystemAccessToken() {
         throw new Error('System sync not configured (Refresh Token missing)');
     }
 
-    const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET
-    );
-    oauth2Client.setCredentials({ refresh_token: refreshToken });
-    const { token } = await oauth2Client.getAccessToken();
-    if (!token) throw new Error('Failed to refresh system token');
-    return token;
+    try {
+        const oauth2Client = new google.auth.OAuth2(
+            process.env.GOOGLE_CLIENT_ID,
+            process.env.GOOGLE_CLIENT_SECRET
+        );
+        oauth2Client.setCredentials({ refresh_token: refreshToken });
+        const { token } = await oauth2Client.getAccessToken();
+        if (!token) throw new Error('Failed to refresh system token');
+        return token;
+    } catch (error: any) {
+        if (error.message?.includes('invalid_grant')) {
+            throw new Error('System sync expired (invalid_grant). The administrator needs to re-authenticate.');
+        }
+        throw error;
+    }
 }
 
 export async function GET(

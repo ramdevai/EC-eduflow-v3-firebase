@@ -245,9 +245,15 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
         return;
     }
 
+    // Generate WhatsApp link first before starting any state updates or renders
+    const whatsappUrl = getWhatsAppLink(lead, 'test', templates);
+    
+    // Open the window immediately using the current stable lead and templates data
+    window.open(whatsappUrl, '_blank');
+
+    // Update state and lead stage in the background
     onUpdate(lead.id, { stage: 'Test sent' });
     setLocalStage('Test sent');
-    window.open(getWhatsAppLink(lead, 'test', templates), '_blank');
   };
 
   const toggleSection = (section: string) => {

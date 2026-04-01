@@ -96,7 +96,17 @@ export function getWhatsAppLink(
   templates?: any[],
   sheetId?: string | null
 ) {
-  const phone = lead.phone.replace(/\D/g, '');
+  // Clean phone number: remove all non-digits except +
+  let phone = lead.phone.replace(/[^\d+]/g, '');
+  
+  // If no country code (10 digits), assume +91 (India)
+  if (phone.length === 10 && !phone.startsWith('+')) {
+    phone = '91' + phone;
+  }
+  
+  // Final cleanup for wa.me - remove any leading + or zeros
+  phone = phone.replace(/^0+|^\+/g, '');
+
   const message = getMessageBody(lead, type, templates, sheetId);
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }

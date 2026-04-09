@@ -5,7 +5,7 @@ import { Sparkles, Mail, Phone } from 'lucide-react';
 
 interface Props {
   lead: Lead;
-  onUpdate: (id: number, updates: Partial<Lead>) => void;
+  onUpdate: (id: string, updates: Partial<Lead>) => void;
 }
 
 export function DrawerProfileForm({ lead, onUpdate }: Props) {

@@ -3,7 +3,7 @@ import { Lead } from '@/lib/types';
 
 interface Props {
   lead: Lead;
-  onUpdate: (id: number, updates: Partial<Lead>) => void;
+  onUpdate: (id: string, updates: Partial<Lead>) => void;
 }
 
 export function DrawerFamilyForm({ lead, onUpdate }: Props) {

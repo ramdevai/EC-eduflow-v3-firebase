@@ -1,9 +1,6 @@
-import { NextResponse } from 'next/server';
-import { addLeads } from '@/lib/db-firestore';
-import { UserRole, Lead, LeadStage, LeadStatus } from '@/lib/types';
-import { auth } from '@/lib/auth';
+import { LeadStage, LeadStatus } from './types';
 
-const SAMPLE_LEADS = [
+export const SAMPLE_LEADS = [
   { name: "Arjun Sharma", phone: "9876543210", email: "arjun.s@gmail.com", grade: "10th", board: "CBSE", stage: "New" as LeadStage, status: "Open" as LeadStatus },
   { name: "Priya Patel", phone: "9123456789", email: "priyap@yahoo.com", grade: "12th", board: "ISC", stage: "Registration requested" as LeadStage, status: "Open" as LeadStatus },
   { name: "Siddharth Nair", phone: "8877665544", email: "sid.nair@outlook.com", grade: "9th", board: "IB", stage: "Registration done" as LeadStage, status: "Open" as LeadStatus },
@@ -30,21 +27,3 @@ const SAMPLE_LEADS = [
   { name: "Tara Sutaria", phone: "9767879808", email: "tara.s@gmail.com", grade: "10th", board: "CBSE", stage: "Session complete" as LeadStage, status: "Won" as LeadStatus },
   { name: "Ishan Khatter", phone: "8878980919", email: "ishan.k@gmail.com", grade: "11th", board: "ISC", stage: "Report sent" as LeadStage, status: "Won" as LeadStatus },
 ];
-
-export async function POST(req: Request) {
-  const session = await auth() as any;
-
-  if (!session?.user?.id || !session?.user?.role) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const callerUid = session.user.id;
-  const role = session.user.role as UserRole;
-
-  try {
-    await addLeads(callerUid, role, SAMPLE_LEADS as Partial<Lead>[]);
-    return NextResponse.json({ success: true, count: SAMPLE_LEADS.length });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}

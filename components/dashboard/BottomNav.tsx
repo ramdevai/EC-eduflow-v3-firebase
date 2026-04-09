@@ -4,8 +4,7 @@ import React from 'react';
 import { 
   LayoutDashboard, 
   Calendar, 
-  Plus, 
-  Sparkles
+  Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LeadStage } from '@/lib/types';
@@ -14,11 +13,9 @@ interface BottomNavProps {
   activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers';
   setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers') => void;
   onAddClick: () => void;
-  onSyncClick: () => void;
-  isSyncing?: boolean;
 }
 
-export function BottomNav({ activeTab, setActiveTab, onAddClick, onSyncClick, isSyncing }: BottomNavProps) {
+export function BottomNav({ activeTab, setActiveTab, onAddClick }: BottomNavProps) {
   const NavItem = ({ 
     icon: Icon, 
     label, 
@@ -67,12 +64,7 @@ export function BottomNav({ activeTab, setActiveTab, onAddClick, onSyncClick, is
         isActive={activeTab === 'today'} 
         onClick={() => setActiveTab('today')} 
       />
-      <NavItem 
-        icon={Sparkles} 
-        label="Sync" 
-        onClick={onSyncClick} 
-        isLoading={isSyncing}
-      />
+
       <NavItem 
         icon={Plus} 
         label="Add Lead" 

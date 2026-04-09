@@ -14,9 +14,21 @@ export type LeadStatus = 'Open' | 'Won' | 'Lost';
 export type FeesPaidStatus = 'Paid' | 'Due' | 'Waived' | 'Bad debt';
 export type CommunityJoinedStatus = 'Yes' | 'No';
 
+export enum UserRole {
+  Admin = 'admin',
+  Staff = 'staff',
+}
+
+export interface User {
+  uid: string;
+  email: string;
+  role: UserRole;
+}
+
 export interface Lead {
+  ownerUid: string;
   // Basic & System
-  id: number;
+  id: string;
   name: string;
   phone: string;
   email: string;

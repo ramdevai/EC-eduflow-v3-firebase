@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 interface Props {
   lead: Lead;
-  onUpdate: (id: number, updates: Partial<Lead>) => void;
+  onUpdate: (id: string, updates: Partial<Lead>) => void;
 }
 
 export function DrawerFeesForm({ lead, onUpdate }: Props) {

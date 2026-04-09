@@ -1,25 +1,23 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { upsertCalendarEvent } from '@/lib/calendar';
-import { updateLead, getAllLeads } from '@/lib/db-sheets';
+import { updateLeads, getAllLeads } from '@/lib/db-firestore';
+import { UserRole } from '@/lib/types';
 
 export async function POST(req: Request) {
   const session = await auth() as any;
-  const sheetId = req.headers.get('x-sheet-id');
 
-  if (!session?.accessToken) {
+  if (!session?.user?.id || !session?.user?.role) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  if (!sheetId) {
-    return NextResponse.json({ error: 'Sheet ID missing' }, { status: 400 });
   }
 
   try {
     const { leadId, startTime } = await req.json();
-    const token = session.accessToken;
+    const callerUid = session.user.id;
+    const role = session.user.role as UserRole;
     
-    const leads = await getAllLeads(sheetId, token);
+    const token = session.accessToken; // Retain token for calendar operations
+    const leads = await getAllLeads(callerUid, role);
     const lead = leads.find(l => l.id === leadId);
     
     if (!lead) throw new Error('Lead not found');
@@ -34,18 +32,22 @@ export async function POST(req: Request) {
     }
 
     const event = await upsertCalendarEvent(
-        token, 
+        token as string, // Ensure token is string
         { name: lead.name, email: lead.email, id: lead.id }, 
         startTime,
         lead.calendarEventId
     );
 
-    // Update sheet with event info
-    await updateLead(sheetId, token, lead.id, {
+    // Update lead in Firestore with event info
+    await updateLeads(callerUid, role, [{
+      id: lead.id,
+      data: {
         calendarEventId: event.id || '',
         appointmentTime: startTime,
-        stage: '1:1 scheduled'
-    });
+        stage: '1:1 scheduled',
+        lastStageUpdate: new Date().toISOString(),
+      },
+    }]);
 
     return NextResponse.json({ 
         success: true, 

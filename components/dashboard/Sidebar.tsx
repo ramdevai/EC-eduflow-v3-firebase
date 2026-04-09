@@ -14,7 +14,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LeadStage } from '@/lib/types';
+import { LeadStage, UserRole } from '@/lib/types';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useSession, signOut } from "next-auth/react";
 
@@ -127,12 +127,14 @@ export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobile
               isActive={activeTab === 'templates'} 
               onClick={() => setActiveTab('templates')} 
             />
-            <NavButton 
-                icon={Settings} 
-                label="Database Setup" 
-                isActive={false} 
-                onClick={() => onPreferencesClick?.()} 
-            />
+            {session?.user?.role === UserRole.Admin && (
+              <NavButton 
+                  icon={Settings} 
+                  label="Database Setup" 
+                  isActive={false} 
+                  onClick={() => onPreferencesClick?.()} 
+              />
+            )}
             <NavButton 
                 icon={LogOut} 
                 label="Sign Out" 

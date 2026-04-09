@@ -24,7 +24,7 @@ export async function getAvailability(accessToken: string, timeMin: string, time
 
 export async function upsertCalendarEvent(
   accessToken: string,
-  lead: { name: string; email?: string; id: number },
+  lead: { name: string; email?: string; id: string },
   startTime: string,
   eventId?: string
 ) {

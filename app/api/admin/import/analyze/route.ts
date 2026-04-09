@@ -1,19 +1,36 @@
 import { NextResponse } from 'next/server';
-import { getSheetsClient } from '@/lib/google';
 import { auth } from '@/lib/auth';
-import { getAllLeads } from '@/lib/db-sheets';
+import { getAllLeads } from '@/lib/db-firestore';
+import { UserRole } from '@/lib/types';
+import { google } from 'googleapis'; // Temporarily re-introduce for external sheet reading
+
+async function getSheetsClient(accessToken: string) {
+  if (!accessToken) {
+    throw new Error('Access token is required to initialize Google Sheets client');
+  }
+  try {
+    const auth = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+    auth.setCredentials({ access_token: accessToken });
+    return google.sheets({ version: 'v4', auth });
+  } catch (error: any) {
+    console.error('Failed to initialize Google Sheets client:', error.message);
+    throw new Error(`Google API Init Error: ${error.message}`);
+  }
+}
 
 export async function POST(req: Request) {
   const session = await auth() as any;
-  const targetSheetId = req.headers.get('x-sheet-id');
   const { externalSheetId } = await req.json();
 
-  if (!session?.accessToken || !targetSheetId || !externalSheetId) {
-    return NextResponse.json({ error: 'Missing configuration' }, { status: 400 });
+  if (!session?.user?.id || !session?.user?.role || !externalSheetId) {
+    return NextResponse.json({ error: 'Missing configuration or authentication' }, { status: 400 });
   }
 
   try {
-    const sheets = await getSheetsClient(session.accessToken);
+    const sheets = await getSheetsClient(session.accessToken as string);
     
     // 1. Get External Data
     const externalRes = await sheets.spreadsheets.values.get({
@@ -30,7 +47,7 @@ export async function POST(req: Request) {
     const dataRows = externalRows.slice(1);
 
     // 2. Get Existing Data for Duplicate Check
-    const existingLeads = await getAllLeads(targetSheetId, session.accessToken);
+    const existingLeads = await getAllLeads(session.user.id, session.user.role as UserRole);
     const existingEmails = new Set(existingLeads.map(l => l.email?.toLowerCase().trim()).filter(Boolean));
     const existingPhones = new Set(existingLeads.map(l => l.phone?.replace(/\D/g, '').slice(-10)).filter(p => p.length >= 10));
 

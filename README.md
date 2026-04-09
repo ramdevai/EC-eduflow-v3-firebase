@@ -1,8 +1,8 @@
 
 
-# EduCompass Micro CRM (Next.js)
+# EC-eduflow-v3-firebase
 
-A modern lead management system integrated with Google Sheets and Google Contacts.
+A modern Next.js application integrated with Firebase, featuring advanced lead management and synchronization capabilities.
 
 ## Features
 - **Google Sheets Database:** Your CRM data lives in a Google Sheet for easy access.

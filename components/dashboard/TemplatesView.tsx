@@ -12,11 +12,9 @@ interface Template {
     message: string;
 }
 
-interface TemplatesViewProps {
-    sheetId: string;
-}
 
-export function TemplatesView({ sheetId }: TemplatesViewProps) {
+
+export function TemplatesView() {
     const [templates, setTemplates] = useState<Template[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -27,10 +25,8 @@ export function TemplatesView({ sheetId }: TemplatesViewProps) {
         setLoading(true);
         setError(null);
         try {
-            console.log('Fetching templates for sheet:', sheetId);
-            const res = await fetch('/api/templates', {
-                headers: { 'x-sheet-id': sheetId }
-            });
+            console.log('Fetching templates from Firestore');
+            const res = await fetch('/api/templates');
             const data = await res.json();
             if (res.ok) {
                 setTemplates(data);
@@ -47,8 +43,8 @@ export function TemplatesView({ sheetId }: TemplatesViewProps) {
     };
 
     useEffect(() => {
-        if (sheetId) fetchTemplates();
-    }, [sheetId]);
+        fetchTemplates();
+    }, []); // Empty dependency array means this runs once on mount
 
     const handleSave = async (id: string, subject: string, message: string) => {
         setSaving(id);
@@ -56,8 +52,7 @@ export function TemplatesView({ sheetId }: TemplatesViewProps) {
             const res = await fetch('/api/templates', {
                 method: 'PATCH',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'x-sheet-id': sheetId 
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ id, subject, message }),
             });
@@ -87,18 +82,10 @@ export function TemplatesView({ sheetId }: TemplatesViewProps) {
                     </div>
                     <div>
                         <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Message Templates</h2>
-                        <p className="text-[10px] text-slate-400 font-medium">Sheet ID: {sheetId.substring(0, 5)}...</p>
+
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <a 
-                        href={`https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=0`} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="text-[10px] text-primary-600 hover:underline flex items-center gap-1 font-bold mr-4"
-                    >
-                        Open Sheet <ExternalLink size={10} />
-                    </a>
                     <Button variant="outline" size="sm" onClick={fetchTemplates} className="gap-2">
                         <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                         Refresh

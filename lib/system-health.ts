@@ -48,6 +48,14 @@ export async function checkSystemHealth(): Promise<HealthStatus> {
             };
         }
 
+        if (error.message?.includes('unauthorized_client')) {
+            return { 
+                ok: false, 
+                errorType: 'API_ERROR',
+                message: 'Unauthorized Client: Client ID or Secret in .env.local is incorrect or mismatched.'
+            };
+        }
+
         return { 
             ok: false, 
             errorType: 'API_ERROR',

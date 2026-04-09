@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getAllLeads, addLead } from '@/lib/db-sheets';
+import { getAllLeads, addLeads } from '@/lib/db-firestore';
+import { UserRole } from '@/lib/types';
 import { auth } from '@/lib/auth';
 import { validateEnv } from '@/lib/env-check';
 
@@ -10,18 +11,13 @@ export async function GET(req: Request) {
   }
 
   const session = await auth() as any;
-  const sheetId = req.headers.get('x-sheet-id');
 
-  if (!session?.accessToken) {
+  if (!session?.user?.id || !session?.user?.role) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  if (!sheetId) {
-    return NextResponse.json({ error: 'Google Sheet ID is not connected. Please go to Settings.' }, { status: 400 });
-  }
-
   try {
-    const leads = await getAllLeads(sheetId, session.accessToken as string);
+    const leads = await getAllLeads(session.user.id, session.user.role as UserRole);
     return NextResponse.json(leads);
   } catch (error: any) {
     console.error('GET leads error:', error);
@@ -40,20 +36,15 @@ export async function POST(req: Request) {
   }
 
   const session = await auth() as any;
-  const sheetId = req.headers.get('x-sheet-id');
 
-  if (!session?.accessToken) {
+  if (!session?.user?.id || !session?.user?.role) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  }
-
-  if (!sheetId) {
-    return NextResponse.json({ error: 'Sheet ID not provided' }, { status: 400 });
   }
 
   try {
     const body = await req.json();
-    const id = await addLead(sheetId, session.accessToken as string, body);
-    return NextResponse.json({ id });
+    const ids = await addLeads(session.user.id, session.user.role as UserRole, [body]);
+    return NextResponse.json({ id: ids[0] });
   } catch (error: any) {
     console.error('POST lead error:', error);
     return NextResponse.json({ error: error.message || 'Failed to add lead' }, { status: 500 });

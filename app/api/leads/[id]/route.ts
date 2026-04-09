@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { updateLead, deleteLead } from '@/lib/db-sheets';
+import { updateLeads, deleteLead } from '@/lib/db-firestore';
+import { UserRole } from '@/lib/types';
 import { auth } from '@/lib/auth';
 import { validateEnv } from '@/lib/env-check';
 
@@ -13,20 +14,15 @@ export async function PATCH(
   }
 
   const session = await auth() as any;
-  const sheetId = req.headers.get('x-sheet-id');
   const { id } = await params;
 
-  if (!session?.accessToken) {
+  if (!session?.user?.id || !session?.user?.role) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  }
-
-  if (!sheetId) {
-    return NextResponse.json({ error: 'Sheet ID not provided' }, { status: 400 });
   }
 
   try {
     const body = await req.json();
-    await updateLead(sheetId, session.accessToken as string, parseInt(id), body);
+    await updateLeads(session.user.id, session.user.role as UserRole, [{ id, data: body }]);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('PATCH lead error:', error);
@@ -44,19 +40,14 @@ export async function DELETE(
   }
 
   const session = await auth() as any;
-  const sheetId = req.headers.get('x-sheet-id');
   const { id } = await params;
 
-  if (!session?.accessToken) {
+  if (!session?.user?.id || !session?.user?.role) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  if (!sheetId) {
-    return NextResponse.json({ error: 'Sheet ID not provided' }, { status: 400 });
-  }
-
   try {
-    await deleteLead(sheetId, session.accessToken as string, parseInt(id));
+    await deleteLead(session.user.id, session.user.role as UserRole, id);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('DELETE lead error:', error);

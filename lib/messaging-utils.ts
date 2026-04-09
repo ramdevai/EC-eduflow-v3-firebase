@@ -9,10 +9,8 @@ export function getMessageBody(
   lead: Lead,
   type: MessageType,
   templates?: any[],
-  sheetId?: string | null
 ): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const sid = sheetId || (typeof window !== 'undefined' ? localStorage.getItem('educompass_sheet_id') : null);
 
   // Try to find custom template from sheet
   const customTemplate = templates?.find(t => t.id === type);
@@ -57,8 +55,7 @@ export function getMessageBody(
 
   // Replace placeholders
   const token = lead.registrationToken || 'PENDING';
-  const registrationLink = `${origin}/register/${token}${sid ? `?sid=${sid}` : ''}`;
-  
+  const registrationLink = `${origin}/register/${token}`;
   // Use lead.testLink if provided, else attempt suggestion, else default
   const testLink = lead.testLink || getTestLinkByGrade(lead.grade, lead.board) || TEST_LINKS["8th-10th"];
 
@@ -94,7 +91,6 @@ export function getWhatsAppLink(
   lead: Lead, 
   type: MessageType,
   templates?: any[],
-  sheetId?: string | null
 ) {
   // Clean phone number: remove all non-digits except +
   let phone = lead.phone.replace(/[^\d+]/g, '');
@@ -107,7 +103,7 @@ export function getWhatsAppLink(
   // Final cleanup for wa.me - remove any leading + or zeros
   phone = phone.replace(/^0+|^\+/g, '');
 
-  const message = getMessageBody(lead, type, templates, sheetId);
+  const message = getMessageBody(lead, type, templates);
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
@@ -115,9 +111,8 @@ export function getEmailData(
   lead: Lead,
   type: MessageType,
   templates?: any[],
-  sheetId?: string | null
 ) {
-  const body = getMessageBody(lead, type, templates, sheetId);
+  const body = getMessageBody(lead, type, templates);
   
   // Try to find custom subject from template
   const customTemplate = templates?.find(t => t.id === type);

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, memo } from 'react';
+import React, { useState, memo, useEffect } from 'react';
+import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -31,7 +32,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
-import { Lead, LeadStage, FeesPaidStatus, TEST_LINKS } from '@/lib/types';
+import { Lead, LeadStage, FeesPaidStatus, TEST_LINKS, UserRole } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -62,18 +63,19 @@ const TEST_OPTIONS = [
 interface LeadDrawerProps {
   lead: Lead;
   onClose: () => void;
-  onUpdate: (id: number, updates: Partial<Lead>) => void;
-  onDelete: (id: number) => void;
+  onUpdate: (id: string, updates: Partial<Lead>) => void;
+  onDelete: (id: string) => void;
   fetchLeads: () => void;
   stages: LeadStage[];
   templates?: any[];
 }
 
 export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates }: LeadDrawerProps) {
-  // Use state derived initially from props, so we don't need a useEffect to sync it, avoiding a double-render.
-  // Because app/page.tsx mounts this component using `key={currentLead.id}`, this state will be fresh for every new lead.
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === UserRole.Admin;
+
   const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [localStage, setLocalStage] = useState<LeadStage | null>(null);
+  const [localStage, setLocalStage] = useState<LeadStage | null>(lead.stage);
   const [localFeesPaid, setLocalFeesPaid] = useState<FeesPaidStatus>(lead.feesPaid || 'Due');
   const [showRawData, setShowRawData] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -151,8 +153,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
 
   const handleCopyLink = () => {
     if (!lead.registrationToken) return;
-    const sheetId = localStorage.getItem('educompass_sheet_id');
-    const url = `${window.location.origin}/register/${lead.registrationToken}${sheetId ? `?sid=${sheetId}` : ''}`;
+    const url = `${window.location.origin}/register/${lead.registrationToken}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -212,10 +213,10 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     if (!currentToken) {
         currentToken = generateRegistrationToken();
         try {
-            await onUpdate(lead.id, { 
-                registrationToken: currentToken,
-                stage: 'Registration requested'
-            });
+        await onUpdate(lead.id, { 
+            registrationToken: currentToken,
+            stage: 'Registration requested'
+        });
         } catch (err) {
             alert('Failed to generate registration link');
             return;
@@ -531,7 +532,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="absolute inset-0 bg-slate-900/60"
+          className="absolute inset-0 bg-slate-950/40"
         />
         
         <motion.div 
@@ -539,8 +540,8 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
           initial={{ x: '100%' }}
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
-          transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
-          className="relative w-full md:max-w-2xl bg-white dark:bg-slate-950 h-full shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col will-change-transform"
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="relative w-full md:max-w-2xl bg-white dark:bg-slate-950 h-full shadow-xl border-l border-slate-200 dark:border-slate-800 flex flex-col will-change-transform"
         >
           <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
@@ -807,9 +808,9 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                         <textarea 
                             defaultValue={lead.notes} 
                             onBlur={(e) => {
-                                if (e.target.value !== lead.notes) {
-                                    onUpdate(lead.id, { notes: e.target.value });
-                                }
+                                    if (e.target.value !== lead.notes) {
+                                        onUpdate(lead.id, { notes: e.target.value });
+                                    }
                             }} 
                             placeholder="Type session recommendations here..."
                             className="w-full p-5 bg-slate-50 dark:bg-slate-900 rounded-3xl text-sm font-medium border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all resize-none min-h-[200px]" 
@@ -822,9 +823,9 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                                 <input 
                                     defaultValue={lead.testLink} 
                                     onBlur={(e) => {
-                                        if (e.target.value !== lead.testLink) {
-                                            onUpdate(lead.id, { testLink: e.target.value });
-                                        }
+                                    if (e.target.value !== lead.testLink) {
+                                        onUpdate(lead.id, { testLink: e.target.value });
+                                    }
                                     }} 
                                     className="flex-1 p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-xs font-mono outline-none border border-slate-200 dark:border-slate-800 focus:border-primary-500" 
                                 />
@@ -911,7 +912,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
 
               {/* Danger Zone */}
               <div className="pt-10 border-t border-slate-100 dark:border-slate-800 space-y-4">
-                {!isSessionDone && (
+                {!isSessionDone && isAdmin && (
                   <Button 
                       variant="outline" 
                       className="w-full h-12 rounded-xl gap-3 text-xs font-bold text-red-500 border-red-100 dark:border-red-900/20 hover:bg-red-50 dark:hover:bg-red-900/10" 
@@ -940,18 +941,18 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                     </pre>
                 )}
 
-                {!isSessionDone && (
+                {!isSessionDone && isAdmin && (
                   <Button 
-                      variant="danger" 
-                      className="w-full h-14 rounded-2xl gap-3 text-sm font-black uppercase tracking-[0.2em]"
-                      onClick={() => {
-                          if (confirm('Permanently delete this student profile?')) {
-                              onDelete(lead.id);
-                              onClose();
-                          }
-                      }}
+                    variant="danger" 
+                    className="w-full h-12 rounded-xl gap-3 text-sm font-bold"
+                    onClick={() => {
+                        if (confirm('Are you sure you want to permanently delete this lead? This action cannot be undone.')) {
+                            onDelete(lead.id);
+                            onClose();
+                        }
+                    }}
                   >
-                      <Trash2 size={18} /> Delete Student Record
+                      <Trash2 size={18} /> Permanently Delete Lead
                   </Button>
                 )}
               </div>

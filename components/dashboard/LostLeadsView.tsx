@@ -20,7 +20,7 @@ import { normalizeStage, safeFormat } from '@/lib/utils';
 
 interface LostLeadsViewProps {
   leads: Lead[];
-  updateLead: (id: number, updates: Partial<Lead>) => void;
+  updateLead: (id: string, updates: Partial<Lead>) => void;
 }
 
 export function LostLeadsView({ leads, updateLead }: LostLeadsViewProps) {
@@ -54,11 +54,11 @@ export function LostLeadsView({ leads, updateLead }: LostLeadsViewProps) {
     };
   }, [leads, lostLeads]);
 
-  const handleRestore = (id: number) => {
+  const handleRestore = (id: string) => {
     updateLead(id, { status: 'Open' });
   };
 
-  const handleMarkWon = (id: number) => {
+  const handleMarkWon = (id: string) => {
     updateLead(id, { status: 'Won' });
   };
 

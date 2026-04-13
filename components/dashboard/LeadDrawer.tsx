@@ -3,6 +3,8 @@
 import React, { useState, memo, useEffect } from 'react';
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from 'motion/react';
+import Timeline from 'react-calendar-timeline';
+import 'react-calendar-timeline/lib/Timeline.css';
 import { 
   X, 
   Phone, 
@@ -30,8 +32,6 @@ import {
   XCircle,
   Pencil,
 } from 'lucide-react';
-
-
 
 import { differenceInDays } from 'date-fns';
 import { Lead, LeadStage, FeesPaidStatus, TEST_LINKS, UserRole, SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/types';
@@ -355,146 +355,160 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     const duration = systemSettings.defaultSessionDuration || 90;
     const days = systemSettings.calendarLookaheadDays || 3;
 
-    const allSlots = [
-      ...busySlots.map(slot => ({
-        type: 'booked' as const,
-        start: safeParseISO(slot.start?.dateTime || slot.start?.date || slot.start || ''),
-        end: safeParseISO(slot.end?.dateTime || slot.end?.date || slot.end || ''),
-        title: slot.summary || 'Booked Event',
-        data: slot,
+    // Data for Timeline View
+    const timelineGroups = [{ id: 1, title: `Admin Calendar (${days} days)` }];
+    const timelineItems = [
+      // Booked slots in red with event title
+      ...busySlots.map((slot, index) => ({
+        id: `busy-${index}`,
+        group: 1,
+        title: slot.summary || 'Booked',
+        start_time: new Date(slot.start?.dateTime || slot.start?.date || slot.start || 0).getTime(),
+        end_time: new Date(slot.end?.dateTime || slot.end?.date || slot.end || 0).getTime(),
+        itemProps: { style: { background: '#ef4444', color: 'white', borderRadius: '4px' } },
       })),
-      ...freeSlots.map(slot => ({
-        type: 'available' as const,
-        start: safeParseISO(slot),
-        end: new Date(safeParseISO(slot).getTime() + duration * 60 * 1000),
+      // Free slots in green
+      ...freeSlots.map((slot, index) => ({
+        id: `free-${index}`,
+        group: 1,
         title: `Free (${duration}min)`,
-        data: slot,
+        start_time: new Date(slot).getTime(),
+        end_time: new Date(new Date(slot).getTime() + duration * 60 * 1000).getTime(),
+        itemProps: { 
+          style: { background: '#22c55e', color: 'white', borderRadius: '4px', cursor: 'pointer' },
+          onClick: () => handleSchedule(slot),
+        },
       })),
-    ].sort((a, b) => a.start.getTime() - b.start.getTime());
-
-    const slotList = Object.entries(allSlots.reduce((acc, slot) => {
-      const dayKey = safeFormat(slot.start, 'yyyy-MM-dd');
-      if (!acc[dayKey]) acc[dayKey] = [];
-      acc[dayKey].push(slot);
-      return acc;
-    }, {} as Record<string, any[]>)).map(([dayKey, daySlots]) => {
-      const dayName = safeFormat(daySlots[0].start, 'EEEE, dd MMM yyyy');
-      return (
-        <div key={dayKey} className="space-y-3">
-          <div className="font-black text-sm uppercase tracking-widest text-slate-400 border-b border-slate-200 dark:border-slate-700 pb-2">{dayName} (9AM-9PM)</div>
-          {daySlots.map((slot, index) => {
-            const isBooked = slot.type === 'booked';
-            const start = slot.start;
-            const end = slot.end;
-            return (
-              <div
-                key={index}
-                className={`p-5 rounded-3xl flex gap-4 items-center border-2 transition-all ${
-                  isBooked 
-                    ? 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800' 
-                    : 'bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950 border-emerald-200 dark:border-emerald-800 cursor-pointer'
-                }`}
-                onClick={() => !isBooked && handleSchedule(slot.data)}
-              >
-                <div className={`w-14 h-14 rounded-2xl flex-shrink-0 flex items-center justify-center font-mono text-xs font-black border ${
-                  isBooked 
-                    ? 'bg-red-100 dark:bg-red-900 text-red-600 border-red-200' 
-                    : 'bg-emerald-100 dark:bg-emerald-900 text-emerald-600 border-emerald-200'
-                }`}>
-                  {isBooked ? 'BUSY' : `${duration} MIN`}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className={`font-bold ${isBooked ? 'text-red-600' : 'text-emerald-600 text-xl'}`}>
-                    {slot.title}
-                  </div>
-                  <div className="text-xs text-slate-500 font-medium">
-                    {safeFormat(start, 'h:mm a')} – {safeFormat(end, 'h:mm a')}
-                  </div>
-                </div>
-                {!isBooked && (
-                  <div className="text-emerald-600 text-xs font-bold">BOOK →</div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      );
-    });
+    ];
 
     return (
       <Card className="p-6 border border-primary-200 dark:border-primary-800 bg-primary-50/30 dark:bg-primary-950/20 shadow-sm mt-4">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h4 className="text-sm font-black uppercase tracking-widest text-primary-600">
-              {duration}-Minute Slots • Next {days} Days (9AM-9PM)
+              {duration}-Minute Slots • Next {days} Days
             </h4>
-            <p className="text-xs text-slate-500">Stacked by time • Red = Booked (with title) • Green = Available</p>
+            <p className="text-xs text-slate-500">Red = Booked (with title) • Green = Available</p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setShowCalendar(false)} className="h-8 w-8 p-0 rounded-full">
             <X size={14} />
           </Button>
         </div>
 
+        {/* Switch to view both timeline and list (as requested) */}
+        <div className="flex gap-1 mb-6 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-fit">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500'}`}
+          >
+            List View
+          </button>
+          <button
+            onClick={() => setViewMode('timeline')}
+            className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all ${viewMode === 'timeline' ? 'bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500'}`}
+          >
+            Timeline View
+          </button>
+        </div>
+
         {loadingCalendar ? (
           <div className="flex items-center gap-3 text-sm text-slate-400 p-8 justify-center">
             <RefreshCw className="animate-spin" size={18} /> Checking admin calendar...
           </div>
-        ) : allSlots.length === 0 ? (
-          <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-700 rounded-3xl">
-            <AlertCircle className="mx-auto text-amber-500 mb-3" size={28} />
-            <p className="font-medium text-slate-600 dark:text-slate-400">No slots available in the next {days} days.</p>
-          </div>
         ) : (
-          <div className="space-y-6">
-            {slotList}
+          <div>
+            {viewMode === 'list' ? (
+              /* Enhanced List View with Day Headers and Red Booked Slots with Titles */
+              <div className="space-y-8">
+                {Array.from(new Set([
+                  ...busySlots.map(s => safeFormat(s.start?.dateTime || s.start?.date || s.start, 'yyyy-MM-dd')),
+                  ...freeSlots.map(s => safeFormat(s, 'yyyy-MM-dd'))
+                ])).sort().map(dayStr => {
+                  const dayName = safeFormat(new Date(dayStr), 'EEEE, dd MMM yyyy');
+                  const dayBusy = busySlots.filter(s => safeFormat(s.start?.dateTime || s.start?.date || s.start, 'yyyy-MM-dd') === dayStr);
+                  const dayFree = freeSlots.filter(s => safeFormat(s, 'yyyy-MM-dd') === dayStr);
+
+                  return (
+                    <div key={dayStr} className="space-y-4">
+                      <div className="font-black text-sm uppercase tracking-widest text-slate-400 border-b border-slate-200 dark:border-slate-700 pb-2">{dayName}</div>
+                      
+                      {/* Booked slots in red with event title */}
+                      {dayBusy.map((slot, index) => {
+                        const startStr = typeof slot.start === 'string' ? slot.start : (slot.start?.dateTime || slot.start?.date || '');
+                        const endStr = typeof slot.end === 'string' ? slot.end : (slot.end?.dateTime || slot.end?.date || '');
+                        const start = safeParseISO(startStr);
+                        const end = safeParseISO(endStr);
+                        return (
+                          <div key={`booked-${index}`} className="p-5 bg-red-50 dark:bg-red-950 border-2 border-red-200 dark:border-red-800 rounded-3xl flex gap-4 items-center">
+                            <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-900 flex-shrink-0 flex items-center justify-center text-red-600 font-mono text-xs font-black border border-red-200">
+                              BUSY
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-red-600">{slot.summary || 'Booked Event'}</div>
+                              <div className="text-xs text-slate-500">
+                                {safeFormat(start, 'h:mm a')} – {safeFormat(end, 'h:mm a')}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Free slots in green */}
+                      {dayFree.map((slot, index) => {
+                        const start = new Date(slot);
+                        const end = new Date(start.getTime() + duration * 60 * 1000);
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => handleSchedule(slot)}
+                            className="w-full p-5 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950 border-2 border-emerald-200 dark:border-emerald-800 rounded-3xl text-left transition-all group flex gap-4 items-center"
+                          >
+                            <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900 flex-shrink-0 flex items-center justify-center text-emerald-600 font-mono text-xs font-black border border-emerald-200">
+                              {duration}<br />MIN
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-black text-emerald-600 text-xl">{safeFormat(slot, 'h:mm a')}</div>
+                              <div className="text-xs text-slate-500 font-medium">{safeFormat(slot, 'EEE, dd MMM')}</div>
+                              <div className="text-[10px] text-slate-400 mt-0.5">to {safeFormat(end, 'h:mm a')}</div>
+                            </div>
+                            <div className="text-emerald-600 text-xs font-bold group-hover:translate-x-0.5 transition-transform">BOOK →</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Full Horizontal Timeline View */
+              <div className="h-80 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden bg-white dark:bg-slate-900">
+                <Timeline
+                  groups={timelineGroups}
+                  items={timelineItems}
+                  defaultTimeStart={Date.now()}
+                  defaultTimeEnd={Date.now() + days * 24 * 60 * 60 * 1000}
+                  canMove={false}
+                  canResize={false}
+                  lineHeight={50}
+                  itemHeightRatio={0.8}
+                  onItemClick={(itemId: any) => {
+                    const item = timelineItems.find(i => i.id === itemId);
+                    if (item && item.title.includes('Free')) {
+                      const slot = new Date(item.start_time).toISOString();
+                      handleSchedule(slot);
+                    }
+                  }}
+                />
+              </div>
+            )}
+            <p className="text-center text-[10px] text-slate-400 pt-4">
+              Red = Booked (with title) • Green = Available • Switch views above to compare
+            </p>
           </div>
         )}
-        <p className="text-center text-[10px] text-slate-400 pt-6 border-t border-slate-200 dark:border-slate-700">
-          Grouped by day (9AM-9PM) • All events on the admin calendar are shown (red = booked with title)
-        </p>
-
-        {/* Flexible Custom Time Picker (using UI/UX skill recommendation) */}
-        <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-700">
-          <p className="text-xs font-bold text-slate-400 mb-3">OR CHOOSE CUSTOM TIME</p>
-          <div className="flex gap-3">
-            <input
-              type="time"
-              id="customStartTime"
-              className="flex-1 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium focus:border-primary-500 outline-none"
-            />
-            <select
-              id="customDuration"
-              className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium focus:border-primary-500 outline-none"
-            >
-              <option value="30">30 min</option>
-              <option value="60">60 min</option>
-              <option value="90" selected>90 min</option>
-              <option value="120">120 min</option>
-            </select>
-            <Button
-              onClick={() => {
-                const timeInput = document.getElementById('customStartTime') as HTMLInputElement;
-                const durationSelect = document.getElementById('customDuration') as HTMLSelectElement;
-                if (!timeInput.value) return alert('Please select a time');
-                const [hours, minutes] = timeInput.value.split(':').map(Number);
-                const customDate = new Date();
-                customDate.setHours(hours, minutes, 0, 0);
-                const customStart = customDate.toISOString();
-                handleSchedule(customStart);
-              }}
-              className="h-11 px-6 rounded-2xl text-xs font-bold"
-            >
-              CHECK & BOOK
-            </Button>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-3">Validates against admin calendar in real-time</p>
-        </div>
       </Card>
     );
   };
-
-
-
 
 
 

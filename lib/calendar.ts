@@ -1,16 +1,13 @@
 import { google } from 'googleapis';
+import { getAdminAuthClient } from './google-auth';
 
-export async function getCalendarClient(accessToken: string) {
-  const auth = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET
-  );
-  auth.setCredentials({ access_token: accessToken });
+export async function getCalendarClient() {
+  const auth = getAdminAuthClient();
   return google.calendar({ version: 'v3', auth });
 }
 
-export async function getAvailability(accessToken: string, timeMin: string, timeMax: string) {
-  const calendar = await getCalendarClient(accessToken);
+export async function getAvailability(timeMin: string, timeMax: string) {
+  const calendar = await getCalendarClient();
   const response = await calendar.freebusy.query({
     requestBody: {
       timeMin,
@@ -23,12 +20,11 @@ export async function getAvailability(accessToken: string, timeMin: string, time
 }
 
 export async function upsertCalendarEvent(
-  accessToken: string,
   lead: { name: string; email?: string; id: string },
   startTime: string,
   eventId?: string
 ) {
-  const calendar = await getCalendarClient(accessToken);
+  const calendar = await getCalendarClient();
   const endTime = new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString();
 
   const eventBody = {
@@ -60,5 +56,20 @@ export async function upsertCalendarEvent(
       conferenceDataVersion: 1,
     });
     return response.data;
+  }
+}
+
+export async function deleteCalendarEvent(eventId: string) {
+  const calendar = await getCalendarClient();
+  try {
+    await calendar.events.delete({
+      calendarId: 'primary',
+      eventId: eventId,
+    });
+  } catch (error: any) {
+    // If the event is already deleted (404), we can ignore it
+    if (error.code !== 404) {
+      throw error;
+    }
   }
 }

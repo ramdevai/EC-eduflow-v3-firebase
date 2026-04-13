@@ -4,12 +4,12 @@ import { getCalendarClient } from '@/lib/calendar';
 
 export async function GET(req: Request) {
   const session = await auth() as any;
-  if (!session?.accessToken) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
-    const calendar = await getCalendarClient(session.accessToken);
+    const calendar = await getCalendarClient();
     const now = new Date();
     const startOfDay = new Date(now.setHours(0, 0, 0, 0)).toISOString();
     const endOfDay = new Date(now.setHours(23, 59, 59, 999)).toISOString();

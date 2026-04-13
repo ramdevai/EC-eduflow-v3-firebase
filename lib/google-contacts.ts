@@ -1,19 +1,12 @@
 import { google } from 'googleapis';
-import { Lead } from './types';
+import { Lead, UserRole } from './types';
 import { adminDb } from './server-firebase';
 import { addLeads, updateLeads } from './db-firestore';
+import { getAdminAuthClient } from './google-auth';
 
 export async function getPeopleClient() {
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET
-  );
-
-  oauth2Client.setCredentials({
-    refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-  });
-
-  return google.people({ version: 'v1', auth: oauth2Client });
+  const auth = getAdminAuthClient();
+  return google.people({ version: 'v1', auth });
 }
 
 /**
@@ -113,14 +106,14 @@ export async function syncGoogleContacts(callerUid: string, triggerType: 'manual
     }
   }
 
-  // 3. Save new leads to Firestore
+  // 3. Save new leads to Firestore (use caller role for proper ownership)
   if (leadsToAdd.length > 0) {
-    await addLeads(callerUid, 'admin' as any, leadsToAdd);
+    await addLeads(callerUid, UserRole.Staff as any, leadsToAdd); // Staff can add leads
   }
 
   // 4. Update existing leads (Manual Sync only)
   if (leadsToUpdate.length > 0) {
-    await updateLeads(callerUid, 'admin' as any, leadsToUpdate);
+    await updateLeads(callerUid, UserRole.Staff as any, leadsToUpdate);
   }
 
   return {

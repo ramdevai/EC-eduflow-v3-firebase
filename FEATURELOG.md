@@ -8,7 +8,8 @@ This file tracks the status and description of features in the EduCompass CRM.
 | **Lead Management** | ✅ Active | Pipeline and List views for managing student leads in Firestore. |
 | **Role-Based Access Control** | ✅ Active | Differentiates between 'Admin' and 'Staff' permissions. |
 | **Google Calendar Sync** | ✅ Active | Automatic scheduling of 1:1 sessions with student leads. |
-| **Google Contacts Sync** | 🚧 In Progress | Automated daily fetching of leads identified by date suffix. |
+| **Google Contacts Sync** | ✅ Active | Automated daily fetching of leads identified by date suffix. |
+| **Delegated Admin Access**| ✅ Active | Shared access to Admin's Google Calendar and Contacts for Staff. |
 | **Communication Center** | ✅ Active | WhatsApp and Email templates for outreach. |
 | **Public Registration** | ✅ Active | Unique links for students to fill their profile details. |
 | **Manual Data Import** | ✅ Active | Importing leads from external Google Sheets (Sheet migration utility). |

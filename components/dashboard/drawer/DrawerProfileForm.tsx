@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lead } from '@/lib/types';
-import { safeFormat, toInputFormat, cn, normalizeStage } from '@/lib/utils';
+import { safeFormat, toInputFormat, cn, normalizeStage, safeParseISO } from '@/lib/utils';
+import { differenceInYears, isValid } from 'date-fns';
 import { Sparkles, Mail, Phone } from 'lucide-react';
 
 interface Props {
@@ -99,10 +100,23 @@ export function DrawerProfileForm({ lead, onUpdate }: Props) {
           className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all" 
         />
       </div>
+      <div className="group">
+        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Residential Address</label>
+        <textarea 
+          defaultValue={lead.address} 
+          onBlur={(e) => { if (e.target.value !== lead.address) onUpdate(lead.id, { address: e.target.value }); }} 
+          className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all resize-none min-h-[80px]" 
+        />
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="group">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">
                 Date of Birth {lead.dob ? `: ${safeFormat(lead.dob, 'dd MMM yyyy')}` : '(Not set)'}
+                {(() => {
+                    const dob = lead.dob ? safeParseISO(lead.dob) : null;
+                    const age = (dob && isValid(dob)) ? differenceInYears(new Date(), dob) : null;
+                    return age !== null ? ` (Age: ${age})` : '';
+                })()}
             </label>
             <input 
                 type="date" 

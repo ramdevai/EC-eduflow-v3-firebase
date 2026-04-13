@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/Button';
@@ -64,7 +65,12 @@ export default function RegistrationPage() {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data, sid }),
+        body: JSON.stringify({ 
+          ...data, 
+          sid,
+          privacy_consent: true,
+          privacy_consent_date: new Date().toISOString()
+        }),
       });
       if (!res.ok) {
         const errData = await res.json();
@@ -340,6 +346,41 @@ export default function RegistrationPage() {
                 </div>
             </div>
           </Card>
+          {/* Data Privacy & Consent */}
+          <Card className="p-8 space-y-6 border-white/20 bg-slate-50/50">
+             <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <ShieldCheck size={20} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 tracking-tight">Privacy Notice & Consent</h3>
+            </div>
+            
+            <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
+                <div className="space-y-2">
+                    <p className="font-bold text-slate-900">Privacy & Data Collection</p>
+                    <p>
+                        EduCompass collects student and family details solely to provide career counseling and assessments. 
+                        Your data is handled securely under the DPDP Act 2023. You have the right to access, correct, or request deletion of your data 
+                        at any time by contacting our Grievance Officer at <span className="text-primary-600 font-bold">support@educompass.in</span>.
+                    </p>
+                </div>
+
+                <div className="pt-4 space-y-4">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                        <div className="pt-0.5">
+                            <input 
+                                type="checkbox" 
+                                required 
+                                className="w-5 h-5 rounded border-2 border-slate-200 text-primary-600 focus:ring-primary-500 cursor-pointer" 
+                            />
+                        </div>
+                        <span className="text-xs font-bold text-slate-900 group-hover:text-primary-600 transition-colors">
+                            I provide my free, specific, and informed consent to EduCompass to process my personal data for career counseling purposes as described above. <span className="text-red-500">*</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+          </Card>
 
           <Button 
             type="submit" 
@@ -359,9 +400,6 @@ export default function RegistrationPage() {
             )}
           </Button>
 
-          <p className="text-center text-[10px] text-slate-400 font-medium">
-            By submitting this form, you agree to EduCompass processing your information for career counseling purposes.
-          </p>
         </form>
       </div>
     </div>

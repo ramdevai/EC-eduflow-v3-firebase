@@ -38,6 +38,7 @@ const ImportModal = dynamic(() => import('@/components/dashboard/ImportModal').t
 const AddLeadModal = dynamic(() => import('@/components/dashboard/AddLeadModal').then(mod => mod.AddLeadModal), { ssr: false });
 const SearchBar = dynamic(() => import('@/components/dashboard/SearchBar').then(mod => mod.SearchBar), { ssr: false });
 const LeadDrawer = dynamic(() => import('@/components/dashboard/LeadDrawer').then(mod => mod.LeadDrawer), { ssr: false });
+const SettingsModal = dynamic(() => import('@/components/dashboard/SettingsModal').then(mod => mod.SettingsModal), { ssr: false });
 
 // UI Components (imported directly for smaller, frequently used components or for TS type consistency)
 import { Button } from '@/components/ui/Button';
@@ -90,7 +91,10 @@ export default function Dashboard() {
   }, [isSettingsOpen, session?.user?.role]);
 
   const handleSeedLeads = async () => {
-    if (!session?.user?.id || !session?.user?.role) return; // Ensure user is authenticated
+    if (session?.user?.role !== UserRole.Admin) {
+      alert('Only administrators can seed sample data.');
+      return;
+    }
     if (!confirm('This will add sample leads to your pipeline. Continue?')) return;
     setIsSeeding(true);
     try {
@@ -170,70 +174,11 @@ export default function Dashboard() {
     );
   }
 
-  if (status === "unauthenticated") {
+  if (status === "unauthenticated" || !session?.user?.role) {
+    console.warn(`[Dashboard] Blocking access - unauthenticated or no role. Status: ${status}, Role: ${session?.user?.role}`);
     return <LoginScreen />;
   }
 
-  if (isSettingsOpen) {
-    if (session?.user?.role !== UserRole.Admin) {
-      return (
-        <div className="min-h-screen flex items-center justify-center p-6">
-          <Card className="p-8 md:p-10 space-y-4 text-center shadow-2xl border-white/20">
-            <ShieldAlert className="text-red-500 mx-auto" size={48} />
-            <h2 className="text-2xl font-black dark:text-white">Access Denied</h2>
-            <p className="text-slate-500 text-sm font-medium">You do not have permission to access this page.</p>
-            <Button onClick={() => setIsSettingsOpen(false)}>Go to Dashboard</Button>
-          </Card>
-        </div>
-      );
-    }
-
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-xl">
-            <Card className="p-8 md:p-10 space-y-10 shadow-2xl border-white/20">
-                <div className="flex items-center gap-5">
-                    <div className="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-primary-100">
-                        <Database size={32} />
-                    </div>
-                    <div>
-                        <h2 className="text-3xl font-black dark:text-white tracking-tight">Preferences</h2>
-                        <p className="text-slate-500 text-sm font-medium">
-                            Manage your CRM settings.
-                        </p>
-                    </div>
-                </div>
-                <div className="space-y-8">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Database Type</label>
-                        <div className="flex gap-2 items-center p-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 rounded-2xl font-bold text-sm outline-none transition-all">
-                            <Database size={18} className="text-primary-600" />
-                            <span>Firestore (Active)</span>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 gap-4">
-                        <Button variant="outline" className="h-14 rounded-2xl font-bold" onClick={() => setIsSettingsOpen(false)}>Close</Button>
-                        <div className="pt-6 border-t border-slate-100 dark:border-slate-800 space-y-6">
-                            <div className="text-center space-y-1"><h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">CRM Database Maintenance</h4><p className="text-[9px] text-slate-400 italic">Essential tools for administrators to manage Firestore data.</p></div>
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Button variant="secondary" className="w-full h-12 rounded-xl text-xs gap-2" onClick={() => alert('Fix sheet structure functionality is deprecated.')}><RefreshCw size={16} />Fix sheet structure</Button>
-                                    <p className="text-[9px] text-slate-500 dark:text-slate-400 text-center px-4 leading-relaxed">This functionality is deprecated. All data is now managed in Firestore.</p>
-                                </div>
-                                <div className="pt-4 border-t border-slate-100 dark:border-slate-800/50 space-y-4">
-                                    <Button variant="outline" className="w-full h-12 rounded-xl text-xs gap-2 border-primary-100 text-primary-600 hover:bg-primary-50" onClick={() => { setIsSettingsOpen(false); setIsImportModalOpen(true); }}><Download size={14} />Import from External Sheet</Button>
-                                    <Button variant="outline" className="w-full h-12 rounded-xl text-[10px] gap-2 border-slate-200 dark:border-slate-800 text-slate-400 hover:text-primary-600 transition-all" onClick={handleSeedLeads} disabled={isSeeding}><Plus size={14} className={isSeeding ? 'animate-spin' : ''} />Seed Sample Data (Testing Only)</Button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div className="bg-primary-50 dark:bg-primary-900/10 p-5 rounded-[2rem] border border-primary-100 dark:border-primary-900/20 flex gap-4 items-start"><AlertCircle className="text-primary-600 shrink-0 mt-0.5" size={18} /><p className="text-xs leading-relaxed text-primary-700 dark:text-primary-400 font-medium">The app now uses Firestore for data storage. Google Sheets integration has been removed.</p></div>
-            </Card>
-        </motion.div>
-      </div>
-    );
-  }
 
   // Main Dashboard Content
   return (
@@ -276,8 +221,19 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="w-10 h-10 p-0 rounded-xl"><Settings size={18} /></Button>
-              <Button variant="outline" size="sm" onClick={() => fetchLeads()} className="w-10 h-10 p-0 rounded-xl"><RefreshCw size={18} className={loading ? 'animate-spin' : ''} /></Button>
+              {session?.user?.role === UserRole.Admin && (
+                <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="w-10 h-10 p-0 rounded-xl"><Settings size={18} /></Button>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleSyncContacts} 
+                disabled={isSyncing}
+                className="hidden md:flex items-center gap-2 px-4 h-10 rounded-xl text-xs font-bold"
+              >
+                <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+                SYNC CONTACTS
+              </Button>
               {activeTab === 'leads' && (
                 <>
                   {session?.user?.role === UserRole.Admin && (
@@ -405,6 +361,14 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
       <AnimatePresence mode="wait">
+        {isSettingsOpen && (
+          <SettingsModal 
+            onClose={() => setIsSettingsOpen(false)} 
+            onImportLeads={() => { setIsSettingsOpen(false); setIsImportModalOpen(true); }}
+            onSeedLeads={handleSeedLeads}
+            isSeeding={isSeeding}
+          />
+        )}
         {isImportModalOpen && <ImportModal onClose={closeImportModal} onSuccess={handleImportSuccess} />}
         {isAddModalOpen && session?.user && (
           <AddLeadModal 

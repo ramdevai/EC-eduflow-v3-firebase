@@ -4,7 +4,7 @@ import { getAvailability } from '@/lib/calendar';
 
 export async function GET(req: Request) {
   const session = await auth() as any;
-  if (!session?.accessToken) {
+  if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    const busySlots = await getAvailability(session.accessToken, timeMin, timeMax);
+    const busySlots = await getAvailability(timeMin as string, timeMax as string);
     return NextResponse.json(busySlots);
   } catch (error: any) {
     console.error('Calendar Availability error:', error);

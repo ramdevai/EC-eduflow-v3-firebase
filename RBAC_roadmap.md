@@ -1,6 +1,6 @@
 # Role-Based Access Control (RBAC) Roadmap
 
-This document outlines the strategy and implementation plan for introducing multi-role support to the EC-eduflow-v2 application.
+This document outlines the strategy and implementation plan for introducing multi-role support to the EC-eduflow-v3-firebase application.
 
 ## 1. Goal
 Transition from a single-user application to a multi-role system that allows the Business Owner to delegate tasks to Assistant/Support Staff without exposing destructive actions or sensitive administrative configurations.

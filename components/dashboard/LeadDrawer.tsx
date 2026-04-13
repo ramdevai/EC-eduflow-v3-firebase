@@ -85,6 +85,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   const [busySlots, setBusySlots] = useState<any[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [emailComposerType, setEmailComposerType] = useState<MessageType | null>(null);
 
   const openEmailComposer = (type: MessageType) => {
@@ -148,6 +149,51 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
       alert('Scheduling failed: ' + err.message);
     } finally {
       setIsScheduling(false);
+    }
+  };
+
+  const handleRemind = () => {
+    let type: MessageType = 'followup';
+    const stage = normalizeStage(lead.stage);
+
+    // 1. Priority: Fees Reminder
+    const advancedStages = ['Test completed', '1:1 scheduled', 'Session complete', 'Report sent'];
+    if (advancedStages.includes(stage) && lead.feesPaid === 'Due') {
+        type = 'fees_reminder';
+    } 
+    // 2. Priority: Stage Nudges
+    else if (stage === 'Test sent') {
+        type = 'test_nudge';
+    } else if (stage === 'Registration requested') {
+        type = 'followup';
+    }
+
+    if (lead.communicateViaEmailOnly) {
+        setEmailComposerType(type);
+    } else {
+        window.open(getWhatsAppLink(lead, type, templates), '_blank');
+    }
+  };
+
+  const handleCancelSchedule = async () => {
+    if (!lead.calendarEventId) return;
+    if (!confirm('Are you sure you want to cancel this booking? This will remove the event from the calendar.')) return;
+    
+    setIsCancelling(true);
+    try {
+      const res = await fetch('/api/calendar/schedule', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id, eventId: lead.calendarEventId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert('Booking cancelled!');
+      fetchLeads(); // Refresh leads to reflect state change
+    } catch (err: any) {
+      alert('Cancellation failed: ' + err.message);
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -448,7 +494,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
             </div>
                 <div className="flex gap-2">
                 {renderFeesDropdown()}
-                <Button variant="outline" className="p-3 rounded-xl flex gap-2 text-xs font-bold">
+                <Button variant="outline" className="p-3 rounded-xl flex gap-2 text-xs font-bold" onClick={handleRemind}>
                     <Bell size={16} /> Remind
                 </Button>
             </div>
@@ -465,9 +511,18 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                             <p className="text-xs font-medium text-primary-600">{lead.appointmentTime ? safeFormat(lead.appointmentTime, 'h:mm a') : ''}</p>
                         </div>
                     </div>
-                    <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-full transition-colors shadow-sm" onClick={fetchAvailability}>
-                        <Pencil size={16} className="text-slate-400" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-full transition-colors shadow-sm" onClick={fetchAvailability}>
+                            <Pencil size={16} className="text-slate-400" />
+                        </button>
+                        <button 
+                            className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-full transition-colors shadow-sm text-red-500" 
+                            onClick={handleCancelSchedule}
+                            disabled={isCancelling}
+                        >
+                            {isCancelling ? <RefreshCw className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                        </button>
+                    </div>
                 </Card>
                 {showCalendar && <SlotPicker />}
                 <Button className="w-full h-14 rounded-2xl bg-emerald-500 text-white gap-3 text-sm font-bold shadow-lg shadow-emerald-100 dark:shadow-none" onClick={() => handleStageChange('Session complete')}>

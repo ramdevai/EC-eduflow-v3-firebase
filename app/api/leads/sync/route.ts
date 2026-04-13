@@ -6,8 +6,8 @@ import { syncGoogleContacts } from '@/lib/google-contacts';
 export async function POST(req: Request) {
   const session = await auth() as any;
 
-  if (!session?.user?.id || session?.user?.role !== UserRole.Admin) {
-    return NextResponse.json({ error: 'Unauthorized. Admin access required.' }, { status: 401 });
+  if (!session?.user?.id || (session?.user?.role !== UserRole.Admin && session?.user?.role !== UserRole.Staff)) {
+    return NextResponse.json({ error: 'Unauthorized. Higher privileges required.' }, { status: 401 });
   }
 
   try {

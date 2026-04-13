@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { upsertCalendarEvent } from '@/lib/calendar';
+import { upsertCalendarEvent, deleteCalendarEvent } from '@/lib/calendar';
 import { updateLeads, getAllLeads } from '@/lib/db-firestore';
 import { UserRole } from '@/lib/types';
 
@@ -16,7 +16,6 @@ export async function POST(req: Request) {
     const callerUid = session.user.id;
     const role = session.user.role as UserRole;
     
-    const token = session.accessToken; // Retain token for calendar operations
     const leads = await getAllLeads(callerUid, role);
     const lead = leads.find(l => l.id === leadId);
     
@@ -32,7 +31,6 @@ export async function POST(req: Request) {
     }
 
     const event = await upsertCalendarEvent(
-        token as string, // Ensure token is string
         { name: lead.name, email: lead.email, id: lead.id }, 
         startTime,
         lead.calendarEventId
@@ -56,6 +54,43 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error('Calendar Schedule error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  const session = await auth() as any;
+
+  if (!session?.user?.id || !session?.user?.role) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const { leadId, eventId } = await req.json();
+    const callerUid = session.user.id;
+    const role = session.user.role as UserRole;
+
+    if (!leadId || !eventId) {
+      return NextResponse.json({ error: 'leadId and eventId are required' }, { status: 400 });
+    }
+
+    // 1. Delete from Google Calendar
+    await deleteCalendarEvent(eventId);
+
+    // 2. Update lead in Firestore
+    await updateLeads(callerUid, role, [{
+      id: leadId,
+      data: {
+        calendarEventId: '',
+        appointmentTime: '',
+        stage: 'Test completed', // Revert to previous logical stage
+        lastStageUpdate: new Date().toISOString(),
+      },
+    }]);
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error('Calendar Cancel error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

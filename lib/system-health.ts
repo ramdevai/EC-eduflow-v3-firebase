@@ -8,6 +8,8 @@ export type HealthStatus = {
 
 export async function checkSystemHealth(): Promise<HealthStatus> {
     const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     
     if (!refreshToken || refreshToken === 'placeholder') {
         return { 
@@ -17,15 +19,18 @@ export async function checkSystemHealth(): Promise<HealthStatus> {
         };
     }
 
+    if (!clientId || !clientSecret) {
+        return { 
+            ok: false, 
+            errorType: 'API_ERROR',
+            message: 'GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET is missing.' 
+        };
+    }
+
     try {
-        const oauth2Client = new google.auth.OAuth2(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET
-        );
+        const oauth2Client = new google.auth.OAuth2(clientId, clientSecret);
         oauth2Client.setCredentials({ refresh_token: refreshToken });
         
-        // Try to get access token to verify refresh token
-        // This is a "dry run" to see if the refresh token is still valid
         const { token } = await oauth2Client.getAccessToken();
         
         if (!token) {

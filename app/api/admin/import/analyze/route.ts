@@ -4,16 +4,11 @@ import { getAllLeads } from '@/lib/db-firestore';
 import { UserRole } from '@/lib/types';
 import { google } from 'googleapis'; // Temporarily re-introduce for external sheet reading
 
-async function getSheetsClient(accessToken: string) {
-  if (!accessToken) {
-    throw new Error('Access token is required to initialize Google Sheets client');
-  }
+import { getAdminAuthClient } from '@/lib/google-auth';
+
+async function getSheetsClient() {
   try {
-    const auth = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET
-    );
-    auth.setCredentials({ access_token: accessToken });
+    const auth = getAdminAuthClient();
     return google.sheets({ version: 'v4', auth });
   } catch (error: any) {
     console.error('Failed to initialize Google Sheets client:', error.message);
@@ -25,12 +20,12 @@ export async function POST(req: Request) {
   const session = await auth() as any;
   const { externalSheetId } = await req.json();
 
-  if (!session?.user?.id || !session?.user?.role || !externalSheetId) {
+  if (!session?.user?.id || (session?.user?.role !== UserRole.Admin && session?.user?.role !== UserRole.Staff) || !externalSheetId) {
     return NextResponse.json({ error: 'Missing configuration or authentication' }, { status: 400 });
   }
 
   try {
-    const sheets = await getSheetsClient(session.accessToken as string);
+    const sheets = await getSheetsClient();
     
     // 1. Get External Data
     const externalRes = await sheets.spreadsheets.values.get({

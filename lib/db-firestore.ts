@@ -4,6 +4,7 @@ import { generateRegistrationToken, safeFormat } from './utils';
 
 const LEADS_COLLECTION = 'leads';
 const TEMPLATES_COLLECTION = 'templates';
+const USERS_COLLECTION = 'users';
 
 interface LeadDocument extends Omit<Lead, 'id'> {
   id?: string; // Firestore document ID
@@ -119,7 +120,9 @@ export async function getAllLeads(callerUid: string, role: UserRole): Promise<Le
   const { adminDb } = await import('./server-firebase');
   let leadsRef: FirebaseFirestore.Query = adminDb.collection(LEADS_COLLECTION);
 
-  if (role !== UserRole.Admin) {
+  // Staff can see all leads (but cannot delete)
+  // Only true Admins get special treatment for other operations
+  if (role !== UserRole.Admin && role !== UserRole.Staff) {
     leadsRef = leadsRef.where('ownerUid', '==', callerUid);
   }
 
@@ -159,7 +162,7 @@ export async function updateLeads(callerUid: string, role: UserRole, updates: { 
 
     const existingLead = mapDocToLead(doc.data()!);
 
-    if (role !== UserRole.Admin && existingLead.ownerUid !== callerUid) {
+    if (role !== UserRole.Admin && role !== UserRole.Staff) {
       throw new Error('Unauthorized: You do not have permission to update this lead.');
     }
 
@@ -240,4 +243,61 @@ export async function updateTemplate(callerUid: string, role: UserRole, template
   }
 
   await docRef.update(updates);
+}
+
+// User Role & Staff Functions
+export async function getUserRole(email: string): Promise<UserRole | null> {
+  try {
+    const { adminDb } = await import('./server-firebase');
+    const snapshot = await adminDb.collection(USERS_COLLECTION)
+      .where('email', '==', email.toLowerCase().trim())
+      .limit(1)
+      .get();
+    
+    if (snapshot.empty) return null;
+    return snapshot.docs[0].data().role as UserRole;
+  } catch (error) {
+    console.error('Failed to get user role from Firestore:', error);
+    return null;
+  }
+}
+
+export async function getStaffMembers(): Promise<{ id: string, email: string, role: UserRole }[]> {
+  const { adminDb } = await import('./server-firebase');
+  const snapshot = await adminDb.collection(USERS_COLLECTION)
+    .where('role', '==', UserRole.Staff)
+    .get();
+  
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    email: doc.data().email,
+    role: doc.data().role as UserRole
+  }));
+}
+
+export async function addStaff(email: string): Promise<string> {
+  const { adminDb } = await import('./server-firebase');
+  const emailLower = email.toLowerCase().trim();
+  
+  // Check if already exists
+  const existing = await adminDb.collection(USERS_COLLECTION)
+    .where('email', '==', emailLower)
+    .get();
+  
+  if (!existing.empty) {
+    throw new Error('User already exists');
+  }
+
+  const docRef = await adminDb.collection(USERS_COLLECTION).add({
+    email: emailLower,
+    role: UserRole.Staff,
+    createdAt: safeFormat(new Date())
+  });
+  
+  return docRef.id;
+}
+
+export async function removeStaff(userId: string): Promise<void> {
+  const { adminDb } = await import('./server-firebase');
+  await adminDb.collection(USERS_COLLECTION).doc(userId).delete();
 }

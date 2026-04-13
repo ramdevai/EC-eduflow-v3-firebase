@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
+import authConfig from "./auth.config";
 import { UserRole } from "./types";
+import { getUserRole } from "./db-firestore";
 
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
   .replace(/["']/g, "") // Remove possible quotes
@@ -17,38 +18,58 @@ const OWNER_EMAILS = (process.env.OWNER_EMAILS || "")
 const ALL_ADMINS = Array.from(new Set([...ADMIN_EMAILS, ...OWNER_EMAILS]));
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code",
-          scope: "openid email profile https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/spreadsheets.readonly"
-        }
-      }
-    }),
-  ],
-  pages: {
-    signIn: "/",
-    error: "/",
-  },
+  ...authConfig,
   session: { strategy: "jwt" },
   callbacks: {
+    async signIn({ user }) {
+      const email = user.email?.toLowerCase() || "";
+      const isAdmin = ALL_ADMINS.includes(email);
+      
+      console.log(`[Auth] Sign-in attempt for: ${email} | Is Admin: ${isAdmin}`);
+
+      if (isAdmin) {
+        console.log(`[Auth] ✅ ALLOWED - Admin account: ${email}`);
+        return true;
+      }
+
+      // Staff accounts must exist in Firestore 'users' collection (added via Staff Management)
+      try {
+        const role = await getUserRole(email);
+        if (role) {
+          console.log(`[Auth] ✅ ALLOWED - Staff account with role '${role}': ${email}`);
+          return true;
+        } else {
+          console.warn(`[Auth] ❌ DENIED - No admin or staff record found for: ${email}`);
+          return false;
+        }
+      } catch (error) {
+        console.error(`[Auth] ❌ ERROR checking role for ${email}:`, error);
+        return false;
+      }
+    },
     async jwt({ token, account }) {
       if (account) {
         const userEmail = token.email?.toLowerCase() || "";
-        const isLocalDev = process.env.NODE_ENV === 'development';
-        const role = (ALL_ADMINS.includes(userEmail) || isLocalDev) ? UserRole.Admin : UserRole.Staff;
+        const isAdmin = ALL_ADMINS.includes(userEmail);
         
-        console.log('--- Auth Debug ---');
-        console.log('User Email:', userEmail);
-        console.log('Is Admin:', ALL_ADMINS.includes(userEmail));
-        console.log('Admin List:', ALL_ADMINS);
-        console.log('Assigned Role:', role);
-        console.log('------------------');
+        let role = UserRole.Staff;
+        
+        if (isAdmin) {
+          role = UserRole.Admin;
+          console.log(`[Auth] JWT - Assigned Admin role to: ${userEmail}`);
+        } else {
+          try {
+            const dbRole = await getUserRole(userEmail);
+            if (dbRole) {
+              role = dbRole;
+              console.log(`[Auth] JWT - Assigned ${role} role to staff: ${userEmail}`);
+            } else {
+              console.warn(`[Auth] JWT - No role found for: ${userEmail}`);
+            }
+          } catch (error) {
+            console.error(`[Auth] JWT - Error fetching role for ${userEmail}:`, error);
+          }
+        }
 
         return { 
             ...token, 

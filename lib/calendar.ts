@@ -8,15 +8,15 @@ export async function getCalendarClient() {
 
 export async function getAvailability(timeMin: string, timeMax: string) {
   const calendar = await getCalendarClient();
-  const response = await calendar.freebusy.query({
-    requestBody: {
-      timeMin,
-      timeMax,
-      items: [{ id: 'primary' }],
-    },
+  const response = await calendar.events.list({
+    calendarId: 'primary',
+    timeMin,
+    timeMax,
+    singleEvents: true,
+    orderBy: 'startTime',
   });
 
-  return response.data.calendars?.primary?.busy || [];
+  return response.data.items || [];
 }
 
 export async function upsertCalendarEvent(

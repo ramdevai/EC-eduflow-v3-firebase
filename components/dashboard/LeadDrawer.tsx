@@ -223,27 +223,28 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
 
     // Start from next hour or tomorrow 9AM if it's late
     let current = new Date(now.getTime() + durationMinutes * 60 * 1000);
-    if (current.getHours() > 18) {
+    if (current.getHours() > 21) {
         current.setDate(current.getDate() + 1);
         current.setHours(9, 0, 0, 0);
     }
 
+    // End at 9PM of the last full day (no rigid 36-hour cutoff)
     const endSearch = new Date(Date.now() + lookaheadDays * 24 * 60 * 60 * 1000);
+    endSearch.setHours(21, 0, 0, 0);
 
     while (current < endSearch) {
         const hour = current.getHours();
-        // Working hours 9AM to 7PM
-        if (hour >= 9 && hour <= 19) {
+        // Working hours 9AM to 9PM as requested
+        if (hour >= 9 && hour < 21) {
             const startStr = current.toISOString();
             const slotEndTime = current.getTime() + durationMinutes * 60 * 1000;
-            const endStr = new Date(slotEndTime).toISOString();
 
             const isBusy = busy.some(b => {
-                const busyStart = new Date(b.start).getTime();
-                const busyEnd = new Date(b.end).getTime();
+                const busyStartTime = new Date(b.start?.dateTime || b.start?.date || b.start).getTime();
+                const busyEndTime = new Date(b.end?.dateTime || b.end?.date || b.end).getTime();
                 const slotStart = current.getTime();
-                return (slotStart >= busyStart && slotStart < busyEnd) || 
-                       (slotEndTime > busyStart && slotStart < busyEnd);
+                return (slotStart >= busyStartTime && slotStart < busyEndTime) || 
+                       (slotEndTime > busyStartTime && slotStart < busyEndTime);
             });
 
             if (!isBusy) {
@@ -358,7 +359,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
             <h4 className="text-sm font-black uppercase tracking-widest text-primary-600">
               {duration}-Minute Slots • Next {days} Days
             </h4>
-            <p className="text-xs text-slate-500">Timeline view • All events shown • Tap green slots to book</p>
+            <p className="text-xs text-slate-500">Red = Booked (with title) • Green = Available • Day headers for clarity</p>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setShowCalendar(false)} className="h-8 w-8 p-0 rounded-full">
             <X size={14} />
@@ -369,41 +370,83 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
           <div className="flex items-center gap-3 text-sm text-slate-400 p-8 justify-center">
             <RefreshCw className="animate-spin" size={18} /> Checking admin calendar...
           </div>
-        ) : freeSlots.length === 0 ? (
+        ) : freeSlots.length === 0 && busySlots.length === 0 ? (
           <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-700 rounded-3xl">
             <AlertCircle className="mx-auto text-amber-500 mb-3" size={28} />
-            <p className="font-medium text-slate-600 dark:text-slate-400">No free {duration}-minute slots found.</p>
-            <p className="text-xs text-slate-400 mt-1">The admin calendar is fully booked for the next {days} days.</p>
+            <p className="font-medium text-slate-600 dark:text-slate-400">No slots available in the next {days} days.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {freeSlots.map((slot, index) => {
-              const start = new Date(slot);
-              const end = new Date(start.getTime() + duration * 60 * 1000);
+          <div className="space-y-8">
+            {/* Group by day for clear day labels */}
+            {Array.from(new Set([
+              ...busySlots.map(s => safeFormat(s.start, 'yyyy-MM-dd')),
+              ...freeSlots.map(s => safeFormat(s, 'yyyy-MM-dd'))
+            ])).sort().map(dayStr => {
+              const dayName = safeFormat(new Date(dayStr), 'EEEE, dd MMM yyyy');
+              const dayBusy = busySlots.filter(s => safeFormat(s.start, 'yyyy-MM-dd') === dayStr);
+              const dayFree = freeSlots.filter(s => safeFormat(s, 'yyyy-MM-dd') === dayStr);
+
               return (
-                <button
-                  key={index}
-                  onClick={() => handleSchedule(slot)}
-                  className="w-full p-5 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950 border-2 border-emerald-200 dark:border-emerald-800 rounded-3xl text-left transition-all group flex gap-4 items-center"
-                >
-                  <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900 flex-shrink-0 flex items-center justify-center text-emerald-600 font-mono text-xs font-black border border-emerald-200">
-                    {duration}<br />MIN
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-black text-emerald-600 text-xl">{safeFormat(slot, 'h:mm a')}</div>
-                    <div className="text-xs text-slate-500 font-medium">{safeFormat(slot, 'EEE, dd MMM')}</div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">to {safeFormat(end, 'h:mm a')}</div>
-                  </div>
-                  <div className="text-emerald-600 text-xs font-bold group-hover:translate-x-0.5 transition-transform">BOOK →</div>
-                </button>
+                <div key={dayStr} className="space-y-4">
+                  <div className="font-black text-sm uppercase tracking-widest text-slate-400 border-b border-slate-200 dark:border-slate-700 pb-2">{dayName}</div>
+                  
+                  {/* Booked slots in red with event title */}
+                  {dayBusy.map((slot, index) => {
+                    const startStr = typeof slot.start === 'string' ? slot.start : (slot.start?.dateTime || slot.start?.date || '');
+                    const endStr = typeof slot.end === 'string' ? slot.end : (slot.end?.dateTime || slot.end?.date || '');
+                    const start = safeParseISO(startStr);
+                    const end = safeParseISO(endStr);
+                    return (
+                      <div key={`booked-${index}`} className="p-5 bg-red-50 dark:bg-red-950 border-2 border-red-200 dark:border-red-800 rounded-3xl flex gap-4 items-center">
+                        <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-900 flex-shrink-0 flex items-center justify-center text-red-600 font-mono text-xs font-black border border-red-200">
+                          BUSY
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-red-600">{slot.summary || 'Booked Event'}</div>
+                          <div className="text-xs text-slate-500">
+                            {safeFormat(start, 'h:mm a')} – {safeFormat(end, 'h:mm a')}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+
+                  {/* Free slots in green */}
+                  {dayFree.map((slot, index) => {
+                    const start = new Date(slot);
+                    const end = new Date(start.getTime() + duration * 60 * 1000);
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => handleSchedule(slot)}
+                        className="w-full p-5 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950 border-2 border-emerald-200 dark:border-emerald-800 rounded-3xl text-left transition-all group flex gap-4 items-center"
+                      >
+                        <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900 flex-shrink-0 flex items-center justify-center text-emerald-600 font-mono text-xs font-black border border-emerald-200">
+                          {duration}<br />MIN
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-black text-emerald-600 text-xl">{safeFormat(slot, 'h:mm a')}</div>
+                          <div className="text-xs text-slate-500 font-medium">{safeFormat(slot, 'EEE, dd MMM')}</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">to {safeFormat(end, 'h:mm a')}</div>
+                        </div>
+                        <div className="text-emerald-600 text-xs font-bold group-hover:translate-x-0.5 transition-transform">BOOK →</div>
+                      </button>
+                    );
+                  })}
+                </div>
               );
             })}
-            <p className="text-center text-[10px] text-slate-400 pt-2">All events on the admin calendar are shown above for context</p>
           </div>
         )}
+        <p className="text-center text-[10px] text-slate-400 pt-6 border-t border-slate-200 dark:border-slate-700">
+          All events on the admin calendar are shown (red = booked with title). Switch to timeline view in future updates.
+        </p>
       </Card>
     );
   };
+
+
 
   const renderFeesDropdown = () => null; // Removed floating fees dropdowns per design update
 

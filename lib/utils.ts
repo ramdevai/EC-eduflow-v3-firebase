@@ -17,6 +17,12 @@ export function safeParseISO(dateStr: string | undefined | null): Date {
     if (isValid(parsed)) return parsed;
   } catch (e) {}
 
+  // 1.5. Try YYYY-MM-DD (common from API)
+  try {
+    const ymdParsed = parse(str, 'yyyy-MM-dd', new Date());
+    if (isValid(ymdParsed)) return ymdParsed;
+  } catch (e) {}
+
   // 2. Try Indian Format (DD/MM/YYYY)
   try {
     const indianParsed = parse(str, 'dd/MM/yyyy', new Date());
@@ -55,7 +61,11 @@ export function safeParseISO(dateStr: string | undefined | null): Date {
 
 export function safeFormat(date: string | Date | undefined | null, formatStr: string = 'dd MMM yyyy'): string {
   if (!date) return '';
-  const dateObj = typeof date === 'string' ? safeParseISO(date) : date;
+  let dateObj = typeof date === 'string' ? safeParseISO(date) : date;
+  if (!(dateObj instanceof Date)) {
+    dateObj = new Date(dateObj as any);
+  }
+  if (isNaN(dateObj.getTime())) return 'Invalid Date';
   return format(dateObj, formatStr);
 }
 

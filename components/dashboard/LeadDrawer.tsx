@@ -3,8 +3,6 @@
 import React, { useState, memo, useEffect } from 'react';
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from 'motion/react';
-import Timeline from 'react-calendar-timeline';
-import 'react-calendar-timeline/lib/Timeline.css';
 import { 
   X, 
   Phone, 
@@ -31,6 +29,8 @@ import {
   Bell,
   XCircle,
   Pencil,
+  Minus,
+  Plus,
 } from 'lucide-react';
 
 import { differenceInDays } from 'date-fns';
@@ -38,6 +38,7 @@ import { Lead, LeadStage, FeesPaidStatus, TEST_LINKS, UserRole, SystemSettings, 
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
+import { SlotCard } from '@/components/ui/SlotCard';
 import { cn, normalizeStage, generateRegistrationToken, safeParseISO, safeFormat, toInputFormat } from '@/lib/utils';
 import { getWhatsAppLink, getEmailLink, getTestLinkByGrade, getReportEmailData, getEmailData, MessageType } from '@/lib/messaging-utils';
 import { RefreshCw, Sparkles } from 'lucide-react';
@@ -89,6 +90,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   const [isScheduling, setIsScheduling] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [emailComposerType, setEmailComposerType] = useState<MessageType | null>(null);
+  const [slotAdjustments, setSlotAdjustments] = useState<Record<string, number>>({});
 
   // Scheduling Settings (loaded from admin settings - hardcoded for now to avoid server bundle issues)
   const systemSettings = {
@@ -259,6 +261,50 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     return slots;
   };
 
+  // Flexible slot adjustment (shift by 15min increments, duration stays fixed)
+  const getAdjustedStart = (originalStart: string): Date => {
+    const adjustment = slotAdjustments[originalStart] || 0;
+    const date = new Date(originalStart);
+    date.setMinutes(date.getMinutes() + adjustment);
+    return date;
+  };
+
+  const shiftSlot = (originalStart: string, minutes: number) => {
+    setSlotAdjustments((prev) => {
+      const currentAdj = prev[originalStart] || 0;
+      const newAdj = currentAdj + minutes;
+      // Prevent shifting too far into past or future
+      if (newAdj < -180 || newAdj > 240) return prev;
+      return { ...prev, [originalStart]: newAdj };
+    });
+  };
+
+  const handleAdjustedSchedule = async (originalStart: string) => {
+    if (isScheduling) return;
+    const adjustedDate = getAdjustedStart(originalStart);
+    const adjustedISO = adjustedDate.toISOString();
+    setIsScheduling(true);
+    try {
+      const res = await fetch('/api/calendar/schedule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-sheet-id': localStorage.getItem('educompass_sheet_id') || '',
+        },
+        body: JSON.stringify({ leadId: lead.id, startTime: adjustedISO }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert('Event scheduled and Meet link generated!');
+      fetchLeads();
+      setShowCalendar(false);
+      setSlotAdjustments({}); // Reset adjustments
+    } catch (err: any) {
+      alert('Scheduling failed: ' + err.message);
+    } finally {
+      setIsScheduling(false);
+    }
+  };
 
   const handleStageChange = (newStage: LeadStage) => {
     setLocalStage(newStage);
@@ -350,170 +396,158 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   );
 
   const SlotPicker = () => {
-    const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list');
     const freeSlots = generateFreeSlots(busySlots);
     const duration = systemSettings.defaultSessionDuration || 90;
     const days = systemSettings.calendarLookaheadDays || 3;
 
-    // Data for Timeline View
-    const timelineGroups = [{ id: 1, title: `Admin Calendar (${days} days)` }];
-    const timelineItems = [
-      // Booked slots in red with event title
-      ...busySlots.map((slot, index) => ({
-        id: `busy-${index}`,
-        group: 1,
+    // Combine busy and available slots
+    const allSlots = [
+      // Busy
+      ...busySlots.map(slot => ({
+        type: 'booked' as const,
+        start: new Date(slot.start?.dateTime || slot.start?.date || slot.start || 0),
+        end: new Date(slot.end?.dateTime || slot.end?.date || slot.end || 0),
         title: slot.summary || 'Booked',
-        start_time: new Date(slot.start?.dateTime || slot.start?.date || slot.start || 0).getTime(),
-        end_time: new Date(slot.end?.dateTime || slot.end?.date || slot.end || 0).getTime(),
-        itemProps: { style: { background: '#ef4444', color: 'white', borderRadius: '4px' } },
+        data: slot,
       })),
-      // Free slots in green
-      ...freeSlots.map((slot, index) => ({
-        id: `free-${index}`,
-        group: 1,
-        title: `Free (${duration}min)`,
-        start_time: new Date(slot).getTime(),
-        end_time: new Date(new Date(slot).getTime() + duration * 60 * 1000).getTime(),
-        itemProps: { 
-          style: { background: '#22c55e', color: 'white', borderRadius: '4px', cursor: 'pointer' },
-          onClick: () => handleSchedule(slot),
-        },
+      // Available (with adjustments)
+      ...freeSlots.map(slot => ({
+        type: 'available' as const,
+        start: new Date(slot),
+        end: new Date(new Date(slot).getTime() + duration * 60 * 1000),
+        title: `${duration} MIN`,
+        data: slot,
       })),
-    ];
+    ].sort((a, b) => a.start.getTime() - b.start.getTime());
 
     return (
-      <Card className="p-6 border border-primary-200 dark:border-primary-800 bg-primary-50/30 dark:bg-primary-950/20 shadow-sm mt-4">
-        <div className="flex items-center justify-between mb-6">
+      <Card className="p-5 sm:p-6 border border-emerald-100 dark:border-emerald-900 bg-emerald-50/60 dark:bg-slate-950 mt-3 shadow-sm">
+        <div className="flex items-center justify-between mb-5">
           <div>
-            <h4 className="text-sm font-black uppercase tracking-widest text-primary-600">
-              {duration}-Minute Slots • Next {days} Days
+            <h4 className="font-black text-emerald-700 dark:text-emerald-400 text-[13px] uppercase tracking-[0.5px]">
+              FLEXIBLE {duration}-MINUTE SLOTS • NEXT {days} DAYS (9AM–9PM)
             </h4>
-            <p className="text-xs text-slate-500">Red = Booked (with title) • Green = Available</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Tap nudge buttons to shift time by 15 minutes • Duration remains fixed
+            </p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setShowCalendar(false)} className="h-8 w-8 p-0 rounded-full">
-            <X size={14} />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => { setShowCalendar(false); setSlotAdjustments({}); }} 
+            className="hidden md:flex h-8 w-8 p-0 rounded-xl text-slate-400 hover:text-slate-500"
+          >
+            <X size={18} />
           </Button>
         </div>
 
-        {/* Switch to view both timeline and list (as requested) */}
-        <div className="flex gap-1 mb-6 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl w-fit">
-          <button
-            onClick={() => setViewMode('list')}
-            className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500'}`}
-          >
-            List View
-          </button>
-          <button
-            onClick={() => setViewMode('timeline')}
-            className={`px-4 py-1.5 text-xs font-bold rounded-xl transition-all ${viewMode === 'timeline' ? 'bg-white dark:bg-slate-900 shadow-sm' : 'text-slate-500'}`}
-          >
-            Timeline View
-          </button>
-        </div>
-
         {loadingCalendar ? (
-          <div className="flex items-center gap-3 text-sm text-slate-400 p-8 justify-center">
-            <RefreshCw className="animate-spin" size={18} /> Checking admin calendar...
+          <div className="flex items-center gap-3 text-sm text-slate-400 py-12 justify-center">
+            <RefreshCw className="animate-spin" size={18} /> Checking calendar...
+          </div>
+        ) : allSlots.length === 0 ? (
+          <div className="py-12 text-center border border-dashed border-slate-200 dark:border-slate-700 rounded-3xl">
+            <AlertCircle className="mx-auto text-amber-500 mb-3" size={28} />
+            <p className="font-medium text-slate-600 dark:text-slate-400">No slots available in the next {days} days.</p>
           </div>
         ) : (
-          <div>
-            {viewMode === 'list' ? (
-              /* Enhanced List View with Day Headers and Red Booked Slots with Titles */
-              <div className="space-y-8">
-                {Array.from(new Set([
-                  ...busySlots.map(s => safeFormat(s.start?.dateTime || s.start?.date || s.start, 'yyyy-MM-dd')),
-                  ...freeSlots.map(s => safeFormat(s, 'yyyy-MM-dd'))
-                ])).sort().map(dayStr => {
-                  const dayName = safeFormat(new Date(dayStr), 'EEEE, dd MMM yyyy');
-                  const dayBusy = busySlots.filter(s => safeFormat(s.start?.dateTime || s.start?.date || s.start, 'yyyy-MM-dd') === dayStr);
-                  const dayFree = freeSlots.filter(s => safeFormat(s, 'yyyy-MM-dd') === dayStr);
+          <div className="space-y-8">
+            {Object.entries(allSlots.reduce((acc, slot) => {
+              const dayKey = safeFormat(slot.start, 'yyyy-MM-dd');
+              if (!acc[dayKey]) acc[dayKey] = [];
+              acc[dayKey].push(slot);
+              return acc;
+            }, {} as Record<string, any[]>)).map(([dayKey, daySlots]) => {
+              const dayName = safeFormat(daySlots[0].start, 'EEEE, dd MMM yyyy');
+              return (
+                <div key={dayKey} className="space-y-5">
+                  <div className="font-black text-xs uppercase tracking-widest text-slate-400 border-b border-slate-200 dark:border-slate-700 pb-2">
+                    {dayName}
+                  </div>
 
-                  return (
-                    <div key={dayStr} className="space-y-4">
-                      <div className="font-black text-sm uppercase tracking-widest text-slate-400 border-b border-slate-200 dark:border-slate-700 pb-2">{dayName}</div>
-                      
-                      {/* Booked slots in red with event title */}
-                      {dayBusy.map((slot, index) => {
-                        const startStr = typeof slot.start === 'string' ? slot.start : (slot.start?.dateTime || slot.start?.date || '');
-                        const endStr = typeof slot.end === 'string' ? slot.end : (slot.end?.dateTime || slot.end?.date || '');
-                        const start = safeParseISO(startStr);
-                        const end = safeParseISO(endStr);
-                        return (
-                          <div key={`booked-${index}`} className="p-5 bg-red-50 dark:bg-red-950 border-2 border-red-200 dark:border-red-800 rounded-3xl flex gap-4 items-center">
-                            <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-900 flex-shrink-0 flex items-center justify-center text-red-600 font-mono text-xs font-black border border-red-200">
-                              BUSY
+                  {/* All slots sorted by time (busy appears naturally in chronological order) */}
+                  {daySlots.map((slot, i) => {
+                    const isBusy = slot.type === 'booked';
+                    const start = slot.start;
+                    const end = slot.end;
+
+                    if (isBusy) {
+                      return (
+                        <SlotCard key={i} variant="busy" className="p-4 flex items-center gap-4">
+                          <div className="px-4 py-2 bg-red-100 dark:bg-red-900/80 text-red-600 dark:text-red-300 text-[10px] font-black tracking-widest rounded-2xl">
+                            BUSY
+                          </div>
+                          <div>
+                            <div className="font-semibold text-red-600 dark:text-red-400 text-sm">Ev2</div>
+                            <div className="text-xs text-red-600/80 dark:text-red-400/80 font-medium">
+                              {safeFormat(start, 'h:mm a')} – {safeFormat(end, 'h:mm a')}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-bold text-red-600">{slot.summary || 'Booked Event'}</div>
-                              <div className="text-xs text-slate-500">
-                                {safeFormat(start, 'h:mm a')} – {safeFormat(end, 'h:mm a')}
+                          </div>
+                        </SlotCard>
+                      );
+                    }
+
+                    // Available slot
+                    const originalStart = slot.data;
+                    const adjustedStart = getAdjustedStart(originalStart);
+                    const endTime = new Date(adjustedStart.getTime() + duration * 60 * 1000);
+                    const adjustment = slotAdjustments[originalStart] || 0;
+
+                    return (
+                      <div key={i} className="flex items-center gap-3">
+                        {/* Vertical stacked nudge controls on left (+ below -) */}
+                        <div className="flex flex-col gap-2">
+                          <button
+                            onClick={() => shiftSlot(originalStart, -15)}
+                            disabled={adjustment <= -150}
+                            className="w-10 h-10 rounded-2xl border border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-900 flex items-center justify-center active:scale-95 transition-all hover:bg-emerald-50 disabled:opacity-40 shadow-sm"
+                          >
+                            <Minus size={16} className="text-emerald-600" />
+                          </button>
+                          <button
+                            onClick={() => shiftSlot(originalStart, 15)}
+                            className="w-10 h-10 rounded-2xl border border-emerald-200 dark:border-emerald-700 bg-white dark:bg-slate-900 flex items-center justify-center active:scale-95 transition-all hover:bg-emerald-50 shadow-sm"
+                          >
+                            <Plus size={16} className="text-emerald-600" />
+                          </button>
+                        </div>
+
+                        <SlotCard className="flex-1 p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-semibold text-emerald-700 dark:text-emerald-400 text-sm">
+                                {duration} MIN
+                              </div>
+                              <div className="font-medium text-xs text-slate-500 dark:text-slate-400 mt-px">
+                                {safeFormat(adjustedStart, 'h:mm a')} – {safeFormat(endTime, 'h:mm a')}
                               </div>
                             </div>
                           </div>
-                        );
-                      })}
+                        </SlotCard>
 
-                      {/* Free slots in green */}
-                      {dayFree.map((slot, index) => {
-                        const start = new Date(slot);
-                        const end = new Date(start.getTime() + duration * 60 * 1000);
-                        return (
-                          <button
-                            key={index}
-                            onClick={() => handleSchedule(slot)}
-                            className="w-full p-5 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950 border-2 border-emerald-200 dark:border-emerald-800 rounded-3xl text-left transition-all group flex gap-4 items-center"
-                          >
-                            <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900 flex-shrink-0 flex items-center justify-center text-emerald-600 font-mono text-xs font-black border border-emerald-200">
-                              {duration}<br />MIN
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-black text-emerald-600 text-xl">{safeFormat(slot, 'h:mm a')}</div>
-                              <div className="text-xs text-slate-500 font-medium">{safeFormat(slot, 'EEE, dd MMM')}</div>
-                              <div className="text-[10px] text-slate-400 mt-0.5">to {safeFormat(end, 'h:mm a')}</div>
-                            </div>
-                            <div className="text-emerald-600 text-xs font-bold group-hover:translate-x-0.5 transition-transform">BOOK →</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              /* Full Horizontal Timeline View */
-              <div className="h-80 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden bg-white dark:bg-slate-900">
-                <Timeline
-                  groups={timelineGroups}
-                  items={timelineItems}
-                  defaultTimeStart={Date.now()}
-                  defaultTimeEnd={Date.now() + days * 24 * 60 * 60 * 1000}
-                  canMove={false}
-                  canResize={false}
-                  lineHeight={50}
-                  itemHeightRatio={0.8}
-                  onItemClick={(itemId: any) => {
-                    const item = timelineItems.find(i => i.id === itemId);
-                    if (item && item.title.includes('Free')) {
-                      const slot = new Date(item.start_time).toISOString();
-                      handleSchedule(slot);
-                    }
-                  }}
-                />
-              </div>
-            )}
-            <p className="text-center text-[10px] text-slate-400 pt-4">
-              Red = Booked (with title) • Green = Available • Switch views above to compare
-            </p>
+                        {/* Book Button - Send icon */}
+                        <Button
+                          onClick={() => handleAdjustedSchedule(originalStart)}
+                          disabled={isScheduling}
+                          variant="primary"
+                          className="h-10 w-10 p-0 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center justify-center"
+                        >
+                          <Send size={18} />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
         )}
       </Card>
     );
   };
 
-
-
-
   const renderFeesDropdown = () => null; // Removed floating fees dropdowns per design update
+
 
     const renderActionArea = () => {
     const stage = normalizeStage(currentStage);

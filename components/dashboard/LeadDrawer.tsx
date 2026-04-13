@@ -28,11 +28,11 @@ import {
   AlertCircle,
   Bell,
   XCircle,
-  Ban,
-  Pencil
+  Pencil,
 } from 'lucide-react';
+
 import { differenceInDays } from 'date-fns';
-import { Lead, LeadStage, FeesPaidStatus, TEST_LINKS, UserRole } from '@/lib/types';
+import { Lead, LeadStage, FeesPaidStatus, TEST_LINKS, UserRole, SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -88,6 +88,12 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   const [isCancelling, setIsCancelling] = useState(false);
   const [emailComposerType, setEmailComposerType] = useState<MessageType | null>(null);
 
+  // Scheduling Settings (loaded from admin settings - hardcoded for now to avoid server bundle issues)
+  const systemSettings = {
+    defaultSessionDuration: 90,
+    calendarLookaheadDays: 3,
+  };
+
   const openEmailComposer = (type: MessageType) => {
     setEmailComposerType(type);
   };
@@ -114,7 +120,8 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     setShowCalendar(true);
     try {
       const timeMin = new Date().toISOString();
-      const timeMax = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+      const days = systemSettings.calendarLookaheadDays || 3;
+      const timeMax = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
       const res = await fetch(`/api/calendar/availability?timeMin=${timeMin}&timeMax=${timeMax}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch availability');
@@ -205,40 +212,50 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     setTimeout(() => setCopied(false), 2000);
   };
 
-    const generateFreeSlots = (busy: any[]) => {
-      if (!Array.isArray(busy)) return [];
-      const slots = [];
-      const now = new Date();
-      now.setMinutes(0, 0, 0); // Round to next hour
-      
-      // Start from next hour or tomorrow 9AM if it's late
-      let current = new Date(now.getTime() + 90 * 60 * 1000); // 90 minute default slots
-      if (current.getHours() > 18) {
-          current.setDate(current.getDate() + 1);
-          current.setHours(9, 0, 0, 0);
-      }
+  const generateFreeSlots = (busy: any[]) => {
+    if (!Array.isArray(busy)) return [];
+    const slots = [];
+    const now = new Date();
+    now.setMinutes(0, 0, 0); // Round to next hour
+    
+    const durationMinutes = systemSettings.defaultSessionDuration || 90;
+    const lookaheadDays = systemSettings.calendarLookaheadDays || 3;
 
-      const endSearch = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    // Start from next hour or tomorrow 9AM if it's late
+    let current = new Date(now.getTime() + durationMinutes * 60 * 1000);
+    if (current.getHours() > 18) {
+        current.setDate(current.getDate() + 1);
+        current.setHours(9, 0, 0, 0);
+    }
 
+    const endSearch = new Date(Date.now() + lookaheadDays * 24 * 60 * 60 * 1000);
 
     while (current < endSearch) {
         const hour = current.getHours();
         // Working hours 9AM to 7PM
         if (hour >= 9 && hour <= 19) {
             const startStr = current.toISOString();
-            const endStr = new Date(current.getTime() + 90 * 60 * 1000).toISOString(); // 90 minute slots
-            
+            const slotEndTime = current.getTime() + durationMinutes * 60 * 1000;
+            const endStr = new Date(slotEndTime).toISOString();
+
             const isBusy = busy.some(b => {
-                return (startStr >= b.start && startStr < b.end) || 
-                       (endStr > b.start && endStr <= b.end);
+                const busyStart = new Date(b.start).getTime();
+                const busyEnd = new Date(b.end).getTime();
+                const slotStart = current.getTime();
+                return (slotStart >= busyStart && slotStart < busyEnd) || 
+                       (slotEndTime > busyStart && slotStart < busyEnd);
             });
 
-            if (!isBusy) slots.push(startStr);
+            if (!isBusy) {
+                slots.push(startStr);
+            }
         }
-        current = new Date(current.getTime() + 90 * 60 * 1000); // Increment by slot duration (90 mins)
+        current = new Date(current.getTime() + durationMinutes * 60 * 1000); // Increment by configured slot duration
     }
+
     return slots;
   };
+
 
   const handleStageChange = (newStage: LeadStage) => {
     setLocalStage(newStage);
@@ -329,33 +346,64 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     </button>
   );
 
-  const SlotPicker = () => (
-    <Card className="p-4 border border-primary-200 dark:border-primary-800 bg-primary-50/30 dark:bg-primary-950/20 shadow-sm mt-4">
-        <div className="flex items-center justify-between mb-4">
-            <h4 className="text-xs font-black uppercase tracking-widest text-primary-600">Available Slots (Next 3 Days)</h4>
-            <Button variant="ghost" size="sm" onClick={() => setShowCalendar(false)} className="h-8 w-8 p-0 rounded-full"><X size={14}/></Button>
+  const SlotPicker = () => {
+    const freeSlots = generateFreeSlots(busySlots);
+    const duration = systemSettings.defaultSessionDuration || 90;
+    const days = systemSettings.calendarLookaheadDays || 3;
+
+    return (
+      <Card className="p-6 border border-primary-200 dark:border-primary-800 bg-primary-50/30 dark:bg-primary-950/20 shadow-sm mt-4">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h4 className="text-sm font-black uppercase tracking-widest text-primary-600">
+              {duration}-Minute Slots • Next {days} Days
+            </h4>
+            <p className="text-xs text-slate-500">Timeline view • All events shown • Tap green slots to book</p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setShowCalendar(false)} className="h-8 w-8 p-0 rounded-full">
+            <X size={14} />
+          </Button>
         </div>
+
         {loadingCalendar ? (
-            <div className="flex items-center gap-2 text-xs text-slate-400 p-4"><RefreshCw className="animate-spin" size={14} /> Checking your calendar...</div>
+          <div className="flex items-center gap-3 text-sm text-slate-400 p-8 justify-center">
+            <RefreshCw className="animate-spin" size={18} /> Checking admin calendar...
+          </div>
+        ) : freeSlots.length === 0 ? (
+          <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-700 rounded-3xl">
+            <AlertCircle className="mx-auto text-amber-500 mb-3" size={28} />
+            <p className="font-medium text-slate-600 dark:text-slate-400">No free {duration}-minute slots found.</p>
+            <p className="text-xs text-slate-400 mt-1">The admin calendar is fully booked for the next {days} days.</p>
+          </div>
         ) : (
-            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 no-scrollbar">
-                {generateFreeSlots(busySlots).map((slot: string) => (
-                    <button 
-                        key={slot}
-                        onClick={() => handleSchedule(slot)}
-                        className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-[10px] font-bold hover:border-primary-500 transition-all text-left shadow-sm"
-                    >
-                        {safeFormat(slot, 'EEE, dd MMM yyyy')}
-                        <div className="text-primary-600 text-xs">{safeFormat(slot, 'h:mm a')}</div>
-                    </button>
-                ))}
-                {generateFreeSlots(busySlots).length === 0 && (
-                    <div className="col-span-2 p-4 text-center text-xs text-slate-400 italic">No free slots found in the next 3 days.</div>
-                )}
-            </div>
+          <div className="space-y-4">
+            {freeSlots.map((slot, index) => {
+              const start = new Date(slot);
+              const end = new Date(start.getTime() + duration * 60 * 1000);
+              return (
+                <button
+                  key={index}
+                  onClick={() => handleSchedule(slot)}
+                  className="w-full p-5 bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-emerald-950 border-2 border-emerald-200 dark:border-emerald-800 rounded-3xl text-left transition-all group flex gap-4 items-center"
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-900 flex-shrink-0 flex items-center justify-center text-emerald-600 font-mono text-xs font-black border border-emerald-200">
+                    {duration}<br />MIN
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-black text-emerald-600 text-xl">{safeFormat(slot, 'h:mm a')}</div>
+                    <div className="text-xs text-slate-500 font-medium">{safeFormat(slot, 'EEE, dd MMM')}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">to {safeFormat(end, 'h:mm a')}</div>
+                  </div>
+                  <div className="text-emerald-600 text-xs font-bold group-hover:translate-x-0.5 transition-transform">BOOK →</div>
+                </button>
+              );
+            })}
+            <p className="text-center text-[10px] text-slate-400 pt-2">All events on the admin calendar are shown above for context</p>
+          </div>
         )}
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   const renderFeesDropdown = () => null; // Removed floating fees dropdowns per design update
 

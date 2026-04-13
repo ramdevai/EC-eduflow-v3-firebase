@@ -1,5 +1,5 @@
 
-import { Lead, LeadStage, LeadStatus, FeesPaidStatus, CommunityJoinedStatus, UserRole } from './types';
+import { Lead, LeadStage, LeadStatus, FeesPaidStatus, CommunityJoinedStatus, UserRole, SystemSettings, DEFAULT_SYSTEM_SETTINGS } from './types';
 import { generateRegistrationToken, safeFormat } from './utils';
 
 const LEADS_COLLECTION = 'leads';
@@ -300,4 +300,25 @@ export async function addStaff(email: string): Promise<string> {
 export async function removeStaff(userId: string): Promise<void> {
   const { adminDb } = await import('./server-firebase');
   await adminDb.collection(USERS_COLLECTION).doc(userId).delete();
+}
+
+const SETTINGS_COLLECTION = 'system_settings';
+const SETTINGS_DOC_ID = 'global';
+
+export async function getSystemSettings(): Promise<SystemSettings> {
+  const { adminDb } = await import('./server-firebase');
+  const doc = await adminDb.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC_ID).get();
+  
+  if (!doc.exists) {
+    // Initialize with defaults
+    await adminDb.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC_ID).set(DEFAULT_SYSTEM_SETTINGS);
+    return DEFAULT_SYSTEM_SETTINGS;
+  }
+  
+  return doc.data() as SystemSettings;
+}
+
+export async function updateSystemSettings(updates: Partial<SystemSettings>): Promise<void> {
+  const { adminDb } = await import('./server-firebase');
+  await adminDb.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC_ID).set(updates, { merge: true });
 }

@@ -22,10 +22,11 @@ export async function getAvailability(timeMin: string, timeMax: string) {
 export async function upsertCalendarEvent(
   lead: { name: string; email?: string; id: string },
   startTime: string,
-  eventId?: string
+  eventId?: string,
+  durationMinutes: number = 90
 ) {
   const calendar = await getCalendarClient();
-  const endTime = new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString();
+  const endTime = new Date(new Date(startTime).getTime() + durationMinutes * 60 * 1000).toISOString();
 
   const eventBody = {
     summary: `1:1 Career Counseling: ${lead.name}`,

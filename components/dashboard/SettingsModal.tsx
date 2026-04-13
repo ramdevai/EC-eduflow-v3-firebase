@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { UserRole } from '@/lib/types';
+import { UserRole, SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/types';
 import { useSession } from 'next-auth/react';
 
 interface Props {
@@ -46,6 +46,10 @@ export const SettingsModal = ({ onClose, onImportLeads, onSeedLeads, isSeeding }
     const [staffLoading, setStaffLoading] = useState(false);
     const [newStaffEmail, setNewStaffEmail] = useState('');
     const [isAddingStaff, setIsAddingStaff] = useState(false);
+
+    // Scheduling Settings
+    const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
+    const [settingsLoading, setSettingsLoading] = useState(false);
 
     useEffect(() => {
         if (isAdmin && activeTab === 'staff') {
@@ -193,27 +197,48 @@ export const SettingsModal = ({ onClose, onImportLeads, onSeedLeads, isSeeding }
                                     </div>
                                 </section>
 
-                                <section className="space-y-4">
-                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data Management</h3>
-                                    <div className="space-y-3">
-                                        <Button variant="outline" className="w-full h-14 rounded-2xl justify-start gap-4" onClick={onImportLeads}>
-                                            <Download size={20} className="text-primary-600" />
-                                            <div className="text-left">
-                                                <p className="font-bold">Import from Google Sheet</p>
-                                                <p className="text-[10px] font-medium text-slate-400">Migrate leads from external recruitment sheets</p>
-                                            </div>
-                                        </Button>
-                                        <Button variant="outline" className="w-full h-14 rounded-2xl justify-start gap-4 border-slate-100 opacity-60 hover:opacity-100" onClick={onSeedLeads} disabled={isSeeding}>
-                                            <Database size={20} className={isSeeding ? 'animate-spin' : ''} />
-                                            <div className="text-left">
-                                                <p className="font-bold">Seed Sample Data</p>
-                                                <p className="text-[10px] font-medium text-slate-400">Testing only: Adds dummy leads to the pipeline</p>
-                                            </div>
-                                        </Button>
-                                    </div>
-                                </section>
-                            </motion.div>
-                        )}
+                                 <section className="space-y-4">
+                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data Management</h3>
+                                     <div className="space-y-3">
+                                         <Button variant="outline" className="w-full h-14 rounded-2xl justify-start gap-4" onClick={onImportLeads}>
+                                             <Download size={20} className="text-primary-600" />
+                                             <div className="text-left">
+                                                 <p className="font-bold">Import from Google Sheet</p>
+                                                 <p className="text-[10px] font-medium text-slate-400">Migrate leads from external recruitment sheets</p>
+                                             </div>
+                                         </Button>
+                                         <Button variant="outline" className="w-full h-14 rounded-2xl justify-start gap-4 border-slate-100 opacity-60 hover:opacity-100" onClick={onSeedLeads} disabled={isSeeding}>
+                                             <Database size={20} className={isSeeding ? 'animate-spin' : ''} />
+                                             <div className="text-left">
+                                                 <p className="font-bold">Seed Sample Data</p>
+                                                 <p className="text-[10px] font-medium text-slate-400">Testing only: Adds dummy leads to the pipeline</p>
+                                             </div>
+                                         </Button>
+                                     </div>
+                                 </section>
+
+                                 <section className="space-y-4">
+                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Scheduling Configuration</h3>
+                                     <div className="p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl space-y-6">
+                                         <div>
+                                             <p className="text-xs font-bold text-slate-400 mb-2">DEFAULT SESSION DURATION</p>
+                                             <select className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium">
+                                                 <option value="30">30 minutes</option>
+                                                 <option value="60">60 minutes</option>
+                                                 <option value="90" selected>90 minutes</option>
+                                                 <option value="120">120 minutes</option>
+                                             </select>
+                                         </div>
+                                         <div>
+                                             <p className="text-xs font-bold text-slate-400 mb-2">CALENDAR LOOKAHEAD (DAYS)</p>
+                                             <input type="number" min="1" max="14" defaultValue="3" className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium" />
+                                             <p className="text-[10px] text-slate-400 mt-1">Maximum days shown when booking 1:1 sessions (1-14)</p>
+                                         </div>
+                                     </div>
+                                 </section>
+                             </motion.div>
+                         )}
+
 
                         {activeTab === 'integrations' && (
                             <motion.div key="integrations" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-8">

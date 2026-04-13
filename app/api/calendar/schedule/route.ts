@@ -33,7 +33,8 @@ export async function POST(req: Request) {
     const event = await upsertCalendarEvent(
         { name: lead.name, email: lead.email, id: lead.id }, 
         startTime,
-        lead.calendarEventId
+        lead.calendarEventId,
+        90 // Default 90 minute sessions
     );
 
     // Update lead in Firestore with event info

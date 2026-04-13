@@ -205,27 +205,28 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const generateFreeSlots = (busy: any[]) => {
-    if (!Array.isArray(busy)) return [];
-    const slots = [];
-    const now = new Date();
-    now.setMinutes(0, 0, 0); // Round to next hour
-    
-    // Start from next hour or tomorrow 9AM if it's late
-    let current = new Date(now.getTime() + 60 * 60 * 1000);
-    if (current.getHours() > 18) {
-        current.setDate(current.getDate() + 1);
-        current.setHours(9, 0, 0, 0);
-    }
+    const generateFreeSlots = (busy: any[]) => {
+      if (!Array.isArray(busy)) return [];
+      const slots = [];
+      const now = new Date();
+      now.setMinutes(0, 0, 0); // Round to next hour
+      
+      // Start from next hour or tomorrow 9AM if it's late
+      let current = new Date(now.getTime() + 90 * 60 * 1000); // 90 minute default slots
+      if (current.getHours() > 18) {
+          current.setDate(current.getDate() + 1);
+          current.setHours(9, 0, 0, 0);
+      }
 
-    const endSearch = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+      const endSearch = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+
 
     while (current < endSearch) {
         const hour = current.getHours();
         // Working hours 9AM to 7PM
         if (hour >= 9 && hour <= 19) {
             const startStr = current.toISOString();
-            const endStr = new Date(current.getTime() + 60 * 60 * 1000).toISOString();
+            const endStr = new Date(current.getTime() + 90 * 60 * 1000).toISOString(); // 90 minute slots
             
             const isBusy = busy.some(b => {
                 return (startStr >= b.start && startStr < b.end) || 
@@ -234,7 +235,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
 
             if (!isBusy) slots.push(startStr);
         }
-        current = new Date(current.getTime() + 60 * 60 * 1000); // Increment 1 hour
+        current = new Date(current.getTime() + 90 * 60 * 1000); // Increment by slot duration (90 mins)
     }
     return slots;
   };

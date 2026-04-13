@@ -8,24 +8,25 @@ export async function getCalendarClient() {
 
 export async function getAvailability(timeMin: string, timeMax: string) {
   const calendar = await getCalendarClient();
-  const response = await calendar.freebusy.query({
-    requestBody: {
-      timeMin,
-      timeMax,
-      items: [{ id: 'primary' }],
-    },
+  const response = await calendar.events.list({
+    calendarId: 'primary',
+    timeMin,
+    timeMax,
+    singleEvents: true,
+    orderBy: 'startTime',
   });
 
-  return response.data.calendars?.primary?.busy || [];
+  return response.data.items || [];
 }
 
 export async function upsertCalendarEvent(
   lead: { name: string; email?: string; id: string },
   startTime: string,
-  eventId?: string
+  eventId?: string,
+  durationMinutes: number = 90
 ) {
   const calendar = await getCalendarClient();
-  const endTime = new Date(new Date(startTime).getTime() + 60 * 60 * 1000).toISOString();
+  const endTime = new Date(new Date(startTime).getTime() + durationMinutes * 60 * 1000).toISOString();
 
   const eventBody = {
     summary: `1:1 Career Counseling: ${lead.name}`,

@@ -93,3 +93,13 @@ export const TEST_LINKS: Record<string, string> = {
   "Professional": "https://careertest.edumilestones.com/student-dashboard/suitability-registration/login/OTI2/as204",
   "Business Management": "https://careertest.edumilestones.com/student-dashboard/suitability-registration/login/OTI2/Bm144"
 };
+
+export interface SystemSettings {
+  defaultSessionDuration: 30 | 60 | 90 | 120;
+  calendarLookaheadDays: number;
+}
+
+export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
+  defaultSessionDuration: 90,
+  calendarLookaheadDays: 3,
+};

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { upsertCalendarEvent, deleteCalendarEvent } from '@/lib/calendar';
-import { updateLeads, getAllLeads } from '@/lib/db-firestore';
 import { UserRole } from '@/lib/types';
+import { getAllLeads, updateLeads, getSystemSettings } from '@/lib/db-firestore';
+import { upsertCalendarEvent, deleteCalendarEvent } from '@/lib/calendar';
 
 export async function POST(req: Request) {
   const session = await auth() as any;
@@ -30,10 +30,12 @@ export async function POST(req: Request) {
         });
     }
 
+    const settings = await getSystemSettings();
     const event = await upsertCalendarEvent(
         { name: lead.name, email: lead.email, id: lead.id }, 
         startTime,
-        lead.calendarEventId
+        lead.calendarEventId,
+        settings.defaultSessionDuration
     );
 
     // Update lead in Firestore with event info

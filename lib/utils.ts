@@ -6,38 +6,51 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function safeParseISO(dateStr: string | undefined | null): Date {
-  if (!dateStr) return new Date();
-  
-  const str = dateStr.trim();
+export function safeParseISO(dateInput: any): Date {
+  if (!dateInput) return new Date();
+
+  // Handle Google Calendar event object
+  let str = dateInput;
+  if (typeof dateInput === 'object' && dateInput !== null) {
+    str = dateInput.dateTime || dateInput.date || JSON.stringify(dateInput);
+  }
+  if (typeof str === 'string') {
+    str = str.trim();
+  }
 
   // 1. Try standard parseISO
   try {
-    const parsed = parseISO(str);
+    const parsed = parseISO(str as string);
     if (isValid(parsed)) return parsed;
+  } catch (e) {}
+
+  // 1.5. Try YYYY-MM-DD (common from API)
+  try {
+    const ymdParsed = parse(str as string, 'yyyy-MM-dd', new Date());
+    if (isValid(ymdParsed)) return ymdParsed;
   } catch (e) {}
 
   // 2. Try Indian Format (DD/MM/YYYY)
   try {
-    const indianParsed = parse(str, 'dd/MM/yyyy', new Date());
+    const indianParsed = parse(str as string, 'dd/MM/yyyy', new Date());
     if (isValid(indianParsed)) return indianParsed;
   } catch (e) {}
   
   // 3. Try Indian Format with time (DD/MM/YYYY HH:mm:ss)
   try {
-    const indianDateTimeParsed = parse(str, 'dd/MM/yyyy HH:mm:ss', new Date());
+    const indianDateTimeParsed = parse(str as string, 'dd/MM/yyyy HH:mm:ss', new Date());
     if (isValid(indianDateTimeParsed)) return indianDateTimeParsed;
   } catch (e) {}
 
   // 4. Try dd MMM yyyy Format
   try {
-    const mmmParsed = parse(str, 'dd MMM yyyy', new Date());
+    const mmmParsed = parse(str as string, 'dd MMM yyyy', new Date());
     if (isValid(mmmParsed)) return mmmParsed;
   } catch (e) {}
 
   // 5. Try native Date constructor (handles MM/DD/YYYY or YYYY/MM/DD)
   try {
-    const native = new Date(str);
+    const native = new Date(str as string);
     if (isValid(native)) return native;
   } catch (e) {}
 
@@ -53,9 +66,18 @@ export function safeParseISO(dateStr: string | undefined | null): Date {
   return new Date();
 }
 
-export function safeFormat(date: string | Date | undefined | null, formatStr: string = 'dd MMM yyyy'): string {
+export function safeFormat(date: any, formatStr: string = 'dd MMM yyyy'): string {
   if (!date) return '';
-  const dateObj = typeof date === 'string' ? safeParseISO(date) : date;
+  
+  // Handle Google Calendar event objects or complex structures
+  let dateInput = date;
+  if (typeof date === 'object' && date !== null && ! (date instanceof Date)) {
+    dateInput = date.dateTime || date.date || date.toString();
+  }
+  
+  const dateObj = typeof dateInput === 'string' ? safeParseISO(dateInput) : (dateInput instanceof Date ? dateInput : new Date(dateInput));
+  
+  if (isNaN(dateObj.getTime())) return 'Invalid Date';
   return format(dateObj, formatStr);
 }
 

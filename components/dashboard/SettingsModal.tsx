@@ -14,7 +14,9 @@ import {
     CheckCircle2,
     Lock,
     Globe,
-    Settings
+    Settings,
+    Clock,
+    Calendar as CalendarIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '@/components/ui/Card';
@@ -51,12 +53,48 @@ export const SettingsModal = ({ onClose, onImportLeads, onSeedLeads, isSeeding }
     const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
     const [settingsLoading, setSettingsLoading] = useState(false);
 
+    const loadSettings = async () => {
+      if (!isAdmin) return;
+      setSettingsLoading(true);
+      try {
+        const res = await fetch('/api/admin/settings');
+        if (res.ok) {
+          const data = await res.json();
+          setSettings(data);
+        }
+      } catch (error) {
+        console.error('Failed to load settings', error);
+        setSettings(DEFAULT_SYSTEM_SETTINGS);
+      } finally {
+        setSettingsLoading(false);
+      }
+    };
+
+    const saveSettings = async (newSettings: Partial<SystemSettings>) => {
+      if (!isAdmin) return;
+      try {
+        const res = await fetch('/api/admin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newSettings),
+        });
+        if (res.ok) {
+          setSettings(prev => ({ ...prev, ...newSettings }));
+        }
+      } catch (error) {
+        console.error('Failed to save settings', error);
+      }
+    };
+
     useEffect(() => {
         if (isAdmin && activeTab === 'staff') {
             fetchStaff();
         }
         if (isAdmin && activeTab === 'integrations' && !adminStatus) {
             checkStatus();
+        }
+        if (isAdmin && activeTab === 'general') {
+            loadSettings();
         }
     }, [activeTab, isAdmin]);
 
@@ -221,17 +259,32 @@ export const SettingsModal = ({ onClose, onImportLeads, onSeedLeads, isSeeding }
                                      <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Scheduling Configuration</h3>
                                      <div className="p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl space-y-6">
                                          <div>
-                                             <p className="text-xs font-bold text-slate-400 mb-2">DEFAULT SESSION DURATION</p>
-                                             <select className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium">
+                                             <p className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-2">
+                                                 <Clock size={14} /> DEFAULT SESSION DURATION
+                                             </p>
+                                             <select 
+                                                 value={settings.defaultSessionDuration}
+                                                 onChange={(e) => saveSettings({ defaultSessionDuration: parseInt(e.target.value) as 30|60|90|120 })}
+                                                 className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium focus:border-primary-500 outline-none"
+                                             >
                                                  <option value="30">30 minutes</option>
                                                  <option value="60">60 minutes</option>
-                                                 <option value="90" selected>90 minutes</option>
+                                                 <option value="90">90 minutes</option>
                                                  <option value="120">120 minutes</option>
                                              </select>
                                          </div>
                                          <div>
-                                             <p className="text-xs font-bold text-slate-400 mb-2">CALENDAR LOOKAHEAD (DAYS)</p>
-                                             <input type="number" min="1" max="14" defaultValue="3" className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium" />
+                                             <p className="text-xs font-bold text-slate-400 mb-2 flex items-center gap-2">
+                                                 <CalendarIcon size={14} /> CALENDAR LOOKAHEAD (DAYS)
+                                             </p>
+                                             <input 
+                                                 type="number" 
+                                                 min="1" 
+                                                 max="14" 
+                                                 value={settings.calendarLookaheadDays}
+                                                 onChange={(e) => saveSettings({ calendarLookaheadDays: parseInt(e.target.value) })}
+                                                 className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium focus:border-primary-500 outline-none"
+                                             />
                                              <p className="text-[10px] text-slate-400 mt-1">Maximum days shown when booking 1:1 sessions (1-14)</p>
                                          </div>
                                      </div>

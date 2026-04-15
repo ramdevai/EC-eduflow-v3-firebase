@@ -6,8 +6,6 @@ import {
     ShieldCheck, 
     RefreshCw, 
     User, 
-    Database, 
-    Download, 
     Plus, 
     Trash2, 
     AlertCircle, 
@@ -27,14 +25,11 @@ import { useSession } from 'next-auth/react';
 
 interface Props {
     onClose: () => void;
-    onImportLeads: () => void;
-    onSeedLeads: () => void;
-    isSeeding: boolean;
 }
 
 type Tab = 'general' | 'integrations' | 'staff';
 
-export const SettingsModal = ({ onClose, onImportLeads, onSeedLeads, isSeeding }: Props) => {
+export const SettingsModal = ({ onClose }: Props) => {
     const { data: session } = useSession();
     const isAdmin = session?.user?.role === UserRole.Admin;
     const [activeTab, setActiveTab] = useState<Tab>('general');
@@ -234,26 +229,6 @@ export const SettingsModal = ({ onClose, onImportLeads, onSeedLeads, isSeeding }
                                         </div>
                                     </div>
                                 </section>
-
-                                 <section className="space-y-4">
-                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Data Management</h3>
-                                     <div className="space-y-3">
-                                         <Button variant="outline" className="w-full h-14 rounded-2xl justify-start gap-4" onClick={onImportLeads}>
-                                             <Download size={20} className="text-primary-600" />
-                                             <div className="text-left">
-                                                 <p className="font-bold">Import from Google Sheet</p>
-                                                 <p className="text-[10px] font-medium text-slate-400">Migrate leads from external recruitment sheets</p>
-                                             </div>
-                                         </Button>
-                                         <Button variant="outline" className="w-full h-14 rounded-2xl justify-start gap-4 border-slate-100 opacity-60 hover:opacity-100" onClick={onSeedLeads} disabled={isSeeding}>
-                                             <Database size={20} className={isSeeding ? 'animate-spin' : ''} />
-                                             <div className="text-left">
-                                                 <p className="font-bold">Seed Sample Data</p>
-                                                 <p className="text-[10px] font-medium text-slate-400">Testing only: Adds dummy leads to the pipeline</p>
-                                             </div>
-                                         </Button>
-                                     </div>
-                                 </section>
 
                                  <section className="space-y-4">
                                      <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Scheduling Configuration</h3>

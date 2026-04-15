@@ -19,9 +19,16 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error('Manual Sync Error:', error);
+    const message = String(error?.message || '');
+    const isQuotaError =
+      message.toLowerCase().includes('resource_exhausted') ||
+      message.toLowerCase().includes('quota exceeded');
+
     return NextResponse.json({
       success: false,
-      error: error.message
+      error: isQuotaError
+        ? 'Google Contacts quota exceeded. Please wait and try again later.'
+        : error.message
     }, { status: 500 });
   }
 }

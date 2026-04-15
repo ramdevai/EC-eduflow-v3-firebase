@@ -2,6 +2,9 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { parseISO, isValid, format, parse } from 'date-fns';
 
+const REGISTRATION_TOKEN_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
+const REGISTRATION_SID_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -122,14 +125,25 @@ export function computeLeadStatus(stage: string, providedStatus?: string): 'Open
   return 'Open';
 }
 
+function getSecureRandomString(length: number, chars: string): string {
+  const cryptoApi = globalThis.crypto;
+  if (!cryptoApi?.getRandomValues) {
+    throw new Error('Secure random generator unavailable');
+  }
+
+  const bytes = new Uint8Array(length);
+  cryptoApi.getRandomValues(bytes);
+
+  return Array.from(bytes, (byte) => chars[byte % chars.length]).join('');
+}
+
 export function generateRegistrationToken(): string {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let token = '';
-    for (let i = 0; i < 12; i++) {
-        token += chars.charAt(Math.floor(Math.random() * chars.length));
-        if ((i + 1) % 4 === 0 && i !== 11) token += '-';
-    }
-    return token;
+  const parts = Array.from({ length: 3 }, () => getSecureRandomString(6, REGISTRATION_TOKEN_CHARS));
+  return parts.join('-');
+}
+
+export function generateRegistrationSid(): string {
+  return getSecureRandomString(32, REGISTRATION_SID_CHARS);
 }
 
 export function generateWhatsAppLink(phone: string, message: string = ''): string {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { 
   Plus, 
@@ -10,18 +10,15 @@ import {
   Menu, 
   AlertCircle, 
   RefreshCw,
-  X,
-  ShieldAlert,
   Download,
   Settings,
-  Database,
   Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useRouter } from 'next/navigation';
 import { useSession, signOut } from "next-auth/react";
 import { useLeads } from '@/hooks/useLeads';
-import { Lead, LeadStage, UserRole, LeadStatus, FeesPaidStatus, CommunityJoinedStatus } from '@/lib/types';
-import { SAMPLE_LEADS } from '@/lib/sample-leads';
+import { Lead, LeadStage, UserRole } from '@/lib/types';
 
 // Dynamically imported components
 const LoginScreen = dynamic(() => import('@/components/LoginScreen').then(mod => mod.LoginScreen), { ssr: false });
@@ -55,6 +52,7 @@ const STAGES: LeadStage[] = [
 ];
 
 export default function Dashboard() {
+  const router = useRouter();
   const { data: session, status } = useSession();
   const { leads, templates, loading, error, reminders, fetchLeads, updateLead, deleteLead, addLead } = useLeads();
   
@@ -64,12 +62,12 @@ export default function Dashboard() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [activeTab, setActiveTab] = useState<'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers'>('leads');
-  const [isSeeding, setIsSeeding] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const historyStateRef = useRef<string>('root');
 
   const currentLead = useMemo(() => {
     if (!selectedLead) return null;
@@ -90,25 +88,81 @@ export default function Dashboard() {
     }
   }, [isSettingsOpen, session?.user?.role]);
 
-  const handleSeedLeads = async () => {
-    if (session?.user?.role !== UserRole.Admin) {
-      alert('Only administrators can seed sample data.');
-      return;
+  useEffect(() => {
+    if (activeTab === 'analysis' && session?.user?.role !== UserRole.Admin) {
+      setActiveTab('leads');
     }
-    if (!confirm('This will add sample leads to your pipeline. Continue?')) return;
-    setIsSeeding(true);
-    try {
-      for (const lead of SAMPLE_LEADS) {
-        await addLead({ ...lead, ownerUid: session.user.id, updatedAt: new Date().toISOString() } as Partial<Lead>);
+  }, [activeTab, session?.user?.role]);
+
+  const closeTopOverlay = useCallback(() => {
+    if (selectedLead) {
+      setSelectedLead(null);
+      return true;
+    }
+    if (isSettingsOpen) {
+      setIsSettingsOpen(false);
+      return true;
+    }
+    if (isImportModalOpen) {
+      setIsImportModalOpen(false);
+      return true;
+    }
+    if (isAddModalOpen) {
+      setIsAddModalOpen(false);
+      return true;
+    }
+    if (isSidebarOpen) {
+      setIsSidebarOpen(false);
+      return true;
+    }
+    return false;
+  }, [selectedLead, isSettingsOpen, isImportModalOpen, isAddModalOpen, isSidebarOpen]);
+
+  const overlayState = useMemo(() => {
+    if (selectedLead) return `lead:${selectedLead.id}`;
+    if (isSettingsOpen) return 'settings';
+    if (isImportModalOpen) return 'import';
+    if (isAddModalOpen) return 'add';
+    if (isSidebarOpen) return 'sidebar';
+    return 'root';
+  }, [selectedLead, isSettingsOpen, isImportModalOpen, isAddModalOpen, isSidebarOpen]);
+
+  useEffect(() => {
+    const url = window.location.pathname;
+
+    if (!window.history.state?.dashboardGuard) {
+      window.history.replaceState({ dashboardGuard: true, overlay: 'root' }, '', url);
+      historyStateRef.current = 'root';
+    }
+
+    if (overlayState !== 'root' && historyStateRef.current !== overlayState) {
+      window.history.pushState({ dashboardGuard: true, overlay: overlayState }, '', url);
+      historyStateRef.current = overlayState;
+    }
+
+    if (overlayState === 'root') {
+      historyStateRef.current = 'root';
+    }
+  }, [overlayState]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const closedOverlay = closeTopOverlay();
+
+      if (closedOverlay) {
+        window.history.pushState({ dashboardGuard: true, overlay: 'root' }, '', window.location.pathname);
+        historyStateRef.current = 'root';
+        return;
       }
-      alert(`Successfully added ${SAMPLE_LEADS.length} sample leads!`);
-      fetchLeads();
-    } catch (err: any) {
-      alert('Seeding failed: ' + err.message);
-    } finally {
-      setIsSeeding(false);
-    }
-  };
+
+      router.replace('/');
+      window.history.pushState({ dashboardGuard: true, overlay: 'root' }, '', '/');
+      historyStateRef.current = 'root';
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [closeTopOverlay, router]);
 
   const handleSyncContacts = async () => {
     setIsSyncing(true);
@@ -126,7 +180,11 @@ export default function Dashboard() {
   };
 
   const closeImportModal = useCallback(() => setIsImportModalOpen(false), []);
-  const handleImportSuccess = useCallback(() => fetchLeads(), [fetchLeads]);
+  const handleImportSuccess = useCallback(() => {
+    setIsImportModalOpen(false);
+    fetchLeads();
+  }, [fetchLeads]);
+
   const handleAddLead = useCallback(async (lead: Partial<Lead>) => {
     if (!session?.user?.id) return;
     await addLead({ ...lead, ownerUid: session.user.id, updatedAt: new Date().toISOString() });
@@ -154,6 +212,13 @@ export default function Dashboard() {
 
   const customerCount = useMemo(() => {
     return leads.filter(l => normalizeStage(l.stage) === 'Report sent').length;
+  }, [leads]);
+
+  const pipelineCount = useMemo(() => {
+    return leads.filter(l => {
+      const normalized = normalizeStage(l.stage);
+      return l.stage !== 'Lost' && normalized !== 'Report sent';
+    }).length;
   }, [leads]);
 
   const kanbanStages = useMemo(() => 
@@ -188,14 +253,14 @@ export default function Dashboard() {
           <motion.div key="mobile-sidebar-container" initial="initial" animate="animate" exit="exit" className="fixed inset-0 z-[60] lg:hidden">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSidebarOpen(false)} className="absolute inset-0 bg-slate-900/40" />
             <motion.div initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }} transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }} className="absolute inset-y-0 left-0 w-72 z-[70] will-change-transform">
-              <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onMobileClose={() => setIsSidebarOpen(false)} onPreferencesClick={() => setIsSettingsOpen(true)} customerCount={customerCount} />
+              <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onMobileClose={() => setIsSidebarOpen(false)} onPreferencesClick={() => setIsSettingsOpen(true)} pipelineCount={pipelineCount} customerCount={customerCount} />
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <div className="hidden lg:block w-72 h-screen sticky top-0 shrink-0">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onPreferencesClick={() => setIsSettingsOpen(true)} customerCount={customerCount} />
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onPreferencesClick={() => setIsSettingsOpen(true)} pipelineCount={pipelineCount} customerCount={customerCount} />
       </div>
 
       <main className="flex-1 px-4 py-6 md:py-10 md:px-10 max-w-7xl mx-auto w-full overflow-hidden">
@@ -350,7 +415,7 @@ export default function Dashboard() {
         {activeTab === 'today' && <TodayView leads={leads} templates={templates} />}
         {activeTab === 'templates' && <TemplatesView />}
         {activeTab === 'lost' && <LostLeadsView leads={leads} updateLead={updateLead} />}
-        {activeTab === 'analysis' && <AnalysisView leads={leads} />}
+        {activeTab === 'analysis' && session?.user?.role === UserRole.Admin && <AnalysisView leads={leads} />}
       </main>
 
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} onAddClick={() => setIsAddModalOpen(true)} />
@@ -364,9 +429,6 @@ export default function Dashboard() {
         {isSettingsOpen && (
           <SettingsModal 
             onClose={() => setIsSettingsOpen(false)} 
-            onImportLeads={() => { setIsSettingsOpen(false); setIsImportModalOpen(true); }}
-            onSeedLeads={handleSeedLeads}
-            isSeeding={isSeeding}
           />
         )}
         {isImportModalOpen && <ImportModal onClose={closeImportModal} onSuccess={handleImportSuccess} />}

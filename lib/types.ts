@@ -76,6 +76,7 @@ export interface Lead {
   reportPdfUrl?: string;
   communityJoined: CommunityJoinedStatus;
   registrationToken?: string;
+  registrationSid?: string;
   calendarEventId?: string;
   communicateViaEmailOnly?: boolean;
 }

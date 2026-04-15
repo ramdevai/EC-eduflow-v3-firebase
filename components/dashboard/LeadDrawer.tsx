@@ -39,7 +39,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { SlotCard } from '@/components/ui/SlotCard';
-import { cn, normalizeStage, generateRegistrationToken, safeParseISO, safeFormat, toInputFormat } from '@/lib/utils';
+import { cn, normalizeStage, generateRegistrationSid, generateRegistrationToken, safeParseISO, safeFormat, toInputFormat } from '@/lib/utils';
 import { getWhatsAppLink, getEmailLink, getTestLinkByGrade, getReportEmailData, getEmailData, MessageType } from '@/lib/messaging-utils';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import { EmailComposer } from './EmailComposer';
@@ -80,7 +80,6 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [localStage, setLocalStage] = useState<LeadStage | null>(lead.stage);
   const [localFeesPaid, setLocalFeesPaid] = useState<FeesPaidStatus>(lead.feesPaid || 'Due');
-  const [showRawData, setShowRawData] = useState(false);
   const [copied, setCopied] = useState(false);
   
   // Slot Picker State
@@ -208,9 +207,23 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     }
   };
 
-  const handleCopyLink = () => {
+  const handleCopyLink = async () => {
     if (!lead.registrationToken) return;
-    const url = `${window.location.origin}/register/${lead.registrationToken}`;
+
+    let currentToken = lead.registrationToken;
+    let currentSid = lead.registrationSid;
+
+    if (!currentSid) {
+      currentSid = generateRegistrationSid();
+      try {
+        await onUpdate(lead.id, { registrationSid: currentSid });
+      } catch (err) {
+        alert('Failed to secure registration link');
+        return;
+      }
+    }
+
+    const url = `${window.location.origin}/register/${currentToken}?sid=${encodeURIComponent(currentSid)}`;
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -321,13 +334,16 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     if (!lead) return;
     
     let currentToken = lead.registrationToken;
+    let currentSid = lead.registrationSid;
     
-    // Generate token if not exists
-    if (!currentToken) {
-        currentToken = generateRegistrationToken();
+    // Generate token + sid if missing
+    if (!currentToken || !currentSid) {
+        currentToken = currentToken || generateRegistrationToken();
+        currentSid = currentSid || generateRegistrationSid();
         try {
         await onUpdate(lead.id, { 
             registrationToken: currentToken,
+            registrationSid: currentSid,
             stage: 'Registration requested'
         });
         } catch (err) {
@@ -341,7 +357,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
         return;
     }
     
-    window.open(getWhatsAppLink(lead, 'onboarding', templates), '_blank');
+    window.open(getWhatsAppLink({ ...lead, registrationToken: currentToken, registrationSid: currentSid }, 'onboarding', templates), '_blank');
     if (normalizeStage(lead.stage) === 'New') {
         handleStageChange('Registration requested');
     }
@@ -1173,20 +1189,6 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                   </Button>
                 )}
 
-                <Button 
-                    variant="outline" 
-                    className="w-full h-10 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-400"
-                    onClick={() => setShowRawData(!showRawData)}
-                >
-                    {showRawData ? 'Hide Debug Data' : 'View Debug Raw Data'}
-                </Button>
-
-                {showRawData && (
-                    <pre className="p-4 bg-slate-900 text-emerald-400 rounded-2xl text-[10px] overflow-auto max-h-64 font-mono">
-                        {JSON.stringify(lead, null, 2)}
-                    </pre>
-                )}
-
                 {!isSessionDone && isAdmin && (
                   <Button 
                     variant="danger" 
@@ -1237,4 +1239,3 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     </>
   );
 });
-

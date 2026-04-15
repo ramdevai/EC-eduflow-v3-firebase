@@ -1,6 +1,6 @@
 
 import { Lead, LeadStage, LeadStatus, FeesPaidStatus, CommunityJoinedStatus, UserRole, SystemSettings, DEFAULT_SYSTEM_SETTINGS } from './types';
-import { generateRegistrationToken, safeFormat } from './utils';
+import { generateRegistrationSid, generateRegistrationToken, safeFormat } from './utils';
 
 const LEADS_COLLECTION = 'leads';
 const TEMPLATES_COLLECTION = 'templates';
@@ -61,6 +61,7 @@ const mapDocToLead = (doc: FirebaseFirestore.DocumentData): Lead => {
     reportPdfUrl: doc.reportPdfUrl,
     communityJoined: doc.communityJoined,
     registrationToken: doc.registrationToken,
+    registrationSid: doc.registrationSid,
     calendarEventId: doc.calendarEventId,
     communicateViaEmailOnly: doc.communicateViaEmailOnly,
   };
@@ -109,6 +110,7 @@ const mapLeadToDoc = (lead: Partial<Lead>): LeadDocument => {
     reportPdfUrl: lead.reportPdfUrl || '',
     communityJoined: lead.communityJoined || 'No',
     registrationToken: lead.registrationToken || generateRegistrationToken(),
+    registrationSid: lead.registrationSid || generateRegistrationSid(),
     calendarEventId: lead.calendarEventId || '',
     communicateViaEmailOnly: lead.communicateViaEmailOnly || false,
   };
@@ -188,15 +190,68 @@ export async function deleteLead(callerUid: string, role: UserRole, leadId: stri
   await docRef.delete();
 }
 
-export async function getLeadByToken(registrationToken: string): Promise<Lead | null> {
+export async function getLeadByRegistrationAccess(registrationToken: string, registrationSid?: string | null): Promise<Lead | null> {
   const { adminDb } = await import('./server-firebase');
-  const snapshot = await adminDb.collection(LEADS_COLLECTION).where('registrationToken', '==', registrationToken).limit(1).get();
+  const snapshot = await adminDb.collection(LEADS_COLLECTION).where('registrationToken', '==', registrationToken).get();
 
   if (snapshot.empty) {
     return null;
   }
 
-  return mapDocToLead({ ...snapshot.docs[0].data(), id: snapshot.docs[0].id });
+  const matchingDoc = snapshot.docs.find((doc) => {
+    const docSid = doc.data().registrationSid;
+    return !docSid || docSid === registrationSid;
+  });
+
+  if (!matchingDoc) {
+    return null;
+  }
+
+  return mapDocToLead({ ...matchingDoc.data(), id: matchingDoc.id });
+}
+
+export async function consumeRegistrationLink(
+  registrationToken: string,
+  registrationSid: string | null,
+  updates: Partial<Lead>
+): Promise<void> {
+  const { adminDb } = await import('./server-firebase');
+
+  await adminDb.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(
+      adminDb.collection(LEADS_COLLECTION).where('registrationToken', '==', registrationToken)
+    );
+
+    if (snapshot.empty) {
+      throw new Error('Invalid registration link');
+    }
+
+    const matchingDoc = snapshot.docs.find((doc) => {
+      const docSid = doc.data().registrationSid;
+      return !docSid || docSid === registrationSid;
+    });
+
+    if (!matchingDoc) {
+      throw new Error('Invalid registration link');
+    }
+
+    const docData = matchingDoc.data();
+    if (!docData.registrationToken) {
+      throw new Error('Registration link has already been used');
+    }
+
+    const currentSid = docData.registrationSid;
+    if (currentSid && currentSid !== registrationSid) {
+      throw new Error('Invalid registration link');
+    }
+
+    transaction.update(matchingDoc.ref, {
+      ...updates,
+      updatedAt: safeFormat(new Date()),
+      registrationToken: '',
+      registrationSid: '',
+    });
+  });
 }
 
 // Template Functions

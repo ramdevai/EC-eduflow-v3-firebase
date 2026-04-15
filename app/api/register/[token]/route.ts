@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getLeadByToken, updateLeads } from '@/lib/db-firestore';
-import { UserRole } from '@/lib/types';
+import { consumeRegistrationLink, getLeadByRegistrationAccess } from '@/lib/db-firestore';
 import { toInputFormat, safeFormat } from '@/lib/utils';
 
 const ALLOWED_REGISTRATION_FIELDS = [
@@ -48,7 +47,7 @@ export async function GET(
   const { searchParams } = new URL(req.url);
   const sid = searchParams.get('sid');
   try {
-    const lead = await getLeadByToken(token);
+    const lead = await getLeadByRegistrationAccess(token, sid);
 
     if (!lead) {
       return NextResponse.json({ error: 'Invalid or expired registration link' }, { status: 404 });
@@ -88,10 +87,12 @@ export async function POST(
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
+  const { searchParams } = new URL(req.url);
+  const sid = searchParams.get('sid');
   
   try {
     const body = await req.json() as Record<string, unknown>;
-    const lead = await getLeadByToken(token);
+    const lead = await getLeadByRegistrationAccess(token, sid);
 
     if (!lead) {
       return NextResponse.json({ error: 'Invalid registration link' }, { status: 404 });
@@ -102,11 +103,9 @@ export async function POST(
         ...pickRegistrationUpdates(body),
         dob: typeof body.dob === 'string' ? safeFormat(body.dob) : lead.dob || '',
         stage: lead.stage === 'Registration requested' ? 'Registration done' : lead.stage,
-        updatedAt: safeFormat(new Date()),
-        registrationToken: '' // Clear token so link expires
     };
 
-    await updateLeads('system-registration', UserRole.Admin, [{ id: String(lead.id), data: updates }]);
+    await consumeRegistrationLink(token, sid, updates);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

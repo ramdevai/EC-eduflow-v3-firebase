@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
 import { signOut } from 'next-auth/react'
@@ -12,6 +13,8 @@ export default function Error({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  const router = useRouter()
+
   useEffect(() => {
     console.error('Application Error:', error)
   }, [error])
@@ -49,7 +52,7 @@ export default function Error({
                     Re-authenticate (Logout)
                 </Button>
             ) : (
-                <Button variant="ghost" onClick={() => window.location.href = '/'} className="h-14 rounded-2xl gap-2 text-slate-500">
+                <Button variant="ghost" onClick={() => router.replace('/')} className="h-14 rounded-2xl gap-2 text-slate-500">
                     <Home size={20} /> Back to Dashboard
                 </Button>
             )}

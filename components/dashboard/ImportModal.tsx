@@ -33,46 +33,30 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
     // Ideally, a parent component should prevent rendering this, or display an access denied message
     return null; 
   }
-  const [mode, setMode] = useState<'selection' | 'sheet' | 'contacts' | 'csv'>('selection');
-  const [externalId, setExternalId] = useState('1cdEuiNvsxEBWgOK718WxCcSDhNKOYkDfsQKHLdDFpZI');
+  const [mode, setMode] = useState<'selection' | 'contacts' | 'csv'>('selection');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvRows, setCsvRows] = useState<any[]>([]);
-  const [step, setStep] = useState<'input' | 'analyze' | 'confirm' | 'success'>('input');
+  const [step, setStep] = useState<'analyze' | 'confirm' | 'success'>('analyze');
   const [analysis, setAnalysis] = useState<any>(null);
   const [syncResult, setSyncResult] = useState<{ checked: number; added: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dupMode, setDupMode] = useState<'skip' | 'allow'>('skip');
 
-  const handleAnalyze = async () => {
-    if (!externalId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/admin/import/analyze', {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ externalSheetId: externalId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setAnalysis(data);
-      setStep('confirm');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+  const formatImportError = (message: string) => {
+    const normalized = message.toLowerCase();
+
+    if (normalized.includes('resource_exhausted') || normalized.includes('quota exceeded')) {
+      return 'Google Contacts quota exceeded. Wait a while and try again, or reduce sync frequency.';
     }
+
+    return message;
   };
 
   const handleExecute = async () => {
     setLoading(true);
     try {
-      const payload = mode === 'csv' 
-        ? { rows: csvRows, handleDuplicates: dupMode, source: 'CSV Import' }
-        : { externalSheetId: externalId, handleDuplicates: dupMode };
+      const payload = { rows: csvRows, handleDuplicates: dupMode, source: 'CSV Import' };
 
       const res = await fetch('/api/admin/import/execute', {
         method: 'POST',
@@ -84,7 +68,7 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
       setStep('success');
       onSuccess();
     } catch (err: any) {
-      setError(err.message);
+      setError(formatImportError(err.message));
     } finally {
       setLoading(false);
     }
@@ -107,7 +91,7 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
       setStep('success');
       onSuccess();
     } catch (err: any) {
-      setError(err.message);
+      setError(formatImportError(err.message));
     } finally {
       setLoading(false);
     }
@@ -150,7 +134,7 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
       setAnalysis(data);
       setStep('confirm');
     } catch (err: any) {
-      setError(err.message);
+      setError(formatImportError(err.message));
     } finally {
       setLoading(false);
     }
@@ -200,20 +184,6 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
                 </button>
 
                 <button 
-                 onClick={() => setMode('sheet')}
-                 className="group p-6 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 rounded-[2rem] text-left hover:border-primary-500 transition-all flex items-center gap-6"
-                >
-                  <div className="w-14 h-14 bg-amber-100 dark:bg-amber-900/30 text-amber-600 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                     <Database size={28} />
-                  </div>
-                  <div className="flex-1">
-                     <h4 className="text-lg font-black dark:text-white">Google Sheet</h4>
-                     <p className="text-xs text-slate-500 font-medium leading-relaxed">Migrate data from an existing lead spreadsheet.</p>
-                  </div>
-                  <ArrowRight className="text-slate-300 group-hover:text-amber-500 transition-colors" size={20} />
-                </button>
-
-                <button 
                  onClick={() => document.getElementById('csv-upload')?.click()}
                  className="group p-6 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 rounded-[2rem] text-left hover:border-emerald-500 transition-all flex items-center gap-6"
                 >
@@ -235,61 +205,6 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
              onChange={handleFileSelect}
              className="hidden"
            />
-
-           {mode === 'selection' && (
-             <button
-               onClick={async () => {
-                 if (!confirm('Delete ALL leads with source "Imported from CSV"? This cannot be undone.')) return;
-                 setLoading(true);
-                 try {
-                   const res = await fetch('/api/admin/delete-csv-leads', { method: 'POST' });
-                   const data = await res.json();
-                   alert(data.message || 'Delete completed');
-                   if (data.success) onSuccess();
-                 } catch (e) {
-                   alert('Error running delete');
-                 } finally {
-                   setLoading(false);
-                 }
-               }}
-               disabled={loading}
-               className="w-full mt-4 text-xs font-bold text-rose-600 hover:text-rose-700 underline"
-             >
-               One-time: Delete all "Imported from CSV" leads
-             </button>
-           )}
-
-
-          {mode === 'sheet' && step === 'input' && (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">External Google Sheet ID</label>
-                <div className="relative">
-                  <input 
-                    value={externalId}
-                    onChange={(e) => setExternalId(e.target.value)}
-                    placeholder="Paste ID here..."
-                    className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-sm font-bold outline-none focus:border-primary-500 transition-all"
-                  />
-                  <button onClick={() => setMode('selection')} className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-primary-600 uppercase">Change</button>
-                </div>
-              </div>
-              <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/20 rounded-2xl space-y-2">
-                <p className="text-[10px] leading-relaxed text-amber-700 dark:text-amber-400 font-bold uppercase tracking-tight">
-                  Important Notes:
-                </p>
-                <ul className="text-[10px] leading-relaxed text-amber-700/80 dark:text-amber-400/80 list-disc ml-4 font-medium">
-                    <li>Data must be on the <b>first tab</b> of the external spreadsheet.</li>
-                    <li>Imported leads will be set to <b>Won</b> status.</li>
-                    <li>Inquiry Date will be pulled from the <b>Timestamp</b> column.</li>
-                </ul>
-              </div>
-              <Button className="w-full h-16 rounded-2xl font-black text-lg gap-2" onClick={handleAnalyze} disabled={loading || !externalId}>
-                {loading ? <Loader2 className="animate-spin" /> : <ArrowRight size={20} />}
-                Analyze External Data
-              </Button>
-            </div>
-           )}
 
            {mode === 'csv' && step === 'analyze' && (
              <div className="space-y-6">
@@ -315,7 +230,7 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
              </div>
            )}
 
-            {(mode === 'sheet' || mode === 'csv') && step === 'confirm' && (
+            {mode === 'csv' && step === 'confirm' && (
 
              <div className="space-y-6">
                <div className="grid grid-cols-2 gap-4">
@@ -367,7 +282,7 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
                  <div>
                    <p className="text-[11px] font-bold text-primary-700 dark:text-primary-400">Confirmation Required</p>
                    <p className="text-[10px] text-primary-600/80 dark:text-primary-400/60 leading-relaxed">
-                     Importing <b>{dupMode === 'skip' ? analysis.total - analysis.duplicates : analysis.total}</b> leads from {mode === 'csv' ? 'CSV' : 'sheet'}. 
+                     Importing <b>{dupMode === 'skip' ? analysis.total - analysis.duplicates : analysis.total}</b> leads from CSV.
                      CSV status takes precedence; otherwise 'Won' only for stage "Session complete" or "Report sent", else 'Open'.
                    </p>
                  </div>

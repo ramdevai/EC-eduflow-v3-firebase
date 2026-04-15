@@ -55,7 +55,9 @@ export function getMessageBody(
 
   // Replace placeholders
   const token = lead.registrationToken || 'PENDING';
-  const registrationLink = `${origin}/register/${token}`;
+  const registrationLink = lead.registrationSid
+    ? `${origin}/register/${token}?sid=${encodeURIComponent(lead.registrationSid)}`
+    : `${origin}/register/${token}`;
   // Use lead.testLink if provided, else attempt suggestion, else default
   const testLink = lead.testLink || getTestLinkByGrade(lead.grade, lead.board) || TEST_LINKS["8th-10th"];
 

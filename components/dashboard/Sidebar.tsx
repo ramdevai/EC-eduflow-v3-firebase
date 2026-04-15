@@ -23,10 +23,11 @@ interface SidebarProps {
   setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers') => void;
   onMobileClose?: () => void;
   onPreferencesClick?: () => void;
+  pipelineCount?: number;
   customerCount?: number;
 }
 
-export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobileClose, onPreferencesClick, customerCount }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobileClose, onPreferencesClick, pipelineCount }: SidebarProps) {
   const { data: session } = useSession();
   const NavButton = ({ 
     icon: Icon, 
@@ -88,21 +89,23 @@ export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobile
               icon={LayoutDashboard} 
               label="Pipeline" 
               isActive={activeTab === 'leads'} 
-              onClick={() => setActiveTab('leads')} 
+              onClick={() => setActiveTab('leads')}
+              count={pipelineCount}
             />
             <NavButton 
               icon={Users} 
               label="All Customers" 
               isActive={activeTab === 'customers'} 
               onClick={() => setActiveTab('customers')} 
-              count={customerCount}
             />
-            <NavButton 
-              icon={BarChart3} 
-              label="Analysis" 
-              isActive={activeTab === 'analysis'} 
-              onClick={() => setActiveTab('analysis')} 
-            />
+            {session?.user?.role === UserRole.Admin && (
+              <NavButton 
+                icon={BarChart3} 
+                label="Analysis" 
+                isActive={activeTab === 'analysis'} 
+                onClick={() => setActiveTab('analysis')} 
+              />
+            )}
             <NavButton 
               icon={Calendar} 
               label="Today" 
@@ -130,7 +133,7 @@ export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobile
             {session?.user?.role === UserRole.Admin && (
               <NavButton 
                   icon={Settings} 
-                  label="Database Setup" 
+                  label="System Settings" 
                   isActive={false} 
                   onClick={() => onPreferencesClick?.()} 
               />

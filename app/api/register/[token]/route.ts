@@ -3,7 +3,42 @@ import { getLeadByToken, updateLeads } from '@/lib/db-firestore';
 import { UserRole } from '@/lib/types';
 import { toInputFormat, safeFormat } from '@/lib/utils';
 
+const ALLOWED_REGISTRATION_FIELDS = [
+  'name',
+  'phone',
+  'email',
+  'grade',
+  'board',
+  'address',
+  'dob',
+  'gender',
+  'school',
+  'hobbies',
+  'fatherName',
+  'fatherPhone',
+  'fatherEmail',
+  'fatherOccupation',
+  'motherName',
+  'motherPhone',
+  'motherEmail',
+  'motherOccupation',
+  'source',
+  'comments',
+  'privacy_consent',
+  'privacy_consent_date',
+] as const;
 
+function pickRegistrationUpdates(body: Record<string, unknown>) {
+  const updates: Record<string, unknown> = {};
+
+  for (const field of ALLOWED_REGISTRATION_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(body, field)) {
+      updates[field] = body[field];
+    }
+  }
+
+  return updates;
+}
 
 export async function GET(
   req: Request,
@@ -53,11 +88,9 @@ export async function POST(
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token } = await params;
-  const { searchParams } = new URL(req.url);
-  const sidParam = searchParams.get('sid');
   
   try {
-    const body = await req.json();
+    const body = await req.json() as Record<string, unknown>;
     const lead = await getLeadByToken(token);
 
     if (!lead) {
@@ -66,8 +99,8 @@ export async function POST(
 
     // Update the lead with form data and EXPIRE the token
     const updates = {
-        ...body,
-        dob: safeFormat(body.dob), // Ensure Indian format in DB
+        ...pickRegistrationUpdates(body),
+        dob: typeof body.dob === 'string' ? safeFormat(body.dob) : lead.dob || '',
         stage: lead.stage === 'Registration requested' ? 'Registration done' : lead.stage,
         updatedAt: safeFormat(new Date()),
         registrationToken: '' // Clear token so link expires

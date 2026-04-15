@@ -1,8 +1,20 @@
 import { NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
 import { sendEmailWithSentCopy } from '@/lib/email';
+import { UserRole } from '@/lib/types';
 
 export async function POST(req: Request) {
   try {
+    const session = await auth() as any;
+
+    if (!session?.user?.id || !session?.user?.role) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    if (session.user.role !== UserRole.Admin && session.user.role !== UserRole.Staff) {
+      return NextResponse.json({ error: 'Insufficient privileges' }, { status: 403 });
+    }
+
     const formData = await req.formData();
     const to = formData.get('to') as string;
     const subject = formData.get('subject') as string;

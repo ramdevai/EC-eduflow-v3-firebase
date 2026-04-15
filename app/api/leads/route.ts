@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     const status = error.code === 403 || error.code === 401 ? 403 : 500;
     return NextResponse.json({ 
         error: error.message || 'Failed to fetch leads',
-        details: error.code === 404 ? 'Sheet not found. Check your Sheet ID.' : 'Check your Google account permissions.'
+        details: error.message
     }, { status });
   }
 }

@@ -11,7 +11,7 @@ export default {
           prompt: "consent",
           access_type: "offline",
           response_type: "code",
-          scope: "openid email profile https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/calendar"
+          scope: "openid email profile https://www.googleapis.com/auth/contacts.readonly https://www.googleapis.com/auth/calendar"
         }
       }
     }),

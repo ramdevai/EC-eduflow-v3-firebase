@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 interface EmailComposerProps {
   lead: Lead;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (result?: any) => void;
   initialSubject: string;
   initialBody: string;
   recipients: string[];
@@ -63,7 +63,7 @@ export function EmailComposer({ lead, onClose, onSuccess, initialSubject, initia
       const data = await res.json();
       if (!res.ok) throw new Error(data.details || data.error || 'Failed to send email');
 
-      onSuccess();
+      onSuccess(data);
     } catch (err: any) {
       console.error('Send error:', err);
       setError(err.message);

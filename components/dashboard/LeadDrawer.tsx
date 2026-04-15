@@ -1215,7 +1215,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
         <EmailComposer 
           lead={lead}
           onClose={() => setEmailComposerType(null)}
-          onSuccess={() => {
+          onSuccess={(result) => {
             if (emailComposerType === 'report_email') {
                 handleStageChange('Report sent');
             } else if (emailComposerType === 'test') {
@@ -1224,7 +1224,10 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                 handleStageChange('Registration requested');
             }
             setEmailComposerType(null);
-            alert('Email sent successfully!');
+            const msg = result?.savedToSent 
+              ? 'Email sent and saved to INBOX.ECRM-sent!' 
+              : 'Email sent successfully (check Sent folder manually)';
+            alert(msg);
           }}
           initialSubject={getEmailData(lead, emailComposerType, templates).subject}
           initialBody={getEmailData(lead, emailComposerType, templates).body}

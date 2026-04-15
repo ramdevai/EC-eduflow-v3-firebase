@@ -111,6 +111,17 @@ export function normalizeStage(stage: string): string {
   return map[s] || stage;
 }
 
+export function computeLeadStatus(stage: string, providedStatus?: string): 'Open' | 'Won' | 'Lost' {
+  if (providedStatus && ['Open', 'Won', 'Lost'].includes(providedStatus)) {
+    return providedStatus as 'Open' | 'Won' | 'Lost';
+  }
+  const normalized = normalizeStage(stage);
+  if (normalized === 'Session complete' || normalized === 'Report sent') {
+    return 'Won';
+  }
+  return 'Open';
+}
+
 export function generateRegistrationToken(): string {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     let token = '';

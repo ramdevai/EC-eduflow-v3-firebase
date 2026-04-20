@@ -13,27 +13,31 @@ interface BottomNavProps {
   activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers';
   setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers') => void;
   onAddClick: () => void;
+  pipelineCount?: number;
+  customerCount?: number;
 }
 
-export function BottomNav({ activeTab, setActiveTab, onAddClick }: BottomNavProps) {
+export function BottomNav({ activeTab, setActiveTab, onAddClick, pipelineCount, customerCount }: BottomNavProps) {
   const NavItem = ({ 
     icon: Icon, 
     label, 
     isActive, 
     onClick,
-    isLoading = false
+    isLoading = false,
+    count
   }: { 
     icon: any, 
     label: string, 
     isActive?: boolean, 
     onClick: () => void,
-    isLoading?: boolean
+    isLoading?: boolean,
+    count?: number
   }) => (
     <button 
       onClick={onClick}
       disabled={isLoading}
       className={cn(
-        "flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-200",
+        "flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-200 relative",
         isActive 
           ? "text-primary-600 dark:text-primary-400" 
           : "text-slate-400 dark:text-slate-500",
@@ -47,6 +51,11 @@ export function BottomNav({ activeTab, setActiveTab, onAddClick }: BottomNavProp
         <Icon size={22} className={isLoading ? 'animate-spin' : ''} />
       </div>
       <span className="text-[9px] font-bold uppercase tracking-wider">{label}</span>
+      {count !== undefined && count > 0 && (
+        <span className="absolute top-1 right-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[8px] font-black w-4 h-4 flex items-center justify-center rounded-full border border-white dark:border-slate-900">
+          {count}
+        </span>
+      )}
     </button>
   );
 
@@ -57,6 +66,7 @@ export function BottomNav({ activeTab, setActiveTab, onAddClick }: BottomNavProp
         label="Pipeline" 
         isActive={activeTab === 'leads'} 
         onClick={() => setActiveTab('leads')} 
+        count={pipelineCount}
       />
       <NavItem 
         icon={Calendar} 
@@ -64,7 +74,6 @@ export function BottomNav({ activeTab, setActiveTab, onAddClick }: BottomNavProp
         isActive={activeTab === 'today'} 
         onClick={() => setActiveTab('today')} 
       />
-
       <NavItem 
         icon={Plus} 
         label="Add Lead" 

@@ -278,8 +278,17 @@ export default function Dashboard() {
                      activeTab === 'analysis' ? 'Business Analysis' :
                      (selectedStage === 'All' ? 'Pipeline' : selectedStage)}
                   </h1>
-                  {activeTab === 'leads' && reminders.length > 0 && selectedStage === 'All' && (
-                    <div className="flex items-center justify-center min-w-[24px] h-6 px-1.5 bg-red-500 text-white text-[10px] font-black rounded-full">{reminders.length}</div>
+                  
+                  {activeTab === 'leads' && (
+                    <div className="flex items-center justify-center min-w-[24px] h-6 px-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-black rounded-lg">
+                      {isSearchActive ? filteredLeads.length : (selectedStage === 'All' ? pipelineCount : filteredLeads.length)}
+                    </div>
+                  )}
+
+                  {activeTab === 'customers' && (
+                    <div className="flex items-center justify-center min-w-[24px] h-6 px-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-black rounded-lg">
+                      {customerCount}
+                    </div>
                   )}
                 </div>
                 <div className="flex items-center gap-1.5 mt-1"><Sparkles size={12} className="text-primary-500" /><p className="text-[10px] md:text-xs text-slate-500 font-bold uppercase tracking-widest">EduCompass CRM</p></div>
@@ -418,7 +427,7 @@ export default function Dashboard() {
         {activeTab === 'analysis' && session?.user?.role === UserRole.Admin && <AnalysisView leads={leads} />}
       </main>
 
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} onAddClick={() => setIsAddModalOpen(true)} />
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} onAddClick={() => setIsAddModalOpen(true)} pipelineCount={pipelineCount} customerCount={customerCount} />
 
       <AnimatePresence>
         {currentLead && (

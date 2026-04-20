@@ -6,6 +6,8 @@ import { GraduationCap, AlertCircle, LogIn, UserCircle } from "lucide-react";
 import { Card } from "./ui/Card";
 import { useEffect } from "react";
 
+import { UserAvatar } from "./dashboard/UserAvatar";
+
 export function LoginScreen() {
   const { status } = useSession();
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
@@ -91,13 +93,7 @@ export function LoginScreen() {
 export function UserProfileBadge({ user }: { user: any }) {
     return (
         <div className="flex items-center gap-3 p-2 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-            {user?.image ? (
-                <img src={user.image} className="w-8 h-8 rounded-full" alt={user.name} />
-            ) : (
-                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
-                    <UserCircle size={20} />
-                </div>
-            )}
+            <UserAvatar user={user} className="w-8 h-8" />
             <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{user?.name}</p>
                 <button onClick={() => signOut()} className="text-[10px] font-bold text-primary-600 hover:underline">Sign Out</button>

@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { UserPlus, CheckCircle2, IndianRupee } from 'lucide-react';
+import { UserPlus, CheckCircle2, IndianRupee, Users } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { normalizeStage } from '@/lib/utils';
@@ -14,7 +14,7 @@ export const StatGrid = memo(function StatGrid({ leads }: StatGridProps) {
       label: 'Active Leads',
       value: leads.filter(l => {
         const stage = normalizeStage(l.stage);
-        return l.status === 'Open' && stage !== 'Report sent' && stage !== 'Lost';
+        return stage !== 'Report sent' && stage !== 'Lost';
       }).length,
       icon: UserPlus,
       color: 'text-emerald-600',
@@ -33,6 +33,13 @@ export const StatGrid = memo(function StatGrid({ leads }: StatGridProps) {
       icon: IndianRupee,
       color: 'text-red-600',
       bg: 'bg-red-50 dark:bg-red-900/20',
+    },
+    {
+      label: 'Total Customers',
+      value: leads.filter(l => normalizeStage(l.stage) === 'Report sent').length,
+      icon: Users,
+      color: 'text-blue-600',
+      bg: 'bg-blue-50 dark:bg-blue-900/20',
     },
   ];
 

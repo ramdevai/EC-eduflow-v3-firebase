@@ -41,7 +41,7 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
   const [syncResult, setSyncResult] = useState<{ checked: number; added: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dupMode, setDupMode] = useState<'skip' | 'allow'>('skip');
+  const [dupMode, setDupMode] = useState<'skip' | 'update'>('update');
 
   const formatImportError = (message: string) => {
     const normalized = message.toLowerCase();
@@ -235,12 +235,12 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
              <div className="space-y-6">
                <div className="grid grid-cols-2 gap-4">
                  <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl text-center">
-                   <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Total Leads</p>
-                   <p className="text-2xl font-black text-slate-900 dark:text-white">{analysis.total}</p>
+                   <p className="text-[10px] font-black uppercase text-slate-400 mb-1">New Leads</p>
+                   <p className="text-2xl font-black text-slate-900 dark:text-white">{analysis.newLeads}</p>
                  </div>
                  <div className="p-4 bg-amber-50 dark:bg-amber-950/20 rounded-2xl text-center">
-                   <p className="text-[10px] font-black uppercase text-amber-600 mb-1">Duplicates Found</p>
-                   <p className="text-2xl font-black text-amber-600">{analysis.duplicates}</p>
+                   <p className="text-[10px] font-black uppercase text-amber-600 mb-1">Existing Leads</p>
+                   <p className="text-2xl font-black text-amber-600">{analysis.existing}</p>
                  </div>
                </div>
 
@@ -259,34 +259,38 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
                  </div>
                )}
 
-               <div className="space-y-3">
-                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Handle Duplicates</label>
-                 <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
-                   <button 
-                     onClick={() => setDupMode('skip')}
-                     className={`py-3 rounded-lg text-xs font-bold transition-all ${dupMode === 'skip' ? 'bg-white dark:bg-slate-700 text-primary-600 shadow-sm' : 'text-slate-400'}`}
-                   >
-                     Skip (Recommended)
-                   </button>
-                   <button 
-                     onClick={() => setDupMode('allow')}
-                     className={`py-3 rounded-lg text-xs font-bold transition-all ${dupMode === 'allow' ? 'bg-white dark:bg-slate-700 text-amber-600 shadow-sm' : 'text-slate-400'}`}
-                   >
-                     Import Anyway
-                   </button>
-                 </div>
-               </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Import Strategy</label>
+                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                    <button 
+                      onClick={() => setDupMode('skip')}
+                      className={`py-3 rounded-lg text-xs font-bold transition-all ${dupMode === 'skip' ? 'bg-white dark:bg-slate-700 text-primary-600 shadow-sm' : 'text-slate-400'}`}
+                    >
+                      New Leads Only
+                    </button>
+                    <button 
+                      onClick={() => setDupMode('update')}
+                      className={`py-3 rounded-lg text-xs font-bold transition-all ${dupMode === 'update' ? 'bg-white dark:bg-slate-700 text-amber-600 shadow-sm' : 'text-slate-400'}`}
+                    >
+                      Update Existing (Recommended)
+                    </button>
+                  </div>
+                </div>
 
-               <div className="p-4 bg-primary-50 dark:bg-primary-950/30 rounded-2xl border border-primary-100 dark:border-primary-900/20 flex gap-4">
-                 <ShieldAlert className="text-primary-600 shrink-0" size={20} />
-                 <div>
-                   <p className="text-[11px] font-bold text-primary-700 dark:text-primary-400">Confirmation Required</p>
-                   <p className="text-[10px] text-primary-600/80 dark:text-primary-400/60 leading-relaxed">
-                     Importing <b>{dupMode === 'skip' ? analysis.total - analysis.duplicates : analysis.total}</b> leads from CSV.
-                     CSV status takes precedence; otherwise 'Won' only for stage "Session complete" or "Report sent", else 'Open'.
-                   </p>
-                 </div>
-               </div>
+                <div className="p-4 bg-primary-50 dark:bg-primary-950/30 rounded-2xl border border-primary-100 dark:border-primary-900/20 flex gap-4">
+                  <ShieldAlert className="text-primary-600 shrink-0" size={20} />
+                  <div>
+                    <p className="text-[11px] font-bold text-primary-700 dark:text-primary-400">Confirmation Required</p>
+                    <p className="text-[10px] text-primary-600/80 dark:text-primary-400/60 leading-relaxed">
+                      {dupMode === 'update' 
+                        ? `Merging data for ${analysis.existing} existing leads and adding ${analysis.newLeads} new leads.`
+                        : `Adding ${analysis.newLeads} new leads. Existing records will be ignored.`
+                      }
+                      <br/>All 40+ columns will be mapped including family details, address, and fees.
+                    </p>
+                  </div>
+                </div>
+
 
                <Button className="w-full h-16 rounded-2xl font-black text-lg gap-2" onClick={handleExecute} disabled={loading}>
                  {loading ? <Loader2 className="animate-spin" /> : <Database size={20} />}

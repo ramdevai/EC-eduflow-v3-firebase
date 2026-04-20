@@ -104,6 +104,41 @@ To allow the CRM to sync contacts in the background (even when you are logged ou
 
 1. **Login:** Visit your deployed URL and Sign In with Google. Ensure you check **all permission boxes** during the Google login.
 2. **Retrieve Tokens:** Visit `https://your-app-name.vercel.app/api/auth/token` in your browser.
+2.1 **Update:** 
+   - This is revoked by google. "Refresh token retrieval through the browser has been removed for security"
+   - The Secure Rotation Plan
+      Step 1: Temporary Code Modification
+      We will add a temporary log statement to lib/auth.ts that only triggers for admins.
+      1.  Open lib/auth.ts.
+      2.  In the jwt callback, add a log line to capture the refresh token from the account object.
+      // Inside lib/auth.ts -> jwt callback
+      async jwt({ token, account }) {
+      if (account) {
+         const userEmail = token.email?.toLowerCase() || "";
+         const isAdmin = ALL_ADMINS.includes(userEmail);
+         // TEMPORARY LOG FOR ROTATION
+         if (isAdmin && account.refresh_token) {
+            console.log(">> ROTATION_TOKEN_START <<", account.refresh_token, ">> ROTATION_TOKEN_END <<");
+         }
+         
+         // ... rest of your existing logic
+      }
+      return token;
+      }
+      Step 2: Deploy and Trigger
+      1.  Commit and Push: Deploy this change to your production environment (Vercel).
+      2.  Sign In: Visit your live application and Sign In with Google. 
+         *   Crucial: Since the Client Secret was rotated (Phase 1), Google will show the consent screen. Ensure you check all permission boxes (Contacts, Calendar, etc.).
+      3.  Capture Token: 
+         *   Go to your Vercel Dashboard > Logs.
+         *   Look for the log entry starting with >> ROTATION_TOKEN_START <<.
+         *   Copy the string between the markers.
+      Step 3: Secure Storage
+      1.  Update Vercel: Go to Settings > Environment Variables and update GOOGLE_REFRESH_TOKEN with the new value.
+      2.  Redeploy: Trigger one final deployment to ensure all background processes (cron jobs, sync tasks) start using the new token.
+      Step 4: Cleanup
+      1.  Remove the temporary console.log from lib/auth.ts.
+      2.  Push the clean code back to your repository. 
 3. **Update Vercel:** Copy the `GOOGLE_REFRESH_TOKEN` value from that page and add it to your Vercel Environment Variables.
 4. **Setup Sheet:**
    - On the CRM dashboard, click **"Create New Workspace"**.

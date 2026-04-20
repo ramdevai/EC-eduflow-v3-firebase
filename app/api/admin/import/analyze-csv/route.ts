@@ -26,14 +26,23 @@ export async function POST(req: Request) {
     const gradeIdx = headers.findIndex(h => h.includes('grade') || h.includes('class') || h.includes('standard'));
     const stageIdx = headers.findIndex(h => h.includes('stage'));
     const statusIdx = headers.findIndex(h => h.includes('status'));
-    const sourceIdx = headers.findIndex(h => h.includes('source') || h.includes('how') || h.includes('know'));
+    const googleContactIdIdx = headers.findIndex(h => h.includes('google contact id') || h.includes('googlecontactid'));
+
+    const existingGoogleIds = new Set(existingLeads.map(l => l.googleContactId).filter(Boolean));
+    const existingNames = new Set(existingLeads.map(l => l.name?.toLowerCase().trim()).filter(Boolean));
 
     for (const row of rows) {
       const email = row[Object.keys(row)[emailIdx]]?.toString().toLowerCase().trim() || '';
       const phoneRaw = row[Object.keys(row)[phoneIdx]]?.toString().replace(/\D/g, '') || '';
       const phone = phoneRaw.slice(-10);
+      const name = row[Object.keys(row)[nameIdx]]?.toString().toLowerCase().trim() || '';
+      const googleId = row[Object.keys(row)[googleContactIdIdx]]?.toString().trim() || '';
 
-      const isDuplicate = (email && existingEmails.has(email)) || (phone && phone.length >= 10 && existingPhones.has(phone));
+      const isDuplicate = (email && existingEmails.has(email)) || 
+                         (phone && phone.length >= 10 && existingPhones.has(phone)) ||
+                         (googleId && existingGoogleIds.has(googleId)) ||
+                         (name && existingNames.has(name) && !email && !phone); // Fallback for orphans
+      
       if (isDuplicate) duplicatesCount++;
     }
 
@@ -43,7 +52,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       total: rows.length,
-      duplicates: duplicatesCount,
+      existing: duplicatesCount,
+      newLeads: rows.length - duplicatesCount,
       matchedFields: {
         name: nameIdx !== -1 ? Object.keys(sampleRow)[nameIdx] : null,
         email: emailIdx !== -1 ? Object.keys(sampleRow)[emailIdx] : null,

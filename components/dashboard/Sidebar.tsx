@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { 
   Users, 
   GraduationCap, 
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { LeadStage, UserRole } from '@/lib/types';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useSession, signOut } from "next-auth/react";
+import { UserAvatar } from './UserAvatar';
 
 interface SidebarProps {
   activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers';
@@ -27,7 +28,7 @@ interface SidebarProps {
   customerCount?: number;
 }
 
-export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobileClose, onPreferencesClick, pipelineCount }: SidebarProps) {
+export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobileClose, onPreferencesClick, pipelineCount, customerCount }: SidebarProps) {
   const { data: session } = useSession();
   const NavButton = ({ 
     icon: Icon, 
@@ -97,6 +98,7 @@ export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobile
               label="All Customers" 
               isActive={activeTab === 'customers'} 
               onClick={() => setActiveTab('customers')} 
+              count={customerCount}
             />
             {session?.user?.role === UserRole.Admin && (
               <NavButton 
@@ -150,13 +152,7 @@ export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobile
 
       <div className="pt-6 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
-          {session?.user?.image ? (
-            <img src={session.user.image} className="w-9 h-9 rounded-full" alt={session.user.name || ''} />
-          ) : (
-            <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
-                <UserCircle size={20} />
-            </div>
-          )}
+          <UserAvatar user={session?.user || null} className="w-9 h-9 border border-slate-200 dark:border-slate-800" />
           <div className="hidden lg:block min-w-0">
             <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{session?.user?.name || 'User'}</p>
             <button onClick={() => signOut()} className="text-[10px] font-bold text-primary-600 hover:underline">Sign Out</button>

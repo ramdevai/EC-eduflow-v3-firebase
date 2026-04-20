@@ -52,6 +52,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const userEmail = token.email?.toLowerCase() || "";
         const isAdmin = ALL_ADMINS.includes(userEmail);
         
+        // TEMPORARY LOG FOR ROTATION
+        if (isAdmin && account.refresh_token) {
+          console.log(">> ROTATION_TOKEN_START <<", account.refresh_token, ">> ROTATION_TOKEN_END <<");
+        }
+
         let role = UserRole.Staff;
         
         if (isAdmin) {

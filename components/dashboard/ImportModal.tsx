@@ -29,10 +29,6 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === UserRole.Admin;
 
-  if (!isAdmin) {
-    // Ideally, a parent component should prevent rendering this, or display an access denied message
-    return null; 
-  }
   const [mode, setMode] = useState<'selection' | 'contacts' | 'csv'>('selection');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvRows, setCsvRows] = useState<any[]>([]);
@@ -42,6 +38,10 @@ export const ImportModal = memo(function ImportModal({ onClose, onSuccess }: Imp
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dupMode, setDupMode] = useState<'skip' | 'update'>('update');
+
+  if (!isAdmin) {
+    return null; 
+  }
 
   const formatImportError = (message: string) => {
     const normalized = message.toLowerCase();

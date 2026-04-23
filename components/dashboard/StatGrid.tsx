@@ -6,13 +6,18 @@ import { normalizeStage } from '@/lib/utils';
 
 interface StatGridProps {
   leads: Lead[];
+  counts?: { 
+    pipeline: number; 
+    customers: number; 
+    stages: Record<string, number> 
+  };
 }
 
-export const StatGrid = memo(function StatGrid({ leads }: StatGridProps) {
+export const StatGrid = memo(function StatGrid({ leads, counts }: StatGridProps) {
   const stats = [
     {
       label: 'Active Leads',
-      value: leads.filter(l => {
+      value: counts?.pipeline ?? leads.filter(l => {
         const stage = normalizeStage(l.stage);
         return stage !== 'Report sent' && stage !== 'Lost';
       }).length,
@@ -22,7 +27,7 @@ export const StatGrid = memo(function StatGrid({ leads }: StatGridProps) {
     },
     {
       label: 'New Inquiries',
-      value: leads.filter(l => normalizeStage(l.stage) === 'New').length,
+      value: counts?.stages?.['New'] ?? leads.filter(l => normalizeStage(l.stage) === 'New').length,
       icon: CheckCircle2,
       color: 'text-amber-600',
       bg: 'bg-amber-50 dark:bg-amber-900/20',
@@ -36,7 +41,7 @@ export const StatGrid = memo(function StatGrid({ leads }: StatGridProps) {
     },
     {
       label: 'Total Customers',
-      value: leads.filter(l => normalizeStage(l.stage) === 'Report sent').length,
+      value: counts?.customers ?? leads.filter(l => normalizeStage(l.stage) === 'Report sent').length,
       icon: Users,
       color: 'text-blue-600',
       bg: 'bg-blue-50 dark:bg-blue-900/20',
@@ -46,7 +51,7 @@ export const StatGrid = memo(function StatGrid({ leads }: StatGridProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 mb-8">
       {stats.map((stat, i) => (
-        <Card key={i} className="p-2.5 md:p-5 flex flex-row items-center gap-2.5 md:gap-4 text-left">
+        <Card key={`${stat.label}-${i}`} className="p-2.5 md:p-5 flex flex-row items-center gap-2.5 md:gap-4 text-left">
           <div className={`w-9 h-9 md:w-12 md:h-12 rounded-xl md:rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center shrink-0`}>
             <stat.icon size={18} className="md:w-6 md:h-6" />
           </div>

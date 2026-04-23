@@ -19,7 +19,8 @@ import {
     Link as LinkIcon,
     AlertTriangle,
     Copy,
-    Check
+    Check,
+    Wrench
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '@/components/ui/Card';
@@ -27,12 +28,13 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { UserRole, SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/types';
 import { useSession } from 'next-auth/react';
+import { DuplicateFinder } from './DuplicateFinder';
 
 interface Props {
     onClose: () => void;
 }
 
-type Tab = 'general' | 'integrations' | 'staff';
+type Tab = 'general' | 'integrations' | 'staff' | 'utilities';
 
 export const SettingsModal = ({ onClose }: Props) => {
     const { data: session } = useSession();
@@ -212,6 +214,12 @@ export const SettingsModal = ({ onClose }: Props) => {
                         className={`py-4 px-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'staff' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                     >
                         Staff Management
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('utilities')}
+                        className={`py-4 px-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'utilities' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                        Utilities
                     </button>
                 </div>
 
@@ -425,6 +433,22 @@ export const SettingsModal = ({ onClose }: Props) => {
                                             ))
                                         )}
                                     </div>
+                                </section>
+                            </motion.div>
+                        )}
+                        {activeTab === 'utilities' && (
+                            <motion.div key="utilities" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-8">
+                                <section className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-2xl bg-primary-50 dark:bg-slate-800 text-primary-600 flex items-center justify-center">
+                                            <Wrench size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black uppercase tracking-widest">Duplicate Finder</h3>
+                                            <p className="text-[10px] text-slate-400 font-bold">Search and resolve duplicate records by phone or email.</p>
+                                        </div>
+                                    </div>
+                                    <DuplicateFinder />
                                 </section>
                             </motion.div>
                         )}

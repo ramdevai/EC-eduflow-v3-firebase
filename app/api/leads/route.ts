@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAllLeads, addLeads } from '@/lib/db-firestore';
+import { getAllLeads, addLeads, getLeadCounts } from '@/lib/db-firestore';
 import { UserRole } from '@/lib/types';
 import { auth } from '@/lib/auth';
 import { validateEnv } from '@/lib/env-check';
@@ -16,9 +16,18 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : undefined;
+  const lastId = searchParams.get('lastId') || undefined;
+  const summary = searchParams.get('summary') === 'true';
+  const category = searchParams.get('category') as any || undefined;
+
   try {
-    const leads = await getAllLeads(session.user.id, session.user.role as UserRole);
-    return NextResponse.json(leads);
+    const [leads, counts] = await Promise.all([
+      getAllLeads(session.user.id, session.user.role as UserRole, { limit, lastId, summary, category }),
+      getLeadCounts(session.user.id, session.user.role as UserRole)
+    ]);
+    return NextResponse.json({ leads, counts });
   } catch (error: any) {
     console.error('GET leads error:', error);
     const status = error.code === 403 || error.code === 401 ? 403 : 500;

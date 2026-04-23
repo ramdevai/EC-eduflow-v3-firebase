@@ -163,7 +163,40 @@ To allow the CRM to sync contacts in the background (even when you are logged ou
 
 ---
 
-## Phase 6: Common Errors & Fixes
+## Phase 6: Automatic Data Backups
+
+The CRM includes an automated backup system that performs a daily native Firestore export to Google Cloud Storage.
+
+### 1. Setup Storage Bucket
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. In the sidebar, go to **Cloud Storage > Buckets**.
+3. Click **Create**.
+4. Name your bucket (e.g., `educompass-crm-backups`).
+5. Choose a region and keep other defaults.
+6. **Important:** Go to the **Lifecycle** tab for the bucket and add a rule:
+   - Action: `Delete object`
+   - Condition: `Age: 30 days`
+   - This ensures you only pay for the last 30 days of backups.
+
+### 2. Configure Permissions
+Ensure your service account (the one provided in `FIREBASE_SERVICE_ACCOUNT_KEY`) has the following roles in IAM:
+- **Cloud Datastore Import Export Admin**
+- **Storage Admin**
+
+### 3. Add Environment Variables
+Add these to Vercel:
+
+| Key | Description |
+| :--- | :--- |
+| `FIREBASE_BACKUP_BUCKET` | The name of the bucket you created (e.g., `educompass-crm-backups`). |
+
+### 4. Verification
+The backup runs automatically every day at 1:00 AM. You can manually trigger a backup for testing by calling:
+`GET https://your-app.vercel.app/api/cron/backup` with the `Authorization: Bearer [CRON_SECRET]` header.
+
+---
+
+## Phase 7: Common Errors & Fixes
 
 ### 1. Error: "There was a problem with the server configuration"
 *   **Cause:** Your `AUTH_SECRET` is missing or named incorrectly in Vercel.

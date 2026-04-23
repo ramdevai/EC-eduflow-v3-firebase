@@ -54,7 +54,21 @@ const STAGES: LeadStage[] = [
 export default function Dashboard() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const { leads, templates, loading, error, reminders, fetchLeads, updateLead, deleteLead, addLead } = useLeads();
+  const { 
+    leads, 
+    counts, 
+    templates, 
+    loading, 
+    error, 
+    reminders, 
+    hasMoreCustomers,
+    loadingCustomers,
+    fetchLeads, 
+    fetchCustomers,
+    updateLead, 
+    deleteLead, 
+    addLead 
+  } = useLeads();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<LeadStage | 'All'>('All');
@@ -185,6 +199,15 @@ export default function Dashboard() {
     fetchLeads();
   }, [fetchLeads]);
 
+  useEffect(() => {
+    if (activeTab === 'customers') {
+      const customersLoaded = leads.some(l => normalizeStage(l.stage) === 'Report sent');
+      if (!customersLoaded) {
+        fetchCustomers();
+      }
+    }
+  }, [activeTab, leads, fetchCustomers]);
+
   const handleAddLead = useCallback(async (lead: Partial<Lead>) => {
     if (!session?.user?.id) return;
     await addLead({ ...lead, ownerUid: session.user.id, updatedAt: new Date().toISOString() });
@@ -210,16 +233,8 @@ export default function Dashboard() {
     });
   }, [leads, searchQuery, selectedStage, activeTab]);
 
-  const customerCount = useMemo(() => {
-    return leads.filter(l => normalizeStage(l.stage) === 'Report sent').length;
-  }, [leads]);
-
-  const pipelineCount = useMemo(() => {
-    return leads.filter(l => {
-      const normalized = normalizeStage(l.stage);
-      return l.stage !== 'Lost' && normalized !== 'Report sent';
-    }).length;
-  }, [leads]);
+  const customerCount = counts.customers;
+  const pipelineCount = counts.pipeline;
 
   const kanbanStages = useMemo(() => 
     STAGES.filter(s => s !== 'Lost' && s !== 'Report sent'),
@@ -281,7 +296,7 @@ export default function Dashboard() {
                   
                   {activeTab === 'leads' && (
                     <div className="flex items-center justify-center min-w-[24px] h-6 px-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-black rounded-lg">
-                      {isSearchActive ? filteredLeads.length : (selectedStage === 'All' ? pipelineCount : filteredLeads.length)}
+                      {isSearchActive ? filteredLeads.length : (selectedStage === 'All' ? pipelineCount : (counts.stages[selectedStage] ?? filteredLeads.length))}
                     </div>
                   )}
 
@@ -318,7 +333,7 @@ export default function Dashboard() {
               )}
             </div>
           </div>
-          {activeTab === 'leads' && !isSearchActive && !isSearchFocused && <StatGrid leads={leads} />}
+          {activeTab === 'leads' && !isSearchActive && !isSearchFocused && <StatGrid leads={leads} counts={counts} />}
         </header>
 
         {(activeTab === 'leads' || activeTab === 'customers') && (
@@ -411,9 +426,24 @@ export default function Dashboard() {
                   <ListView leads={filteredLeads} onLeadClick={setSelectedLead} />
                 </div>
               ) : activeTab === 'customers' ? (
-                <ListView leads={filteredLeads} onLeadClick={setSelectedLead} />
+                <div className="space-y-6">
+                  <ListView leads={filteredLeads} onLeadClick={setSelectedLead} />
+                  {hasMoreCustomers && (
+                    <div className="flex justify-center pt-4">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => fetchCustomers()} 
+                        disabled={loadingCustomers}
+                        className="rounded-xl min-w-[200px]"
+                      >
+                        {loadingCustomers ? <RefreshCw size={16} className="animate-spin mr-2" /> : <Plus size={16} className="mr-2" />}
+                        Load More Customers
+                      </Button>
+                    </div>
+                  )}
+                </div>
               ) : viewMode === 'kanban' ? (
-                <KanbanView leads={leads} stages={kanbanStages} onLeadClick={setSelectedLead} searchQuery={searchQuery} />
+                <KanbanView leads={leads} stages={kanbanStages} onLeadClick={setSelectedLead} searchQuery={searchQuery} counts={counts} />
               ) : (
                 <ListView leads={filteredLeads} onLeadClick={setSelectedLead} />
               )}

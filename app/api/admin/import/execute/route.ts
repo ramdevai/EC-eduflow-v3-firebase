@@ -44,6 +44,9 @@ export async function POST(req: Request) {
     let skipped = 0;
     let updatedCount = 0;
 
+    const BOARDS = ['CBSE', 'ICSE', 'IGCSE', 'SSC', 'IB', 'STATE BOARD', 'MAHARASHTRA'];
+    const GRADES = ['10TH', '12TH', '8TH', '9TH', '11TH'];
+
     for (const row of rows) {
       const email = (row.email || row.Email || row.EMAIL || '').toString().trim().toLowerCase();
       const phoneRaw = (row.phone || row.Phone || row.PHONE || row.mobile || row.Mobile || '').toString();
@@ -51,7 +54,8 @@ export async function POST(req: Request) {
       const name = (row.name || row.Name || row.NAME || row.student || row.Student || '').toString().trim();
       const googleId = (row.googleContactId || row.GoogleContactId || row['Google Contact ID'] || '').toString().trim();
 
-      if (!name) {
+      // Robustness: Skip rows that are clearly fragments of scrambled CSV lines
+      if (!name || name.length < 2 || BOARDS.includes(name.toUpperCase()) || GRADES.includes(name.toUpperCase())) {
         skipped++;
         continue;
       }
@@ -76,8 +80,8 @@ export async function POST(req: Request) {
         address: (row.address || row.Address || '').toString().trim(),
         gender: (row.gender || row.Gender || '').toString().trim(),
         dob: (row.dob || row.DOB || '').toString().trim(),
-        grade: (row.grade || row.Grade || row.class || row.Class || '10th').toString().trim(),
-        board: (row.board || row.Board || 'CBSE').toString().trim(),
+        grade: (row.grade || row.Grade || row.class || row.Class || '').toString().trim(),
+        board: (row.board || row.Board || '').toString().trim(),
         school: (row.school || row.School || '').toString().trim(),
         hobbies: (row.hobbies || row.Hobbies || '').toString().trim(),
         
@@ -97,7 +101,7 @@ export async function POST(req: Request) {
         stage: normalizedStage as any,
         inquiryDate,
         lastStageUpdate,
-        notes: (row.notes || row.Notes || '').toString().trim() || 'Imported from CSV',
+        notes: (row.notes || row.Notes || '').toString().trim(),
         
         lastFollowUp: (row.lastFollowUp || row.LastFollowUp || row['Last Follow Up'] || safeFormat(new Date())).toString().trim(),
         testLink: (row.testLink || row.TestLink || row['Test Link'] || '').toString().trim(),

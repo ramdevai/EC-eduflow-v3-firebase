@@ -20,6 +20,7 @@ const ALL_ADMINS = Array.from(new Set([...ADMIN_EMAILS, ...OWNER_EMAILS]));
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   session: { strategy: "jwt" },
+  trustHost: true,
   callbacks: {
     async signIn({ user }) {
       const email = user.email?.toLowerCase() || "";
@@ -48,40 +49,35 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
     },
     async jwt({ token, account }) {
+      // Only fetch role from Firestore on initial sign-in (when account is present).
+      // Subsequent session refreshes reuse the cached role from the JWT.
       if (account) {
         const userEmail = token.email?.toLowerCase() || "";
         const isAdmin = ALL_ADMINS.includes(userEmail);
-        
-        // TEMPORARY LOG FOR ROTATION
+
         if (isAdmin && account.refresh_token) {
           console.log(">> ROTATION_TOKEN_START <<", account.refresh_token, ">> ROTATION_TOKEN_END <<");
         }
 
         let role = UserRole.Staff;
-        
         if (isAdmin) {
           role = UserRole.Admin;
-          console.log(`[Auth] JWT - Assigned Admin role to: ${userEmail}`);
         } else {
           try {
             const dbRole = await getUserRole(userEmail);
-            if (dbRole) {
-              role = dbRole;
-              console.log(`[Auth] JWT - Assigned ${role} role to staff: ${userEmail}`);
-            } else {
-              console.warn(`[Auth] JWT - No role found for: ${userEmail}`);
-            }
+            if (dbRole) role = dbRole;
           } catch (error) {
             console.error(`[Auth] JWT - Error fetching role for ${userEmail}:`, error);
           }
         }
 
         return {
-            ...token,
-            role,
-            googleRefreshToken: account.refresh_token,
+          ...token,
+          role,
+          googleRefreshToken: account.refresh_token,
         };
       }
+      // Reuse cached token (no Firestore hit) on subsequent calls
       return token;
     },
     async session({ session, token }: any) {

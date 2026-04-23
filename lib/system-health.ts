@@ -1,3 +1,4 @@
+import 'server-only';
 import { google } from 'googleapis';
 
 export type HealthStatus = {
@@ -6,7 +7,16 @@ export type HealthStatus = {
     message?: string;
 };
 
+let cachedHealth: HealthStatus | null = null;
+let lastCheckTime = 0;
+const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+
 export async function checkSystemHealth(): Promise<HealthStatus> {
+    const now = Date.now();
+    if (cachedHealth && (now - lastCheckTime < CACHE_DURATION)) {
+        return cachedHealth;
+    }
+
     const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -34,37 +44,46 @@ export async function checkSystemHealth(): Promise<HealthStatus> {
         const { token } = await oauth2Client.getAccessToken();
         
         if (!token) {
-            return { 
+            const result: HealthStatus = { 
                 ok: false, 
                 errorType: 'REFRESH_FAILED',
                 message: 'Failed to generate access token from refresh token.' 
             };
+            cachedHealth = result;
+            lastCheckTime = Date.now();
+            return result;
         }
 
-        return { ok: true };
+        const result: HealthStatus = { ok: true };
+        cachedHealth = result;
+        lastCheckTime = Date.now();
+        return result;
     } catch (error: any) {
         console.error('System Health Check Error:', error.message);
         
+        let result: HealthStatus;
         if (error.message?.includes('invalid_grant')) {
-            return { 
+            result = { 
                 ok: false, 
                 errorType: 'INVALID_GRANT',
                 message: 'The Google Refresh Token has expired or been revoked.' 
             };
-        }
-
-        if (error.message?.includes('unauthorized_client')) {
-            return { 
+        } else if (error.message?.includes('unauthorized_client')) {
+            result = { 
                 ok: false, 
                 errorType: 'API_ERROR',
                 message: 'Unauthorized Client: Client ID or Secret in .env.local is incorrect or mismatched.'
             };
+        } else {
+            result = { 
+                ok: false, 
+                errorType: 'API_ERROR',
+                message: error.message || 'Unknown Google API error during health check.'
+            };
         }
 
-        return { 
-            ok: false, 
-            errorType: 'API_ERROR',
-            message: error.message || 'Unknown Google API error during health check.'
-        };
+        cachedHealth = result;
+        lastCheckTime = Date.now();
+        return result;
     }
 }

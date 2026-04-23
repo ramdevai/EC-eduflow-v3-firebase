@@ -14,7 +14,12 @@ import {
     Globe,
     Settings,
     Clock,
-    Calendar as CalendarIcon
+    Calendar as CalendarIcon,
+    Key,
+    Link as LinkIcon,
+    AlertTriangle,
+    Copy,
+    Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '@/components/ui/Card';
@@ -32,11 +37,13 @@ type Tab = 'general' | 'integrations' | 'staff';
 export const SettingsModal = ({ onClose }: Props) => {
     const { data: session } = useSession();
     const isAdmin = session?.user?.role === UserRole.Admin;
+    const googleRefreshToken = (session?.user as any)?.googleRefreshToken;
     const [activeTab, setActiveTab] = useState<Tab>('general');
     
     // Status State
     const [statusLoading, setStatusLoading] = useState(false);
     const [adminStatus, setAdminStatus] = useState<any>(null);
+    const [copiedToken, setCopiedToken] = useState(false);
     
     // Staff State
     const [staff, setStaff] = useState<any[]>([]);
@@ -277,6 +284,49 @@ export const SettingsModal = ({ onClose }: Props) => {
                                         <p className="text-xs text-emerald-700 dark:text-emerald-500/80 leading-relaxed">
                                             The system is using a centralized Google Auth token to sync Contacts and Calendar items on behalf of the business.
                                         </p>
+                                        <div className="pt-3">
+                                            {!googleRefreshToken ? (
+                                                <Button 
+                                                    variant="outline" 
+                                                    size="sm" 
+                                                    className="h-9 px-4 rounded-xl text-xs font-bold gap-2 bg-white dark:bg-slate-900"
+                                                    onClick={() => window.open('/api/admin/auth/google', '_blank')}
+                                                >
+                                                    <Key size={14} />
+                                                    Generate Refresh Token
+                                                </Button>
+                                            ) : (
+                                                <div className="space-y-3 mt-4">
+                                                    <div className="relative group">
+                                                        <div className="w-full bg-[#0f172a] p-4 pr-12 rounded-2xl border border-slate-800 font-mono text-xs text-emerald-400 break-all leading-relaxed shadow-inner">
+                                                            {googleRefreshToken}
+                                                            <button 
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(googleRefreshToken);
+                                                                    setCopiedToken(true);
+                                                                    setTimeout(() => setCopiedToken(false), 2000);
+                                                                }}
+                                                                className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition-all active:scale-95"
+                                                            >
+                                                                {copiedToken ? <CheckCircle2 size={16} className="text-emerald-500" /> : <LinkIcon size={16} />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-start gap-2 text-amber-600 dark:text-amber-500 font-bold leading-tight">
+                                                        <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                                                        <p className="text-[10px] italic">Update GOOGLE_REFRESH_TOKEN in Vercel with this value and redeploy to fix "Link Invalid" errors.</p>
+                                                    </div>
+                                                    <div className="flex justify-start">
+                                                         <button 
+                                                            onClick={() => window.open('/api/admin/auth/google', '_blank')}
+                                                            className="text-[10px] font-black uppercase tracking-widest text-primary-600 hover:underline"
+                                                        >
+                                                            Force Re-generate New Token
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 

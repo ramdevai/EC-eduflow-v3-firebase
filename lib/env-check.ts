@@ -4,7 +4,7 @@ const envSchema = z.object({
   AUTH_SECRET: z.string().min(1, "AUTH_SECRET is missing"),
   GOOGLE_CLIENT_ID: z.string().min(1, "GOOGLE_CLIENT_ID is missing"),
   GOOGLE_CLIENT_SECRET: z.string().min(1, "GOOGLE_CLIENT_SECRET is missing"),
-  GOOGLE_REFRESH_TOKEN: z.string().min(1, "GOOGLE_REFRESH_TOKEN is missing"),
+  GOOGLE_REFRESH_TOKEN: z.string().optional(),
   CRON_SECRET: z.string().min(1, "CRON_SECRET is missing"),
   SMTP_HOST: z.string().optional(),
   SMTP_USER: z.string().optional(),

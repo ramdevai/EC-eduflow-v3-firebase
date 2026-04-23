@@ -10,12 +10,14 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    status: 'disabled',
-    details: 'Refresh token retrieval through the browser has been removed for security.',
+    status: 'enabled',
+    details: 'Administrative refresh token generation is available via the settings panel.',
     instructions: [
-      'Store GOOGLE_REFRESH_TOKEN only in server-side environment variables.',
-      'Rotate the existing Google refresh token if this endpoint was previously used in production.',
-      'Use an admin-only operational workflow to update Vercel environment variables.'
+      'Navigate to System Settings > Integrations.',
+      'Click "Generate Refresh Token" to initiate the OAuth flow.',
+      'Copy the resulting token and update GOOGLE_REFRESH_TOKEN in your environment.',
+      'Only accessible to Admin users.'
     ],
+    actionUrl: '/api/admin/auth/google'
   });
 }

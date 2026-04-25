@@ -20,7 +20,11 @@ import {
     AlertTriangle,
     Copy,
     Check,
-    Wrench
+    Wrench,
+    Database,
+    History,
+    FileCode,
+    Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '@/components/ui/Card';
@@ -29,6 +33,7 @@ import { Badge } from '@/components/ui/Badge';
 import { UserRole, SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/types';
 import { useSession } from 'next-auth/react';
 import { DuplicateFinder } from './DuplicateFinder';
+import { formatBackupTimestamp } from '@/lib/utils';
 
 interface Props {
     onClose: () => void;
@@ -57,6 +62,29 @@ export const SettingsModal = ({ onClose }: Props) => {
     const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SYSTEM_SETTINGS);
     const [settingsLoading, setSettingsLoading] = useState(false);
 
+    // Restore State
+    const [backups, setBackups] = useState<string[]>([]);
+    const [selectedBackup, setSelectedBackup] = useState('');
+    const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
+    const [restoreConfirm, setRestoreConfirm] = useState('');
+    const [isRestoring, setIsRestoring] = useState(false);
+    const [restoreOpName, setRestoreOpName] = useState('');
+    const [restoreStatus, setRestoreStatus] = useState<any>(null);
+    const [backupsLoading, setBackupsLoading] = useState(false);
+
+    const AVAILABLE_COLLECTIONS = [
+        { id: 'leads', label: 'Leads' },
+        { id: 'users', label: 'Users' },
+        { id: 'templates', label: 'Templates' },
+        { id: 'system_settings', label: 'Settings' }
+    ];
+
+    const toggleCollection = (id: string) => {
+        setSelectedCollections(prev => 
+            prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+        );
+    };
+
     const loadSettings = async () => {
       if (!isAdmin) return;
       setSettingsLoading(true);
@@ -73,6 +101,102 @@ export const SettingsModal = ({ onClose }: Props) => {
         setSettingsLoading(false);
       }
     };
+
+    const fetchBackups = async () => {
+        setBackupsLoading(true);
+        try {
+            const res = await fetch('/api/admin/restore/backups');
+            const data = await res.json();
+            if (data.success) {
+                setBackups(data.backups);
+                if (data.backups.length > 0 && !selectedBackup) {
+                    setSelectedBackup(data.backups[0]);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to fetch backups');
+        } finally {
+            setBackupsLoading(false);
+        }
+    };
+
+    const handleRestore = async () => {
+        if (restoreConfirm !== 'RESTORE') return;
+        if (!selectedBackup) {
+            alert('Please select a backup to restore');
+            return;
+        }
+
+        const scope = selectedCollections.length === 0 ? 'ENTIRE DATABASE' : `COLLECTIONS: ${selectedCollections.join(', ')}`;
+
+        if (!confirm(`CRITICAL WARNING: You are about to restore ${scope}. This will overwrite existing documents with the same IDs. This action cannot be undone. Are you sure?`)) {
+            return;
+        }
+
+        setIsRestoring(true);
+        setRestoreStatus(null);
+        try {
+            const res = await fetch('/api/admin/restore/trigger', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    timestamp: selectedBackup,
+                    collectionIds: selectedCollections
+                })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                setRestoreOpName(data.operationName);
+            } else {
+                alert(data.error);
+                setIsRestoring(false);
+            }
+        } catch (err: any) {
+            alert(err.message);
+            setIsRestoring(false);
+        }
+    };
+
+    const handleExportLeads = () => {
+        window.open('/api/admin/export/leads', '_blank');
+    };
+
+    const extractNameFromEmail = (email: string) => {
+        const localPart = email.split('@')[0];
+        return localPart
+            .split(/[._-]/)
+            .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ');
+    };
+
+    useEffect(() => {
+        let interval: any;
+        if (restoreOpName && isRestoring) {
+            interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/admin/restore/status?name=${encodeURIComponent(restoreOpName)}`);
+                    const data = await res.json();
+                    if (data.success) {
+                        setRestoreStatus(data.operation);
+                        if (data.operation.done) {
+                            setIsRestoring(false);
+                            setRestoreOpName('');
+                            if (data.operation.error) {
+                                alert(`Restore failed: ${data.operation.error.message}`);
+                            } else {
+                                alert('Restore completed successfully!');
+                                setRestoreConfirm('');
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to check restore status');
+                }
+            }, 5000);
+        }
+        return () => clearInterval(interval);
+    }, [restoreOpName, isRestoring]);
 
     const saveSettings = async (newSettings: Partial<SystemSettings>) => {
       if (!isAdmin) return;
@@ -99,6 +223,9 @@ export const SettingsModal = ({ onClose }: Props) => {
         }
         if (isAdmin && activeTab === 'general') {
             loadSettings();
+        }
+        if (isAdmin && activeTab === 'utilities') {
+            fetchBackups();
         }
     }, [activeTab, isAdmin]);
 
@@ -419,8 +546,8 @@ export const SettingsModal = ({ onClose }: Props) => {
                                                             <User size={20} />
                                                         </div>
                                                         <div className="space-y-0.5">
-                                                            <p className="text-sm font-bold">{member.email}</p>
-                                                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Active Staff</p>
+                                                            <p className="text-sm font-bold">{extractNameFromEmail(member.email)}</p>
+                                                            <p className="text-[10px] font-medium text-slate-400">{member.email}</p>
                                                         </div>
                                                     </div>
                                                     <button 
@@ -449,6 +576,150 @@ export const SettingsModal = ({ onClose }: Props) => {
                                         </div>
                                     </div>
                                     <DuplicateFinder />
+                                </section>
+
+                                <section className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 flex items-center justify-center">
+                                            <Download size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black uppercase tracking-widest text-emerald-600">Data Management</h3>
+                                            <p className="text-[10px] text-slate-400 font-bold">Export system data for offline analysis or backup.</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl">
+                                        <Button 
+                                            onClick={handleExportLeads}
+                                            variant="outline"
+                                            className="w-full h-12 rounded-2xl gap-2 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                                        >
+                                            <Download size={18} />
+                                            Download Leads (CSV)
+                                        </Button>
+                                    </div>
+                                </section>
+
+                                <section className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-2xl bg-red-50 dark:bg-red-900/10 text-red-600 flex items-center justify-center">
+                                            <Database size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black uppercase tracking-widest text-red-600">Database Recovery</h3>
+                                            <p className="text-[10px] text-slate-400 font-bold">Restore Firestore from native native backups (GCS).</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl space-y-6">
+                                        <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20 rounded-2xl">
+                                            <AlertTriangle className="text-amber-600 shrink-0" size={18} />
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-bold text-amber-900 dark:text-amber-400">High Risk Operation</p>
+                                                <p className="text-[10px] text-amber-700 dark:text-amber-500/80 leading-relaxed">
+                                                    Restoring from a backup will <strong>overwrite</strong> any existing documents with matching IDs. This cannot be reversed.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                                                    <History size={12} /> Select Backup Point
+                                                </p>
+                                                <select 
+                                                    value={selectedBackup}
+                                                    onChange={(e) => setSelectedBackup(e.target.value)}
+                                                    disabled={isRestoring || backupsLoading}
+                                                    className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold outline-none focus:border-primary-500 disabled:opacity-50"
+                                                >
+                                                    {backupsLoading ? (
+                                                        <option>Loading backups...</option>
+                                                    ) : backups.length === 0 ? (
+                                                        <option>No backups found</option>
+                                                    ) : (
+                                                        backups.map(b => (
+                                                            <option key={b} value={b}>
+                                                                {formatBackupTimestamp(b)}
+                                                            </option>
+                                                        ))
+                                                    )}
+                                                </select>
+                                                <p className="text-[9px] text-slate-400 pl-1 italic">
+                                                    Note: Last 4 digits (e.g. 0109) indicate HHMM time.
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                                                    <FileCode size={12} /> Restore Scope (Optional)
+                                                </p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {AVAILABLE_COLLECTIONS.map(col => (
+                                                        <button
+                                                            key={col.id}
+                                                            onClick={() => toggleCollection(col.id)}
+                                                            disabled={isRestoring}
+                                                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase border-2 transition-all ${
+                                                                selectedCollections.includes(col.id)
+                                                                ? 'bg-primary-50 border-primary-500 text-primary-600'
+                                                                : 'bg-white border-slate-100 text-slate-400'
+                                                            }`}
+                                                        >
+                                                            {col.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <p className="text-[9px] text-slate-400 pl-1">
+                                                    {selectedCollections.length === 0 ? 'Full database restore (Default)' : `${selectedCollections.length} collections selected`}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {isRestoring ? (
+                                            <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <RefreshCw className="animate-spin text-primary-600" size={16} />
+                                                        <span className="text-xs font-bold">Restore in progress...</span>
+                                                    </div>
+                                                    <span className="text-[10px] font-mono text-slate-400">{restoreStatus?.metadata?.common?.operationType || 'Importing'}</span>
+                                                </div>
+                                                <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                                    <motion.div 
+                                                        className="bg-primary-600 h-full"
+                                                        initial={{ width: "0%" }}
+                                                        animate={{ width: "100%" }}
+                                                        transition={{ duration: 120, ease: "linear" }}
+                                                    />
+                                                </div>
+                                                <p className="text-[9px] text-slate-400 text-center italic">This may take several minutes. You can close this modal; the process will continue on the server.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <div className="space-y-2">
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Type "RESTORE" to confirm</p>
+                                                    <input 
+                                                        type="text"
+                                                        placeholder="RESTORE"
+                                                        value={restoreConfirm}
+                                                        onChange={(e) => setRestoreConfirm(e.target.value)}
+                                                        className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-xs font-bold outline-none focus:border-red-500"
+                                                    />
+                                                </div>
+                                                <Button 
+                                                    onClick={handleRestore}
+                                                    disabled={restoreConfirm !== 'RESTORE' || !selectedBackup}
+                                                    variant="danger"
+                                                    className="w-full h-12 rounded-2xl gap-2 shadow-lg shadow-red-200 dark:shadow-none"
+                                                >
+                                                    <Database size={18} />
+                                                    Initiate System Restore
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </section>
                             </motion.div>
                         )}

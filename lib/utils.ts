@@ -154,3 +154,27 @@ export function generateWhatsAppLink(phone: string, message: string = ''): strin
   const encodedMessage = encodeURIComponent(message);
   return `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
 }
+
+/**
+ * Formats a Firestore backup timestamp (YYYY-MM-DD-HHmm) into a readable string
+ */
+export function formatBackupTimestamp(timestamp: string): string {
+  if (!timestamp || typeof timestamp !== 'string') return timestamp;
+  
+  // Format: yyyy-MM-dd-HHmm (e.g., 2026-04-24-0109)
+  const parts = timestamp.split('-');
+  if (parts.length < 4) return timestamp;
+  
+  const [year, month, day, time] = parts;
+  const hour = time.substring(0, 2);
+  const minute = time.substring(2, 4);
+  
+  try {
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
+    if (isValid(date)) {
+      return format(date, 'MMM dd, yyyy @ hh:mm a');
+    }
+  } catch (e) {}
+  
+  return timestamp;
+}

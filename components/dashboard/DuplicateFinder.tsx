@@ -31,12 +31,14 @@ export function DuplicateFinder() {
     const [category, setCategory] = useState<'pipeline' | 'customers'>('pipeline');
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [selectedSet, setSelectedSet] = useState<Lead[] | null>(null);
     const [fullLeadsData, setFullLeadsData] = useState<Record<string, Lead>>({});
 
     const fetchLeads = async () => {
         setLoading(true);
+        setHasSearched(true);
         try {
             const res = await fetch(`/api/leads?category=${category}&summary=true`);
             if (res.ok) {
@@ -51,7 +53,9 @@ export function DuplicateFinder() {
     };
 
     useEffect(() => {
-        fetchLeads();
+        if (hasSearched) {
+            fetchLeads();
+        }
     }, [category]);
 
     const duplicateGroups = useMemo(() => {
@@ -218,7 +222,23 @@ export function DuplicateFinder() {
                 </button>
             </div>
 
-            {loading ? (
+            {!hasSearched ? (
+                <div className="py-12 text-center space-y-6 bg-slate-50/50 dark:bg-slate-800/20 rounded-[2rem] border-2 border-dashed border-slate-100 dark:border-slate-800">
+                    <div className="w-16 h-16 bg-primary-50 dark:bg-primary-900/10 text-primary-600 rounded-full flex items-center justify-center mx-auto">
+                        <Search size={32} />
+                    </div>
+                    <div className="space-y-2 px-6">
+                        <p className="text-sm font-bold text-slate-600 dark:text-slate-300">Ready to clean up your data?</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider leading-relaxed">
+                            Scanning {category} will identify records with matching phone numbers or email addresses.
+                        </p>
+                    </div>
+                    <Button onClick={fetchLeads} className="h-11 rounded-xl px-8 text-xs font-black uppercase gap-2 shadow-lg shadow-primary-100">
+                        <RefreshCw size={16} />
+                        Start Duplicate Scan
+                    </Button>
+                </div>
+            ) : loading ? (
                 <div className="py-12 flex flex-col items-center justify-center gap-4">
                     <RefreshCw className="animate-spin text-primary-500" size={32} />
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Scanning for duplicates...</p>

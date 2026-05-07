@@ -13,6 +13,7 @@ interface KanbanViewProps {
   counts?: { 
     pipeline: number; 
     customers: number; 
+    feesPending: number;
     stages: Record<string, number> 
   };
 }

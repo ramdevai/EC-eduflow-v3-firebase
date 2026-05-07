@@ -132,6 +132,7 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
 export async function getLeadCounts(callerUid: string, role: UserRole): Promise<{ 
   pipeline: number; 
   customers: number; 
+  feesPending: number;
   stages: Record<string, number>;
 }> {
   let baseQuery: FirebaseFirestore.Query = adminDb.collection(LEADS_COLLECTION);
@@ -146,9 +147,14 @@ export async function getLeadCounts(callerUid: string, role: UserRole): Promise<
   ];
 
   // Fetch counts for all stages in parallel
-  const snapshots = await Promise.all(
-    STAGES.map(stage => baseQuery.where('stage', '==', stage).count().get())
-  );
+  const [snapshots, feesPendingSnapshots] = await Promise.all([
+    Promise.all(STAGES.map(stage => baseQuery.where('stage', '==', stage).count().get())),
+    Promise.all(
+      (['1:1 scheduled', 'Session complete'] as LeadStage[]).map(stage =>
+        baseQuery.where('stage', '==', stage).where('feesPaid', '==', 'Due').count().get()
+      )
+    ),
+  ]);
 
   const stageCounts: Record<string, number> = {};
   STAGES.forEach((stage, i) => {
@@ -162,6 +168,7 @@ export async function getLeadCounts(callerUid: string, role: UserRole): Promise<
   return {
     pipeline,
     customers: stageCounts['Report sent'] || 0,
+    feesPending: feesPendingSnapshots.reduce((sum, snapshot) => sum + snapshot.data().count, 0),
     stages: stageCounts,
   };
 }
@@ -222,6 +229,7 @@ export async function getAllLeads(
         email: data.email || '',
         stage: data.stage || 'New',
         status: data.status || 'Open',
+        feesPaid: data.feesPaid || 'Due',
         updatedAt: data.updatedAt || '',
         grade: data.grade || '',
         board: data.board || '',
@@ -304,6 +312,31 @@ export async function deleteLead(callerUid: string, role: UserRole, leadId: stri
   }
 
   await docRef.delete();
+}
+
+export async function deleteAllLeads(callerUid: string, role: UserRole): Promise<{ deleted: number }> {
+  if (role !== UserRole.Admin) {
+    throw new Error('Unauthorized: Only admins can delete leads.');
+  }
+
+  let deleted = 0;
+
+  while (true) {
+    const snapshot = await adminDb.collection(LEADS_COLLECTION).limit(450).get();
+    if (snapshot.empty) {
+      break;
+    }
+
+    const batch = adminDb.batch();
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    deleted += snapshot.size;
+  }
+
+  return { deleted };
 }
 
 export async function getLeadByRegistrationAccess(registrationToken: string, registrationSid?: string | null): Promise<Lead | null> {

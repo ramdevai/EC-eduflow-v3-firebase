@@ -1,8 +1,13 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSession } from "next-auth/react";
-import { Lead, LeadStage } from '@/lib/types';
+import { Lead } from '@/lib/types';
 import { differenceInDays } from 'date-fns';
 import { normalizeStage, safeParseISO, safeFormat } from '@/lib/utils';
+
+const isFeesPendingLead = (lead: Pick<Lead, 'stage' | 'feesPaid'>) => {
+  const stage = normalizeStage(lead.stage);
+  return ['1:1 scheduled', 'Session complete'].includes(stage) && lead.feesPaid === 'Due';
+};
 
 export function useLeads() {
   const { data: session } = useSession();
@@ -10,10 +15,12 @@ export function useLeads() {
   const [counts, setCounts] = useState<{ 
     pipeline: number; 
     customers: number; 
+    feesPending: number;
     stages: Record<string, number> 
   }>({ 
     pipeline: 0, 
     customers: 0, 
+    feesPending: 0,
     stages: {} 
   });
   const [templates, setTemplates] = useState<any[]>([]);
@@ -42,7 +49,7 @@ export function useLeads() {
       
       if (data.leads && Array.isArray(data.leads)) {
         setLeads(data.leads);
-        setCounts(data.counts || { pipeline: 0, customers: 0, stages: {} });
+        setCounts(data.counts || { pipeline: 0, customers: 0, feesPending: 0, stages: {} });
       }
     } catch (err: any) {
       console.error('Fetch Leads Error:', err);
@@ -141,12 +148,13 @@ export function useLeads() {
     const previousLeads = [...leads];
     const previousCounts = { ...counts };
     
-    // Calculate count changes if stage changed
-    if (updates.stage) {
+    // Calculate count changes if stage or fee status changed
+    if (finalUpdates.stage || finalUpdates.feesPaid) {
       setCounts(prev => {
         const next = { ...prev, stages: { ...prev.stages } };
         const oldStage = normalizeStage(existingLead.stage);
-        const newStage = normalizeStage(updates.stage!);
+        const nextLead = { ...existingLead, ...finalUpdates };
+        const newStage = normalizeStage(nextLead.stage);
         
         if (oldStage !== newStage) {
           // Decrement old category
@@ -162,6 +170,13 @@ export function useLeads() {
           if (next.stages[newStage] !== undefined) next.stages[newStage]++;
           else next.stages[newStage] = 1;
         }
+
+        const wasFeesPending = isFeesPendingLead(existingLead);
+        const isFeesPending = isFeesPendingLead(nextLead);
+        if (wasFeesPending !== isFeesPending) {
+          next.feesPending += isFeesPending ? 1 : -1;
+        }
+
         return next;
       });
     }
@@ -205,6 +220,7 @@ export function useLeads() {
       else if (stage !== 'Lost') next.pipeline--;
       
       if (next.stages[stage] !== undefined) next.stages[stage]--;
+      if (isFeesPendingLead(leadToDelete)) next.feesPending--;
       return next;
     });
 
@@ -250,6 +266,7 @@ export function useLeads() {
 
         if (next.stages[stage] !== undefined) next.stages[stage]++;
         else next.stages[stage] = 1;
+        if (isFeesPendingLead(createdLead)) next.feesPending++;
         return next;
       });
     } catch (err) {

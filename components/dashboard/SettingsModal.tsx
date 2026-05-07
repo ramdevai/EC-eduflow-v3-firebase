@@ -71,6 +71,9 @@ export const SettingsModal = ({ onClose }: Props) => {
     const [restoreOpName, setRestoreOpName] = useState('');
     const [restoreStatus, setRestoreStatus] = useState<any>(null);
     const [backupsLoading, setBackupsLoading] = useState(false);
+    const [deleteDataConfirm, setDeleteDataConfirm] = useState('');
+    const [isDeletingData, setIsDeletingData] = useState(false);
+    const [deleteDataResult, setDeleteDataResult] = useState('');
 
     const AVAILABLE_COLLECTIONS = [
         { id: 'leads', label: 'Leads' },
@@ -160,6 +163,33 @@ export const SettingsModal = ({ onClose }: Props) => {
 
     const handleExportLeads = () => {
         window.open('/api/admin/export/leads', '_blank');
+    };
+
+    const handleDeleteAllLeadData = async () => {
+        if (deleteDataConfirm !== 'DELETE ALL DATA') return;
+
+        if (!confirm('This will permanently delete every lead and customer record. This cannot be undone. Continue?')) {
+            return;
+        }
+
+        setIsDeletingData(true);
+        setDeleteDataResult('');
+        try {
+            const res = await fetch('/api/admin/delete-all-leads', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ confirmation: deleteDataConfirm })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to delete lead data');
+
+            setDeleteDataResult(data.message || `Deleted ${data.deleted || 0} lead and customer records.`);
+            setDeleteDataConfirm('');
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setIsDeletingData(false);
+        }
     };
 
     const extractNameFromEmail = (email: string) => {
@@ -597,6 +627,59 @@ export const SettingsModal = ({ onClose }: Props) => {
                                         >
                                             <Download size={18} />
                                             Download Leads (CSV)
+                                        </Button>
+                                    </div>
+                                </section>
+
+                                <section className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-2xl bg-red-50 dark:bg-red-900/10 text-red-600 flex items-center justify-center">
+                                            <Trash2 size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-black uppercase tracking-widest text-red-600">Temporary Data Reset</h3>
+                                            <p className="text-[10px] text-slate-400 font-bold">Delete all lead and customer records before a fresh CSV upload.</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="p-6 bg-red-50/70 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 rounded-3xl space-y-4">
+                                        <div className="flex items-start gap-3 p-4 bg-white dark:bg-slate-900 border border-red-100 dark:border-red-900/30 rounded-2xl">
+                                            <AlertTriangle className="text-red-600 shrink-0" size={18} />
+                                            <div className="space-y-1">
+                                                <p className="text-xs font-bold text-red-900 dark:text-red-400">Temporary destructive utility</p>
+                                                <p className="text-[10px] text-red-700 dark:text-red-500/80 leading-relaxed">
+                                                    This deletes every record in the leads collection, including customers in the Report sent stage. Remove this feature before production.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-500">Type "DELETE ALL DATA" to confirm</p>
+                                            <input 
+                                                type="text"
+                                                placeholder="DELETE ALL DATA"
+                                                value={deleteDataConfirm}
+                                                onChange={(e) => setDeleteDataConfirm(e.target.value)}
+                                                disabled={isDeletingData}
+                                                className="w-full p-3 bg-white dark:bg-slate-900 border border-red-100 dark:border-red-900/30 rounded-2xl text-xs font-bold outline-none focus:border-red-500 disabled:opacity-50"
+                                            />
+                                        </div>
+
+                                        {deleteDataResult && (
+                                            <div className="flex items-center gap-2 text-xs font-bold text-emerald-600">
+                                                <CheckCircle2 size={16} />
+                                                {deleteDataResult}
+                                            </div>
+                                        )}
+
+                                        <Button 
+                                            onClick={handleDeleteAllLeadData}
+                                            disabled={deleteDataConfirm !== 'DELETE ALL DATA' || isDeletingData}
+                                            variant="danger"
+                                            className="w-full h-12 rounded-2xl gap-2 shadow-lg shadow-red-200 dark:shadow-none"
+                                        >
+                                            {isDeletingData ? <RefreshCw className="animate-spin" size={18} /> : <Trash2 size={18} />}
+                                            Delete All Leads and Customers
                                         </Button>
                                     </div>
                                 </section>

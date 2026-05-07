@@ -9,6 +9,7 @@ interface StatGridProps {
   counts?: { 
     pipeline: number; 
     customers: number; 
+    feesPending: number;
     stages: Record<string, number> 
   };
 }
@@ -34,7 +35,10 @@ export const StatGrid = memo(function StatGrid({ leads, counts }: StatGridProps)
     },
     {
       label: 'Fees Pending',
-      value: leads.filter(l => l.status !== 'Lost' && l.feesPaid === 'Due').length,
+      value: counts?.feesPending ?? leads.filter(l => {
+        const stage = normalizeStage(l.stage);
+        return ['1:1 scheduled', 'Session complete'].includes(stage) && l.feesPaid === 'Due';
+      }).length,
       icon: IndianRupee,
       color: 'text-red-600',
       bg: 'bg-red-50 dark:bg-red-900/20',

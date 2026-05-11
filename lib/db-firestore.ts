@@ -221,7 +221,7 @@ export async function getAllLeads(
   const leads = snapshot.docs.map(doc => {
     const data = doc.data();
     if (options?.summary) {
-      // Return only essential fields for list view
+      // Return essential fields for list view + all drawer/registration fields
       return {
         id: doc.id,
         name: data.name || '',
@@ -234,6 +234,34 @@ export async function getAllLeads(
         grade: data.grade || '',
         board: data.board || '',
         inquiryDate: data.inquiryDate || '',
+        address: data.address || '',
+        gender: data.gender || '',
+        dob: data.dob || '',
+        school: data.school || '',
+        hobbies: data.hobbies || '',
+        fatherName: data.fatherName || '',
+        fatherPhone: data.fatherPhone || '',
+        fatherEmail: data.fatherEmail || '',
+        fatherOccupation: data.fatherOccupation || '',
+        motherName: data.motherName || '',
+        motherPhone: data.motherPhone || '',
+        motherEmail: data.motherEmail || '',
+        motherOccupation: data.motherOccupation || '',
+        source: data.source || '',
+        comments: data.comments || '',
+        notes: data.notes || '',
+        testLink: data.testLink || '',
+        reportPdfUrl: data.reportPdfUrl || '',
+        feesAmount: data.feesAmount || '',
+        paymentMode: data.paymentMode || '',
+        transactionId: data.transactionId || '',
+        registrationToken: data.registrationToken || '',
+        registrationSid: data.registrationSid || '',
+        calendarEventId: data.calendarEventId || '',
+        appointmentTime: data.appointmentTime || '',
+        communityJoined: data.communityJoined || 'No',
+        communicateViaEmailOnly: data.communicateViaEmailOnly || false,
+        lastStageUpdate: data.lastStageUpdate || '',
       } as Lead;
     }
     return mapDocToLead({ ...data, id: doc.id });

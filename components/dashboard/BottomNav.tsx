@@ -4,20 +4,20 @@ import React from 'react';
 import { 
   LayoutDashboard, 
   Calendar, 
-  Plus
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LeadStage } from '@/lib/types';
 
 interface BottomNavProps {
   activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers';
   setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers') => void;
-  onAddClick: () => void;
+  onSyncContacts: () => void;
+  isSyncing?: boolean;
   pipelineCount?: number;
   customerCount?: number;
 }
 
-export function BottomNav({ activeTab, setActiveTab, onAddClick, pipelineCount, customerCount }: BottomNavProps) {
+export function BottomNav({ activeTab, setActiveTab, onSyncContacts, isSyncing = false, pipelineCount, customerCount }: BottomNavProps) {
   const NavItem = ({ 
     icon: Icon, 
     label, 
@@ -75,9 +75,10 @@ export function BottomNav({ activeTab, setActiveTab, onAddClick, pipelineCount, 
         onClick={() => setActiveTab('today')} 
       />
       <NavItem 
-        icon={Plus} 
-        label="Add Lead" 
-        onClick={onAddClick} 
+        icon={RefreshCw} 
+        label="Sync" 
+        onClick={onSyncContacts}
+        isLoading={isSyncing}
       />
     </nav>
   );

@@ -10,8 +10,6 @@ import {
   Menu, 
   AlertCircle, 
   RefreshCw,
-  Download,
-  Settings,
   Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -194,6 +192,10 @@ export default function Dashboard() {
   };
 
   const closeImportModal = useCallback(() => setIsImportModalOpen(false), []);
+  const openImportFromSettings = useCallback(() => {
+    setIsSettingsOpen(false);
+    setIsImportModalOpen(true);
+  }, []);
   const handleImportSuccess = useCallback(() => {
     setIsImportModalOpen(false);
     fetchLeads();
@@ -310,9 +312,6 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {session?.user?.role === UserRole.Admin && (
-                <Button variant="outline" size="sm" onClick={() => setIsSettingsOpen(true)} className="w-10 h-10 p-0 rounded-xl"><Settings size={18} /></Button>
-              )}
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -325,10 +324,7 @@ export default function Dashboard() {
               </Button>
               {activeTab === 'leads' && (
                 <>
-                  {session?.user?.role === UserRole.Admin && (
-                    <Button variant="outline" size="sm" onClick={() => setIsImportModalOpen(true)} className="h-10 px-4 rounded-xl hidden md:flex gap-2 text-xs font-bold"><Download size={16} />Import Leads</Button>
-                  )}
-                  <Button className="hidden md:flex" onClick={() => setIsAddModalOpen(true)}><Plus size={18} />Add Lead</Button>
+                  <Button className="flex" onClick={() => setIsAddModalOpen(true)}><Plus size={18} /><span className="hidden md:inline">Add Lead</span></Button>
                 </>
               )}
             </div>
@@ -457,7 +453,7 @@ export default function Dashboard() {
         {activeTab === 'analysis' && session?.user?.role === UserRole.Admin && <AnalysisView leads={leads} />}
       </main>
 
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} onAddClick={() => setIsAddModalOpen(true)} pipelineCount={pipelineCount} customerCount={customerCount} />
+      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} onSyncContacts={handleSyncContacts} isSyncing={isSyncing} pipelineCount={pipelineCount} customerCount={customerCount} />
 
       <AnimatePresence>
         {currentLead && (
@@ -468,6 +464,7 @@ export default function Dashboard() {
         {isSettingsOpen && (
           <SettingsModal 
             onClose={() => setIsSettingsOpen(false)} 
+            onImportLeads={openImportFromSettings}
           />
         )}
         {isImportModalOpen && <ImportModal onClose={closeImportModal} onSuccess={handleImportSuccess} />}

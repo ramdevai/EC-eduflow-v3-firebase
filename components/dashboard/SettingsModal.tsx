@@ -24,7 +24,8 @@ import {
     Database,
     History,
     FileCode,
-    Download
+    Download,
+    Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '@/components/ui/Card';
@@ -37,11 +38,12 @@ import { formatBackupTimestamp } from '@/lib/utils';
 
 interface Props {
     onClose: () => void;
+    onImportLeads: () => void;
 }
 
 type Tab = 'general' | 'integrations' | 'staff' | 'utilities';
 
-export const SettingsModal = ({ onClose }: Props) => {
+export const SettingsModal = ({ onClose, onImportLeads }: Props) => {
     const { data: session } = useSession();
     const isAdmin = session?.user?.role === UserRole.Admin;
     const googleRefreshToken = (session?.user as any)?.googleRefreshToken;
@@ -163,6 +165,10 @@ export const SettingsModal = ({ onClose }: Props) => {
 
     const handleExportLeads = () => {
         window.open('/api/admin/export/leads', '_blank');
+    };
+
+    const handleImportLeads = () => {
+        onImportLeads();
     };
 
     const handleDeleteAllLeadData = async () => {
@@ -619,7 +625,15 @@ export const SettingsModal = ({ onClose }: Props) => {
                                         </div>
                                     </div>
                                     
-                                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl">
+                                    <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl space-y-3">
+                                        <Button 
+                                            onClick={handleImportLeads}
+                                            variant="outline"
+                                            className="w-full h-12 rounded-2xl gap-2 hover:bg-primary-50 hover:text-primary-600 hover:border-primary-100 transition-all shadow-sm"
+                                        >
+                                            <Upload size={18} />
+                                            Import Leads
+                                        </Button>
                                         <Button 
                                             onClick={handleExportLeads}
                                             variant="outline"

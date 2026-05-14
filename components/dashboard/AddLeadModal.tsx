@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { motion } from 'motion/react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +20,8 @@ interface AddLeadModalProps {
 }
 
 export const AddLeadModal = memo(function AddLeadModal({ onClose, onAdd, user }: AddLeadModalProps) {
+  const [submitting, setSubmitting] = useState(false);
+
   return (
     <motion.div 
       key="add-modal-backdrop" 
@@ -77,9 +79,11 @@ export const AddLeadModal = memo(function AddLeadModal({ onClose, onAdd, user }:
           };
           
           try {
+            setSubmitting(true);
             await onAdd(initialLeadData);
             onClose();
           } catch (err) { 
+            setSubmitting(false);
             alert('Failed to add lead. Check your permissions.'); 
           }
         }}>
@@ -107,7 +111,9 @@ export const AddLeadModal = memo(function AddLeadModal({ onClose, onAdd, user }:
               </div>
             </div>
           </div>
-          <Button type="submit" className="w-full py-5 text-lg font-black rounded-2xl mt-6">Create Lead Profile</Button>
+          <Button type="submit" disabled={submitting} className="w-full py-5 text-lg font-black rounded-2xl mt-6">
+              {submitting ? 'Creating...' : 'Create Lead Profile'}
+            </Button>
         </form>
       </motion.div>
     </motion.div>

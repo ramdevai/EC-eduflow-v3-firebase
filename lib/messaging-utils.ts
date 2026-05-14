@@ -189,9 +189,9 @@ export function getTestLinkByGrade(grade: string | undefined, board: string | un
     return TEST_LINKS["Secondary (IB/IGCSE)"];
   }
 
-  if (g.includes('2') || g.includes('3') || g.includes('4') || g.includes('5') || g.includes('6') || g.includes('7')) return TEST_LINKS["2nd-7th"];
-  if (g.includes('8') || g.includes('9') || g.includes('10')) return TEST_LINKS["8th-10th"];
   if (g.includes('11') || g.includes('12')) return TEST_LINKS["11th-12th"];
+  if (g.includes('8') || g.includes('9') || g.includes('10')) return TEST_LINKS["8th-10th"];
+  if (g.includes('2') || g.includes('3') || g.includes('4') || g.includes('5') || g.includes('6') || g.includes('7')) return TEST_LINKS["2nd-7th"];
   if (g.includes('grad')) return TEST_LINKS["Graduate"];
   if (g.includes('prof')) return TEST_LINKS["Professional"];
   if (g.includes('business') || g.includes('mba')) return TEST_LINKS["Business Management"];

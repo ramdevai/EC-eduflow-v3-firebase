@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getWhatsAppLink, getEmailLink } from '@/lib/messaging-utils';
+import { getWhatsAppLink, getEmailLink, getTestLinkByGrade } from '@/lib/messaging-utils';
 import { Lead } from '@/lib/types';
 
 describe('messaging utils', () => {
@@ -66,5 +66,49 @@ describe('messaging utils', () => {
     expect(decoded).toContain('mailto:john@example.com');
     expect(decoded).toContain('John Doe - Career Counseling Report');
     expect(decoded).toContain('Dear Parent');
+  });
+});
+
+describe('getTestLinkByGrade', () => {
+  it('should return 2nd-7th test for grade 2', () => {
+    expect(getTestLinkByGrade('2nd', 'CBSE')).toContain('as11');
+  });
+
+  it('should return 8th-10th test for grade 8', () => {
+    expect(getTestLinkByGrade('8th', 'CBSE')).toContain('as12');
+  });
+
+  it('should return 8th-10th test for grade 10', () => {
+    expect(getTestLinkByGrade('10th', 'CBSE')).toContain('as12');
+  });
+
+  it('should return 11th-12th test for grade 11', () => {
+    expect(getTestLinkByGrade('11th', 'CBSE')).toContain('as13');
+  });
+
+  it('should return 11th-12th test for grade 12 (not 2nd-7th)', () => {
+    const link = getTestLinkByGrade('12th', 'CBSE');
+    expect(link).toContain('as13');
+    expect(link).not.toContain('as11');
+  });
+
+  it('should return High School (IBDP/A-level) for IB board with grade 11', () => {
+    expect(getTestLinkByGrade('11th', 'IB')).toContain('as72');
+  });
+
+  it('should return Secondary (IB/IGCSE) for IB board with grade 8', () => {
+    expect(getTestLinkByGrade('8th', 'IGCSE')).toContain('as71');
+  });
+
+  it('should return Graduate for grad keyword', () => {
+    expect(getTestLinkByGrade('Graduate', '')).toContain('as14');
+  });
+
+  it('should return undefined for unrecognized grade', () => {
+    expect(getTestLinkByGrade('unrecognized', 'CBSE')).toBeUndefined();
+  });
+
+  it('should return undefined when grade is undefined', () => {
+    expect(getTestLinkByGrade(undefined, 'CBSE')).toBeUndefined();
   });
 });

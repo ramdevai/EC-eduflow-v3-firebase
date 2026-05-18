@@ -6,6 +6,13 @@ export async function getCalendarClient() {
   return google.calendar({ version: 'v3', auth });
 }
 
+export type CalendarBusySlot = {
+  id?: string;
+  title: string;
+  start: string;
+  end: string;
+};
+
 export async function getAvailability(timeMin: string, timeMax: string) {
   const calendar = await getCalendarClient();
   const response = await calendar.events.list({
@@ -16,7 +23,27 @@ export async function getAvailability(timeMin: string, timeMax: string) {
     orderBy: 'startTime',
   });
 
-  return response.data.items || [];
+  return (response.data.items || []).reduce<CalendarBusySlot[]>((slots, event) => {
+    if (event.status === 'cancelled' || event.transparency === 'transparent') {
+      return slots;
+    }
+
+    const start = event.start?.dateTime || event.start?.date;
+    const end = event.end?.dateTime || event.end?.date;
+
+    if (!start || !end) {
+      return slots;
+    }
+
+    slots.push({
+      id: event.id || undefined,
+      title: event.summary || 'Busy',
+      start,
+      end,
+    });
+
+    return slots;
+  }, []);
 }
 
 export async function upsertCalendarEvent(

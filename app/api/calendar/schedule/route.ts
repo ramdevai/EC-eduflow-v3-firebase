@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { UserRole } from '@/lib/types';
 import { getAllLeads, updateLeads, getSystemSettings } from '@/lib/db-firestore';
-import { upsertCalendarEvent, deleteCalendarEvent } from '@/lib/calendar';
+import { upsertCalendarEvent, deleteCalendarEvent, getAvailability } from '@/lib/calendar';
 
 export async function POST(req: Request) {
   const session = await auth() as any;
@@ -31,11 +31,30 @@ export async function POST(req: Request) {
     }
 
     const settings = await getSystemSettings();
+    const startDate = new Date(startTime);
+    if (Number.isNaN(startDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid startTime' }, { status: 400 });
+    }
+
+    const durationMinutes = settings.defaultSessionDuration || 90;
+    const endTime = new Date(startDate.getTime() + durationMinutes * 60 * 1000).toISOString();
+    const conflicts = await getAvailability(startDate.toISOString(), endTime);
+    const blockingConflicts = conflicts.filter(conflict => {
+      return !lead.calendarEventId || conflict.id !== lead.calendarEventId;
+    });
+
+    if (blockingConflicts.length > 0) {
+      return NextResponse.json(
+        { error: 'Selected slot is no longer available. Please refresh availability and choose another time.' },
+        { status: 409 }
+      );
+    }
+
     const event = await upsertCalendarEvent(
         { name: lead.name, email: lead.email, id: lead.id }, 
         startTime,
         lead.calendarEventId,
-        settings.defaultSessionDuration
+        durationMinutes
     );
 
     // Update lead in Firestore with event info
@@ -52,7 +71,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ 
         success: true, 
         eventId: event.id,
-        meetLink: event.conferenceData?.entryPoints?.[0]?.uri
+        meetLink: event.conferenceData?.entryPoints?.[0]?.uri,
+        htmlLink: event.htmlLink
     });
   } catch (error: any) {
     console.error('Calendar Schedule error:', error);

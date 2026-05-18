@@ -18,6 +18,10 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - NextAuth `MissingSecret` error by configuring `AUTH_SECRET`.
 - NextAuth configuration to support access token persistence for Google API calls.
+- Prevented duplicate lead creation when rapidly clicking the "Create Lead Profile" button by disabling it during submission.
+- Fixed grade-to-test matching logic that incorrectly routed Grade 12 students into the 2nd-7th test bucket due to order-sensitive `includes('2')` check.
+- Prevented duplicate lead creation when rapidly clicking the "Create Lead Profile" button by disabling it during submission.
+- Fixed grade-to-test matching logic that incorrectly routed Grade 12 students into the 2nd-7th test bucket due to order-sensitive `includes('2')` check.
 
 ## [v0.1.0] - 2026-04-09
 ### Added

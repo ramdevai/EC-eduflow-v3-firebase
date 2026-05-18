@@ -73,6 +73,13 @@ interface LeadDrawerProps {
   templates?: any[];
 }
 
+type BusySlot = {
+  id?: string;
+  title: string;
+  start: string;
+  end: string;
+};
+
 export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates }: LeadDrawerProps) {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === UserRole.Admin;
@@ -84,7 +91,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   
   // Slot Picker State
   const [showCalendar, setShowCalendar] = useState(false);
-  const [busySlots, setBusySlots] = useState<any[]>([]);
+  const [busySlots, setBusySlots] = useState<BusySlot[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -92,10 +99,10 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   const [slotAdjustments, setSlotAdjustments] = useState<Record<string, number>>({});
 
   // Scheduling Settings (loaded from admin settings - hardcoded for now to avoid server bundle issues)
-  const systemSettings = {
+  const [systemSettings, setSystemSettings] = useState({
     defaultSessionDuration: 90,
     calendarLookaheadDays: 3,
-  };
+  });
 
   const openEmailComposer = (type: MessageType) => {
     setEmailComposerType(type);
@@ -111,6 +118,23 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
       }
     }
   }, [lead.id, lead.stage, lead.grade, lead.board, lead.testLink, onUpdate]);
+
+  // Fetch system settings from server for accurate slot duration & lookahead
+  React.useEffect(() => {
+    fetch('/api/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data.defaultSessionDuration && data.calendarLookaheadDays) {
+          setSystemSettings({
+            defaultSessionDuration: data.defaultSessionDuration,
+            calendarLookaheadDays: data.calendarLookaheadDays,
+          });
+        }
+      })
+      .catch(() => {
+        // Keep defaults on failure
+      });
+  }, []);
 
   const currentStage = localStage || (normalizeStage(lead.stage) as LeadStage);
   const normalizedCurrentStage = normalizeStage(currentStage);
@@ -138,7 +162,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     }
   };
 
-  const handleSchedule = async (startTime: string) => {
+const handleSchedule = async (startTime: string) => {
     if (isScheduling) return;
     setIsScheduling(true);
     try {
@@ -152,7 +176,10 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      alert('Event scheduled and Meet link generated!');
+      alert(
+        'Event scheduled and Meet link generated!\n\n' +
+        (data.htmlLink ? 'Open in Calendar: ' + data.htmlLink : '')
+      );
       fetchLeads(); // Refresh leads to show updated stage
       setShowCalendar(false);
     } catch (err: any) {
@@ -196,12 +223,17 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId: lead.id, eventId: lead.calendarEventId }),
       });
-      const data = await res.json();
+const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      alert('Booking cancelled!');
-      fetchLeads(); // Refresh leads to reflect state change
+      alert(
+        'Event scheduled and Meet link generated!\n\n' +
+        (data.htmlLink ? 'Open in Calendar: ' + data.htmlLink : '')
+      );
+      fetchLeads();
+      setShowCalendar(false);
+      setSlotAdjustments({}); // Reset adjustments
     } catch (err: any) {
-      alert('Cancellation failed: ' + err.message);
+      alert('Scheduling failed: ' + err.message);
     } finally {
       setIsCancelling(false);
     }
@@ -229,7 +261,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const generateFreeSlots = (busy: any[]) => {
+  const generateFreeSlots = (busy: BusySlot[]) => {
     if (!Array.isArray(busy)) return [];
     const slots = [];
     const now = new Date();
@@ -257,8 +289,8 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
             const slotEndTime = current.getTime() + durationMinutes * 60 * 1000;
 
             const isBusy = busy.some(b => {
-                const busyStartTime = new Date(b.start?.dateTime || b.start?.date || b.start).getTime();
-                const busyEndTime = new Date(b.end?.dateTime || b.end?.date || b.end).getTime();
+                const busyStartTime = new Date(b.start).getTime();
+                const busyEndTime = new Date(b.end).getTime();
                 const slotStart = current.getTime();
                 return (slotStart >= busyStartTime && slotStart < busyEndTime) || 
                        (slotEndTime > busyStartTime && slotStart < busyEndTime);
@@ -308,7 +340,10 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      alert('Event scheduled and Meet link generated!');
+      alert(
+        'Event scheduled and Meet link generated!\n\n' +
+        (data.htmlLink ? 'Open in Calendar: ' + data.htmlLink : '')
+      );
       fetchLeads();
       setShowCalendar(false);
       setSlotAdjustments({}); // Reset adjustments
@@ -421,9 +456,8 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
       // Busy
       ...busySlots.map(slot => ({
         type: 'booked' as const,
-        start: new Date(slot.start?.dateTime || slot.start?.date || slot.start || 0),
-        end: new Date(slot.end?.dateTime || slot.end?.date || slot.end || 0),
-        title: slot.summary || 'Booked',
+        start: new Date(slot.start),
+        end: new Date(slot.end),
         data: slot,
       })),
       // Available (with adjustments)
@@ -493,8 +527,8 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
                           <div className="px-4 py-2 bg-red-100 dark:bg-red-900/80 text-red-600 dark:text-red-300 text-[10px] font-black tracking-widest rounded-2xl">
                             BUSY
                           </div>
-                          <div>
-                            <div className="font-semibold text-red-600 dark:text-red-400 text-sm">Ev2</div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-red-600 dark:text-red-400 text-sm truncate">{slot.data.title || 'Busy'}</div>
                             <div className="text-xs text-red-600/80 dark:text-red-400/80 font-medium">
                               {safeFormat(start, 'h:mm a')} – {safeFormat(end, 'h:mm a')}
                             </div>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { auth } from '@/lib/auth';
 import { UserRole } from '@/lib/types';
+import { assertProductionCloudOperation } from '@/lib/firebase-environment';
 
 /**
  * API to check the status of a long-running Firestore operation.
@@ -10,6 +11,12 @@ export async function GET(req: Request) {
   const session = await auth() as any;
   if (!session?.user?.id || session?.user?.role !== UserRole.Admin) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
+  try {
+    assertProductionCloudOperation('Firestore restore status');
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);

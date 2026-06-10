@@ -76,6 +76,63 @@ Official verification requires a public Privacy Policy, a domain verification, a
 ### 1. Deploy to Vercel
 1. Push this code to a private GitHub repository.
 2. Import the repository into [Vercel](https://vercel.com/).
+
+### Firebase Environment Isolation
+
+Local development and production use deliberately separate Firestore targets.
+
+**Local**
+
+1. Set `NEXT_PUBLIC_APP_ENV=local` in `.env.local`.
+2. Run `npm run dev`.
+3. The command starts Firestore at `127.0.0.1:8080`, seeds synthetic records,
+   and starts Next.js.
+4. Use `npm run db:local:reset` when a clean fixture database is needed.
+
+Local Firebase initialization always uses `demo-eduflow-local`. Even if old
+production Firebase values remain in `.env.local`, local mode ignores them.
+The fixture emails use `example.com` and fixture phone numbers use the reserved
+`202-555-01xx` range.
+
+Google OAuth, Contacts, Calendar, and email are not emulated. Use only the
+dedicated test Google and mail accounts when developing locally.
+
+**Production**
+
+1. Set `NEXT_PUBLIC_APP_ENV=production` in the Vercel Production environment.
+2. Set `NEXT_PUBLIC_FIREBASE_PROJECT_ID=eduflow-689c0`.
+3. Store the matching Firebase service account in
+   `FIREBASE_SERVICE_ACCOUNT_KEY`.
+4. Do not set `FIRESTORE_EMULATOR_HOST` in Vercel.
+
+The application refuses to initialize production Firebase when the project ID
+or service-account project differs from `eduflow-689c0`.
+
+### Firestore Changes and Migrations
+
+Firestore has no automatic local-to-live database synchronization. Local
+documents must never be imported into production.
+
+- Deploy rules and indexes with
+  `npm run firebase:deploy:production`.
+- Register versioned migrations in `migrations/index.mjs`.
+- Preview them with `npm run db:migrate:production:dry-run`.
+- Apply them only after review with
+  `CONFIRM_FIREBASE_PROJECT=eduflow-689c0 npm run db:migrate:production`.
+
+Production migration credentials must be provided in the current shell using
+`GOOGLE_APPLICATION_CREDENTIALS` or `FIREBASE_SERVICE_ACCOUNT_KEY`. Migration
+scripts verify that the service account belongs to `eduflow-689c0`, preserve
+existing values, and record completed migrations in `_migrations`.
+
+Release order:
+
+1. Test the change and migration twice against local fixtures.
+2. Trigger a production backup and wait for it to complete.
+3. Deploy required indexes and wait for them to become ready.
+4. Review the production migration dry-run.
+5. Apply the migration.
+6. Deploy the Vercel application and perform smoke tests.
 3. In the **Environment Variables** section, add the following:
 
 | Key | Description |

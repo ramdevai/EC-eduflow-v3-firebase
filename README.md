@@ -37,11 +37,41 @@ Copy `.env.example` to `.env.local` and fill in the values:
 
 
 ### 4. Run Locally
-1. `npm install`
-2. `npm run dev`
-3. Visit `http://localhost:3000`
+1. Install Java and the Firebase CLI if they are not already available.
+2. Run `npm install`.
+3. Keep `NEXT_PUBLIC_APP_ENV=local` in `.env.local`. Production Firebase
+   credentials are not required locally.
+4. Run `npm run dev`.
+5. Visit `http://localhost:3000`. The Firestore Emulator UI is available at
+   `http://127.0.0.1:4000`.
+
+`npm run dev` starts a fresh Firestore emulator, loads synthetic fixtures, and
+then starts Next.js. It fails instead of falling back to the live database if
+the emulator is unavailable.
+
+Useful local commands:
+
+- `npm run emulators:start`: run the emulator separately.
+- `npm run db:local:reset`: clear and reseed a running emulator.
+- `npm run db:migrate:local:dry-run`: preview pending migrations locally.
+- `npm run db:migrate:local`: apply pending migrations locally.
 
 ## Deployment
 This app is optimized for **Vercel**.
-- Set up the environment variables in the Vercel dashboard.
+- Set `NEXT_PUBLIC_APP_ENV=production` in the Vercel Production environment.
+- Keep the live Firebase variables and service account only in Vercel.
 - Configure the Cron job in `vercel.json` (pointing to `/api/cron/sync-contacts`).
+
+Firestore rules, indexes, and data migrations are separate from the Vercel
+deployment:
+
+1. Trigger a production backup and verify it completed.
+2. Run `npm run db:migrate:production:dry-run` with production credentials.
+3. Deploy rules/indexes using `npm run firebase:deploy:production`.
+4. Apply reviewed migrations using
+   `CONFIRM_FIREBASE_PROJECT=eduflow-689c0 npm run db:migrate:production`.
+5. Deploy the application through Vercel.
+
+Production migrations require either `GOOGLE_APPLICATION_CREDENTIALS` pointing
+to an untracked service-account JSON file or `FIREBASE_SERVICE_ACCOUNT_KEY` in
+the current shell. The credential project must be `eduflow-689c0`.

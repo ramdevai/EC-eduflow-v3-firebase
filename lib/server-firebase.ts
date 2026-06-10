@@ -1,5 +1,9 @@
 import 'server-only';
 import * as admin from 'firebase-admin';
+import {
+  assertServerFirebaseEnvironment,
+  getFirebaseProjectId,
+} from './firebase-environment';
 
 // Cache on globalThis to survive Next.js HMR/module re-evaluation in dev mode
 declare global {
@@ -12,13 +16,19 @@ declare global {
 
 function initializeFirebaseAdmin() {
   if (!admin.apps.length) {
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    const environment = assertServerFirebaseEnvironment();
+
+    if (environment === 'local') {
       admin.initializeApp({
-        credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)),
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        projectId: getFirebaseProjectId(),
       });
     } else {
-      console.warn("FIREBASE_SERVICE_ACCOUNT_KEY not found. Firebase Admin SDK not initialized.");
+      admin.initializeApp({
+        credential: admin.credential.cert(
+          JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY!)
+        ),
+        projectId: getFirebaseProjectId(),
+      });
     }
   }
 }

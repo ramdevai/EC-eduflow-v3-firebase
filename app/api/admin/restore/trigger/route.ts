@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { auth } from '@/lib/auth';
 import { UserRole } from '@/lib/types';
+import { assertProductionCloudOperation } from '@/lib/firebase-environment';
 
 /**
  * API to trigger a Firestore native import (Restore).
@@ -11,6 +12,12 @@ export async function POST(req: Request) {
   const session = await auth() as any;
   if (!session?.user?.id || session?.user?.role !== UserRole.Admin) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
+  try {
+    assertProductionCloudOperation('Firestore restore');
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 403 });
   }
 
   try {

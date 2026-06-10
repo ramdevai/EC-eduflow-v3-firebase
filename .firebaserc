@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "eduflow-689c0"
+    "default": "demo-eduflow-local",
+    "production": "eduflow-689c0"
   }
 }

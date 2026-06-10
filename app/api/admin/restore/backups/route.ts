@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { auth } from '@/lib/auth';
 import { UserRole } from '@/lib/types';
+import { assertProductionCloudOperation } from '@/lib/firebase-environment';
 
 /**
  * API to list available Firestore native backups from GCS.
@@ -11,6 +12,12 @@ export async function GET() {
   const session = await auth() as any;
   if (!session?.user?.id || session?.user?.role !== UserRole.Admin) {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
+  try {
+    assertProductionCloudOperation('Firestore backup listing');
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 403 });
   }
 
   const bucketName = 'educompassfb_crm_backups'; // Strictly use the backup bucket as requested

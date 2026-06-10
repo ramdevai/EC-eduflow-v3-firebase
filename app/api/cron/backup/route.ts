@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import { adminDb } from '@/lib/server-firebase';
 import { format } from 'date-fns';
+import { assertProductionCloudOperation } from '@/lib/firebase-environment';
 
 /**
  * CRON API Route to trigger an automated Firestore backup.
@@ -12,6 +12,12 @@ export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response('Unauthorized', { status: 401 });
+  }
+
+  try {
+    assertProductionCloudOperation('Firestore backup');
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 403 });
   }
 
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;

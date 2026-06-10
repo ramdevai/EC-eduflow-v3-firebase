@@ -55,7 +55,6 @@ export async function GET(
 
     // Return only necessary fields for pre-filling
     return NextResponse.json({
-        name: lead.name,
         phone: lead.phone,
         email: lead.email,
         grade: lead.grade,

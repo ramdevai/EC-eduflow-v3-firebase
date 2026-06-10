@@ -32,6 +32,7 @@ export default function RegistrationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [submittedName, setSubmittedName] = useState('');
   const [formData, setFormData] = useState<any>(null);
 
   useEffect(() => {
@@ -76,6 +77,7 @@ export default function RegistrationPage() {
         const errData = await res.json();
         throw new Error(errData.details || errData.error || 'Submission failed');
       }
+      setSubmittedName(String(data.name || '').trim());
       setSubmitted(true);
     } catch (err: any) {
       console.error('Submission error:', err);
@@ -122,7 +124,7 @@ export default function RegistrationPage() {
             </div>
             <h1 className="text-3xl font-black text-slate-900">Thank You!</h1>
             <p className="text-slate-500 text-sm leading-relaxed">
-              Registration form submitted successfully for <b>{formData.name}</b>. We will contact you soon for the next steps.
+              Registration form submitted successfully for <b>{submittedName}</b>. We will contact you soon for the next steps.
             </p>
             <Button className="w-full h-14 rounded-2xl" onClick={() => window.close()}>
                 Close Window
@@ -160,7 +162,6 @@ export default function RegistrationPage() {
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Full Name</label>
                     <input 
                         name="name" 
-                        defaultValue={formData.name} 
                         required 
                         autoComplete="name"
                         className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" 

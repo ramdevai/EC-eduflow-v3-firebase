@@ -55,7 +55,7 @@ export const ListView = memo(function ListView({ leads, onLeadClick }: ListViewP
             <thead>
               <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
                 <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">#</th>
-                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Student name</th>
+                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Primary Contact</th>
                 <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
                 <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Education</th>
                 <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Date</th>
@@ -121,4 +121,3 @@ export const ListView = memo(function ListView({ leads, onLeadClick }: ListViewP
     </div>
   );
 });
-

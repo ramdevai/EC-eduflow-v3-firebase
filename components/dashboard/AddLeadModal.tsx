@@ -43,7 +43,7 @@ export const AddLeadModal = memo(function AddLeadModal({ onClose, onAdd, user }:
         <div className="flex items-center justify-between mb-8">
           <div>
             <h3 className="text-2xl font-black dark:text-white tracking-tight">New Inquiry</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Add a student to your pipeline.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Add the primary contact for a new inquiry.</p>
           </div>
           <Button variant="ghost" className="rounded-full w-10 h-10 p-0 bg-slate-50 dark:bg-slate-800/50" onClick={onClose}>
             <X size={20} />
@@ -89,15 +89,15 @@ export const AddLeadModal = memo(function AddLeadModal({ onClose, onAdd, user }:
         }}>
           <div className="space-y-4">
             <div className="group">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Full Name</label>
-              <input name="name" required placeholder="Student Name" className="w-full p-4 bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Primary Contact Name</label>
+              <input name="name" required placeholder="Primary contact name" className="w-full p-4 bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
             </div>
             <div className="group">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Contact Number</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Primary Contact Phone</label>
               <input name="phone" required placeholder="+91 00000 00000" className="w-full p-4 bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
             </div>
             <div className="group">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Email Address</label>
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4 mb-1 block">Primary Contact Email</label>
               <input name="email" placeholder="example@mail.com" type="email" className="w-full p-4 bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" />
             </div>
             <div className="grid grid-cols-2 gap-4">

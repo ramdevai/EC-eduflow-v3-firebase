@@ -85,14 +85,17 @@ Local development and production use deliberately separate Firestore targets.
 
 1. Set `NEXT_PUBLIC_APP_ENV=local` in `.env.local`.
 2. Run `npm run dev`.
-3. The command starts Firestore at `127.0.0.1:8080`, seeds synthetic records,
-   and starts Next.js.
+3. The command starts Firestore at `127.0.0.1:8080`, restores saved local
+   emulator data when available, and starts Next.js without reseeding.
 4. Use `npm run db:local:reset` when a clean fixture database is needed.
+
+The emulator exports its data to `.firebase/emulator-data` on shutdown. Use
+`npm run db:local:seed` only when fixtures should be merged explicitly.
 
 Local Firebase initialization always uses `demo-eduflow-local`. Even if old
 production Firebase values remain in `.env.local`, local mode ignores them.
-The fixture emails use `example.com` and fixture phone numbers use the reserved
-`202-555-01xx` range.
+The fixtures use synthetic Indian names, addresses, and `+91 90000...` phone
+numbers. All fixture email addresses use the non-routable `example.com` domain.
 
 Google OAuth, Contacts, Calendar, and email are not emulated. Use only the
 dedicated test Google and mail accounts when developing locally.

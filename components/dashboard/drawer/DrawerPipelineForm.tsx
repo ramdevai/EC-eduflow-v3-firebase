@@ -3,7 +3,6 @@ import { Lead } from '@/lib/types';
 import { safeFormat, toInputFormat } from '@/lib/utils';
 import { Phone, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { normalizeStage } from '@/lib/utils';
 
 interface Props {
   lead: Lead;
@@ -12,9 +11,6 @@ interface Props {
 }
 
 export function DrawerPipelineForm({ lead, onUpdate, stageAge }: Props) {
-  const stage = normalizeStage(lead.stage);
-  const isRegistrationPending = stage === 'New' || stage === 'Registration requested';
-
   return (
     <div className="px-1 pb-4 space-y-4">
       <div className="flex items-center gap-2 mb-2">
@@ -22,10 +18,19 @@ export function DrawerPipelineForm({ lead, onUpdate, stageAge }: Props) {
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Stage Duration: {stageAge} days</p>
       </div>
 
-      {isRegistrationPending && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1 sm:col-span-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 block">Primary Contact Name</label>
+                <input
+                    defaultValue={lead.name}
+                    onBlur={(e) => {
+                        if (e.target.value !== lead.name) onUpdate(lead.id, { name: e.target.value });
+                    }}
+                    className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold outline-none focus:border-primary-500"
+                />
+            </div>
             <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 block">Student Phone</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 block">Primary Contact Phone</label>
                 <div className="flex gap-2">
                     <input 
                         defaultValue={lead.phone} 
@@ -42,7 +47,7 @@ export function DrawerPipelineForm({ lead, onUpdate, stageAge }: Props) {
                 </div>
             </div>
             <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 block">Student Email</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 block">Primary Contact Email</label>
                 <div className="flex gap-2">
                     <input 
                         defaultValue={lead.email} 
@@ -59,7 +64,6 @@ export function DrawerPipelineForm({ lead, onUpdate, stageAge }: Props) {
                 </div>
             </div>
         </div>
-      )}
 
       <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">

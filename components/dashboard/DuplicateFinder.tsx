@@ -130,7 +130,7 @@ export function DuplicateFinder() {
 
     if (selectedSet) {
         const fields = [
-            { key: 'name', label: 'Student Name', icon: User },
+            { key: 'name', label: 'Primary Contact Name', icon: User },
             { key: 'phone', label: 'Phone', icon: Phone },
             { key: 'email', label: 'Email', icon: Mail },
             { key: 'stage', label: 'Stage', icon: Filter },

@@ -27,6 +27,9 @@ const mapDocToLead = (doc: FirebaseFirestore.DocumentData): Lead => {
     name: doc.name,
     phone: doc.phone,
     email: doc.email,
+    studentName: doc.studentName,
+    studentPhone: doc.studentPhone,
+    studentEmail: doc.studentEmail,
     stage: doc.stage,
     status: doc.status,
     inquiryDate: doc.inquiryDate,
@@ -66,6 +69,9 @@ const mapDocToLead = (doc: FirebaseFirestore.DocumentData): Lead => {
     registrationSid: doc.registrationSid,
     calendarEventId: doc.calendarEventId,
     communicateViaEmailOnly: doc.communicateViaEmailOnly,
+    privacy_consent: doc.privacy_consent,
+    privacy_consent_date: doc.privacy_consent_date,
+    primaryContactRecoveredAt: doc.primaryContactRecoveredAt,
   };
 };
 
@@ -76,6 +82,9 @@ const mapLeadToDoc = (lead: Partial<Lead>): LeadDocument => {
     name: lead.name || '',
     phone: lead.phone || '',
     email: lead.email || '',
+    studentName: lead.studentName || '',
+    studentPhone: lead.studentPhone || '',
+    studentEmail: lead.studentEmail || '',
     stage: lead.stage || 'New',
     status: lead.status || 'Open',
     inquiryDate: lead.inquiryDate || safeFormat(new Date()),
@@ -115,6 +124,9 @@ const mapLeadToDoc = (lead: Partial<Lead>): LeadDocument => {
     registrationSid: lead.registrationSid || generateRegistrationSid(),
     calendarEventId: lead.calendarEventId || '',
     communicateViaEmailOnly: lead.communicateViaEmailOnly || false,
+    privacy_consent: lead.privacy_consent || false,
+    privacy_consent_date: lead.privacy_consent_date || '',
+    primaryContactRecoveredAt: lead.primaryContactRecoveredAt || '',
   };
   return doc;
 };
@@ -227,6 +239,9 @@ export async function getAllLeads(
         name: data.name || '',
         phone: data.phone || '',
         email: data.email || '',
+        studentName: data.studentName || '',
+        studentPhone: data.studentPhone || '',
+        studentEmail: data.studentEmail || '',
         stage: data.stage || 'New',
         status: data.status || 'Open',
         feesPaid: data.feesPaid || 'Due',
@@ -262,6 +277,9 @@ export async function getAllLeads(
         communityJoined: data.communityJoined || 'No',
         communicateViaEmailOnly: data.communicateViaEmailOnly || false,
         lastStageUpdate: data.lastStageUpdate || '',
+        privacy_consent: data.privacy_consent || false,
+        privacy_consent_date: data.privacy_consent_date || '',
+        primaryContactRecoveredAt: data.primaryContactRecoveredAt || '',
       } as Lead;
     }
     return mapDocToLead({ ...data, id: doc.id });
@@ -437,8 +455,8 @@ const DEFAULT_TEMPLATES = [
   { id: 'followup', label: 'Follow-up Message', subject: 'Follow-up: Career Counseling Inquiry', message: 'Hi {name}, just checking in regarding your career counseling inquiry. Do you have any questions I can help with?' },
   { id: 'community', label: 'Community Invite', subject: 'Invitation: EduCompass Parents Community', message: "Hi {name}, I'd like to invite you to the EduCompass Parents WhatsApp Community where I share important updates and form filling dates: https://chat.whatsapp.com/example-group-link" },
   { id: 'review', label: 'Google Review Request', subject: 'How was your session? - Feedback Request', message: 'Hi {name}, it was a pleasure counseling you. If you found the session helpful, I\'d really appreciate a quick review on Google: [YOUR_GOOGLE_REVIEW_LINK]' },
-  { id: 'birthday', label: 'Birthday Wish', subject: 'Happy Birthday {name}! 🎂', message: 'Hi {name}, wishing you a very Happy Birthday! 🎂 Hope you have a fantastic day ahead! - Binal from EduCompass' },
-  { id: 'report_email', label: 'Report Email', subject: '{name} - Career Counseling Report', message: "Dear Parent,\n\nPlease find attached the career counseling report for {name}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass" },
+  { id: 'birthday', label: 'Birthday Wish', subject: 'Happy Birthday {studentName}! 🎂', message: 'Hi {name}, please wish {studentName} a very Happy Birthday! 🎂 Hope they have a fantastic day ahead! - Binal from EduCompass' },
+  { id: 'report_email', label: 'Report Email', subject: '{studentName} - Career Counseling Report', message: "Dear Parent,\n\nPlease find attached the career counseling report for {studentName}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass" },
   { id: 'fees_reminder', label: 'Fees Reminder', subject: 'Professional Fees Reminder - EduCompass', message: 'Hi {name}, just a gentle reminder regarding the professional fees for the career counseling session. Please ignore if already paid. Thanks!' },
 ];
 

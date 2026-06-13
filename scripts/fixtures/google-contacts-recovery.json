@@ -1,0 +1,20 @@
+[
+  {
+    "googleContactId": "fixture-google-recoverable",
+    "rawName": "Sunita Desai 010626",
+    "name": "Sunita Desai",
+    "phone": "+91 90000 00601",
+    "email": "sunita.desai@example.com",
+    "biography": "",
+    "organization": ""
+  },
+  {
+    "googleContactId": "fixture-google-partial",
+    "rawName": "Rohan Joshi 020626",
+    "name": "Rohan Joshi",
+    "phone": "",
+    "email": "rohan.joshi@example.com",
+    "biography": "",
+    "organization": ""
+  }
+]

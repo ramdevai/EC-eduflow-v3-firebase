@@ -45,10 +45,10 @@ export function getMessageBody(
             message = `Hi {name}, it was a pleasure counseling you. If you found the session helpful, I\'d really appreciate a quick review on Google: [YOUR_GOOGLE_REVIEW_LINK]`;
             break;
         case 'birthday':
-            message = `Hi {name}, wishing you a very Happy Birthday! 🎂 Hope you have a fantastic day ahead! - Binal from EduCompass`;
+            message = `Hi {name}, please wish {studentName} a very Happy Birthday! 🎂 Hope they have a fantastic day ahead! - Binal from EduCompass`;
             break;
         case 'report_email':
-            message = `Dear Parent,\n\nPlease find attached the career counseling report for {name}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass`;
+            message = `Dear Parent,\n\nPlease find attached the career counseling report for {studentName}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass`;
             break;
     }
   }
@@ -64,6 +64,8 @@ export function getMessageBody(
   message = message
     .replace(/{name}/g, lead.name)
     .replace(/\[name\]/g, lead.name)
+    .replace(/{studentName}/g, lead.studentName || lead.name)
+    .replace(/\[studentName\]/g, lead.studentName || lead.name)
     .replace(/{notes}/g, lead.notes || '[Notes from your session]');
 
   // Smart placeholder replacement based on message type and intent
@@ -145,10 +147,10 @@ export function getEmailData(
           subject = `How was your session? - Feedback Request`;
           break;
       case 'birthday':
-          subject = `Happy Birthday {name}! 🎂`;
+          subject = `Happy Birthday {studentName}! 🎂`;
           break;
       case 'report_email':
-          subject = `{name} - Career Counseling Report`;
+          subject = `{studentName} - Career Counseling Report`;
           break;
     }
   }
@@ -156,14 +158,19 @@ export function getEmailData(
   // Replace placeholders in subject
   subject = subject
     .replace(/{name}/g, lead.name)
-    .replace(/\[name\]/g, lead.name);
+    .replace(/\[name\]/g, lead.name)
+    .replace(/{studentName}/g, lead.studentName || lead.name)
+    .replace(/\[studentName\]/g, lead.studentName || lead.name);
 
   // Collect all valid recipients
-  const recipients = [
-    lead.email,
-    lead.fatherEmail,
-    lead.motherEmail
-  ].filter(Boolean).map(e => e!.trim());
+  const recipientCandidates = type === 'report_email'
+    ? [lead.email, lead.fatherEmail, lead.motherEmail]
+    : [lead.email];
+  const recipients = Array.from(new Map(recipientCandidates
+    .filter(Boolean)
+    .map(email => email!.trim())
+    .filter(Boolean)
+    .map(email => [email.toLowerCase(), email.toLowerCase()] as const)).values());
 
   return { subject, body, recipients };
 }

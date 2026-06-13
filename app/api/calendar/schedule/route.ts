@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     }
 
     const event = await upsertCalendarEvent(
-        { name: lead.name, email: lead.email, id: lead.id }, 
+        { name: lead.name, studentName: lead.studentName, email: lead.email, id: lead.id },
         startTime,
         lead.calendarEventId,
         durationMinutes

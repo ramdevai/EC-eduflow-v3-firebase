@@ -77,7 +77,7 @@ export default function RegistrationPage() {
         const errData = await res.json();
         throw new Error(errData.details || errData.error || 'Submission failed');
       }
-      setSubmittedName(String(data.name || '').trim());
+      setSubmittedName(String(data.studentName || '').trim());
       setSubmitted(true);
     } catch (err: any) {
       console.error('Submission error:', err);
@@ -161,7 +161,7 @@ export default function RegistrationPage() {
                 <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Full Name</label>
                     <input 
-                        name="name" 
+                        name="studentName"
                         required 
                         autoComplete="name"
                         className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" 
@@ -199,8 +199,7 @@ export default function RegistrationPage() {
                 <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Contact Number</label>
                     <input 
-                        name="phone" 
-                        defaultValue={formData.phone} 
+                        name="studentPhone"
                         required 
                         autoComplete="tel"
                         className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" 
@@ -211,8 +210,7 @@ export default function RegistrationPage() {
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Email Address</label>
                     <input 
                         type="email" 
-                        name="email" 
-                        defaultValue={formData.email} 
+                        name="studentEmail"
                         required
                         autoComplete="email"
                         className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" 

@@ -45,13 +45,15 @@ Copy `.env.example` to `.env.local` and fill in the values:
 5. Visit `http://localhost:3000`. The Firestore Emulator UI is available at
    `http://127.0.0.1:4000`.
 
-`npm run dev` starts a fresh Firestore emulator, loads synthetic fixtures, and
-then starts Next.js. It fails instead of falling back to the live database if
-the emulator is unavailable.
+`npm run dev` starts Firestore and Next.js without reseeding. Emulator data is
+saved under `.firebase/emulator-data` on shutdown and restored on the next
+startup. It fails instead of falling back to the live database if the emulator
+is unavailable.
 
 Useful local commands:
 
 - `npm run emulators:start`: run the emulator separately.
+- `npm run db:local:seed`: explicitly merge synthetic fixtures into the emulator.
 - `npm run db:local:reset`: clear and reseed a running emulator.
 - `npm run db:migrate:local:dry-run`: preview pending migrations locally.
 - `npm run db:migrate:local`: apply pending migrations locally.

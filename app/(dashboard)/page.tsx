@@ -222,6 +222,7 @@ export default function Dashboard() {
     return leads.filter(lead => {
       const matchesSearch = !isSearchActive || 
                            lead.name.toLowerCase().includes(query) ||
+                           (lead.studentName || '').toLowerCase().includes(query) ||
                            lead.phone.includes(query) ||
                            (lead.email && lead.email.toLowerCase().includes(query));
 

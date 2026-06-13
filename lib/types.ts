@@ -32,6 +32,9 @@ export interface Lead {
   name: string;
   phone: string;
   email: string;
+  studentName?: string;
+  studentPhone?: string;
+  studentEmail?: string;
   stage: LeadStage;
   status: LeadStatus;
   inquiryDate: string;
@@ -79,6 +82,9 @@ export interface Lead {
   registrationSid?: string;
   calendarEventId?: string;
   communicateViaEmailOnly?: boolean;
+  privacy_consent?: boolean;
+  privacy_consent_date?: string;
+  primaryContactRecoveredAt?: string;
 }
 
 export const TEST_LINKS: Record<string, string> = {

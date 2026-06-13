@@ -102,7 +102,7 @@ export function TodayView({ leads, templates }: TodayViewProps) {
             {birthdaysToday.map((lead) => (
               <Card key={lead.id} className="p-5 border-l-4 border-pink-500 shadow-sm flex items-center justify-between">
                 <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white">{lead.name}</h4>
+                  <h4 className="font-bold text-slate-900 dark:text-white">{lead.studentName || lead.name}</h4>
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Student ID: #{lead.id}</p>
                 </div>
                 <Button size="sm" className="rounded-xl bg-pink-500 hover:bg-pink-600 text-white gap-2 text-xs" onClick={() => birthdayWish(lead)}>

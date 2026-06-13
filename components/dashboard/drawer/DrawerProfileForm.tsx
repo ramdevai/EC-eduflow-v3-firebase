@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Lead } from '@/lib/types';
-import { safeFormat, toInputFormat, cn, normalizeStage, safeParseISO } from '@/lib/utils';
+import { safeFormat, toInputFormat, cn, safeParseISO } from '@/lib/utils';
 import { differenceInYears, isValid } from 'date-fns';
 import { Sparkles, Mail, Phone } from 'lucide-react';
 
@@ -23,9 +23,6 @@ export function DrawerProfileForm({ lead, onUpdate }: Props) {
     onUpdate(lead.id, { communicateViaEmailOnly: newVal });
   };
 
-  const stage = normalizeStage(lead.stage);
-  const isRegistrationDone = stage !== 'New' && stage !== 'Registration requested';
-
   return (
     <div className="space-y-4">
       <div className="p-4 bg-primary-50/50 dark:bg-primary-900/10 border border-primary-100 dark:border-primary-900/20 rounded-2xl flex items-center justify-between">
@@ -47,14 +44,21 @@ export function DrawerProfileForm({ lead, onUpdate }: Props) {
         </button>
       </div>
 
-      {isRegistrationDone && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="group sm:col-span-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Student Name</label>
+                <input
+                    defaultValue={lead.studentName}
+                    onBlur={(e) => { if (e.target.value !== (lead.studentName || '')) onUpdate(lead.id, { studentName: e.target.value }); }}
+                    className="w-full p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all"
+                />
+            </div>
             <div className="group">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Student Phone</label>
                 <div className="relative">
                     <input 
-                        defaultValue={lead.phone} 
-                        onBlur={(e) => { if (e.target.value !== lead.phone) onUpdate(lead.id, { phone: e.target.value }); }} 
+                        defaultValue={lead.studentPhone}
+                        onBlur={(e) => { if (e.target.value !== (lead.studentPhone || '')) onUpdate(lead.id, { studentPhone: e.target.value }); }}
                         className="w-full p-4 pr-12 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all" 
                     />
                     <Phone size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -64,15 +68,14 @@ export function DrawerProfileForm({ lead, onUpdate }: Props) {
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Student Email</label>
                 <div className="relative">
                     <input 
-                        defaultValue={lead.email} 
-                        onBlur={(e) => { if (e.target.value !== lead.email) onUpdate(lead.id, { email: e.target.value }); }} 
+                        defaultValue={lead.studentEmail}
+                        onBlur={(e) => { if (e.target.value !== (lead.studentEmail || '')) onUpdate(lead.id, { studentEmail: e.target.value }); }}
                         className="w-full p-4 pr-12 bg-slate-50 dark:bg-slate-900 rounded-2xl text-sm font-bold border border-slate-200 dark:border-slate-800 focus:border-primary-500 outline-none transition-all" 
                     />
                     <Mail size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                 </div>
             </div>
         </div>
-      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="group">

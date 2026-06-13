@@ -841,7 +841,7 @@ const data = await res.json();
         >
           <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
-              <span className="text-lg font-bold text-slate-900 dark:text-white">Student detail</span>
+              <span className="text-lg font-bold text-slate-900 dark:text-white">Lead Details</span>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={onClose} className="rounded-full w-10 h-10 p-0">
@@ -853,20 +853,16 @@ const data = await res.json();
             <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 pb-24">
               {/* Header Info */}
               <header className="mb-6 space-y-1">
-                <div className="group">
-                    <input 
-                        defaultValue={lead.name} 
-                        onBlur={(e) => {
-                            if (e.target.value !== lead.name) {
-                                onUpdate(lead.id, { name: e.target.value });
-                            }
-                        }}
-                        className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight w-full bg-transparent border-b border-transparent focus:border-primary-500 outline-none transition-all"
-                    />
-                </div>
+                <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight">
+                  {lead.studentName || lead.name}
+                </h1>
                 <p className="text-slate-500 font-bold text-sm">
                    Class {lead.grade || 'N/A'}, {lead.board || 'N/A'}
                 </p>
+                <div className="pt-2 text-xs text-slate-500 space-y-1">
+                  <p><span className="font-black uppercase tracking-wider text-[10px]">Primary Contact:</span> {lead.name}</p>
+                  <p>{lead.phone}{lead.email ? ` | ${lead.email}` : ''}</p>
+                </div>
               </header>
 
               {/* Current Stage Selection */}
@@ -1242,7 +1238,7 @@ const data = await res.json();
 
             {/* Sticky Mobile Actions */}
             <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-slate-950/90 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 flex gap-3 z-[60]">
-               <Button variant="outline" className="w-full h-14 rounded-2xl" onClick={onClose}>Close Student Detail</Button>
+               <Button variant="outline" className="w-full h-14 rounded-2xl" onClick={onClose}>Close Lead Details</Button>
           </div>
         </motion.div>
       </motion.div>

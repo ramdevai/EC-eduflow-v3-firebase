@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getWhatsAppLink, getEmailLink, getTestLinkByGrade } from '@/lib/messaging-utils';
+import { getWhatsAppLink, getEmailData, getEmailLink, getMessageBody, getTestLinkByGrade } from '@/lib/messaging-utils';
 import { Lead } from '@/lib/types';
 
 describe('messaging utils', () => {
@@ -8,6 +8,7 @@ describe('messaging utils', () => {
     name: 'John Doe',
     phone: '9876543210',
     email: 'john@example.com',
+    studentName: 'Jane Doe',
     stage: 'New',
     registrationToken: 'test-token',
     grade: '10th',
@@ -64,8 +65,25 @@ describe('messaging utils', () => {
     const link = getEmailLink(mockLead);
     const decoded = decodeURIComponent(link);
     expect(decoded).toContain('mailto:john@example.com');
-    expect(decoded).toContain('John Doe - Career Counseling Report');
+    expect(decoded).toContain('Jane Doe - Career Counseling Report');
     expect(decoded).toContain('Dear Parent');
+  });
+
+  it('keeps {name} as primary contact and supports {studentName}', () => {
+    const body = getMessageBody(mockLead, 'birthday', [{
+      id: 'birthday',
+      message: 'Hello {name}, birthday wishes for {studentName}.',
+    }]);
+    expect(body).toBe('Hello John Doe, birthday wishes for Jane Doe.');
+  });
+
+  it('normalizes and deduplicates report recipients', () => {
+    const data = getEmailData({
+      ...mockLead,
+      fatherEmail: ' JOHN@example.com ',
+      motherEmail: 'mother@example.com',
+    }, 'report_email');
+    expect(data.recipients).toEqual(['john@example.com', 'mother@example.com']);
   });
 });
 

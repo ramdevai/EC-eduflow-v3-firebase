@@ -13,6 +13,29 @@ export type CalendarBusySlot = {
   end: string;
 };
 
+export function buildCalendarEventBody(
+  lead: { name: string; studentName?: string; email?: string; id: string },
+  startTime: string,
+  durationMinutes: number = 90
+) {
+  const studentName = lead.studentName || lead.name;
+  const endTime = new Date(new Date(startTime).getTime() + durationMinutes * 60 * 1000).toISOString();
+
+  return {
+    summary: `1:1 Career Counseling: ${studentName}`,
+    description: `Career counseling session for student ID: ${lead.id}`,
+    start: { dateTime: startTime },
+    end: { dateTime: endTime },
+    attendees: lead.email ? [{ email: lead.email }] : [],
+    conferenceData: {
+      createRequest: {
+        requestId: `educompass-${lead.id}-${Date.now()}`,
+        conferenceSolutionKey: { type: 'hangoutsMeet' },
+      },
+    },
+  };
+}
+
 export async function getAvailability(timeMin: string, timeMax: string) {
   const calendar = await getCalendarClient();
   const response = await calendar.events.list({
@@ -47,27 +70,13 @@ export async function getAvailability(timeMin: string, timeMax: string) {
 }
 
 export async function upsertCalendarEvent(
-  lead: { name: string; email?: string; id: string },
+  lead: { name: string; studentName?: string; email?: string; id: string },
   startTime: string,
   eventId?: string,
   durationMinutes: number = 90
 ) {
   const calendar = await getCalendarClient();
-  const endTime = new Date(new Date(startTime).getTime() + durationMinutes * 60 * 1000).toISOString();
-
-  const eventBody = {
-    summary: `1:1 Career Counseling: ${lead.name}`,
-    description: `Career counseling session for student ID: ${lead.id}`,
-    start: { dateTime: startTime },
-    end: { dateTime: endTime },
-    attendees: lead.email ? [{ email: lead.email }] : [],
-    conferenceData: {
-      createRequest: {
-        requestId: `educompass-${lead.id}-${Date.now()}`,
-        conferenceSolutionKey: { type: 'hangoutsMeet' },
-      },
-    },
-  };
+  const eventBody = buildCalendarEventBody(lead, startTime, durationMinutes);
 
   if (eventId) {
     const response = await calendar.events.update({

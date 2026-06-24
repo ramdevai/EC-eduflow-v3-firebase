@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { parseISO, isValid, format, parse } from 'date-fns';
+import type { Lead } from './types';
 
 const REGISTRATION_TOKEN_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
 const REGISTRATION_SID_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -108,7 +109,8 @@ export function normalizeStage(stage: string): string {
     '1:1 scheduled': '1:1 scheduled',
     '1:1 complete': 'Session complete',
     'session complete': 'Session complete',
-    'report sent': 'Report sent'
+    'report sent': 'Report sent',
+    'lost': 'Lost'
   };
 
   return map[s] || stage;
@@ -122,7 +124,22 @@ export function computeLeadStatus(stage: string, providedStatus?: string): 'Open
   if (normalized === 'Session complete' || normalized === 'Report sent') {
     return 'Won';
   }
+  if (normalized === 'Lost') {
+    return 'Lost';
+  }
   return 'Open';
+}
+
+export function isLostLead(lead: Pick<Lead, 'stage' | 'status'>): boolean {
+  return lead.status === 'Lost' || normalizeStage(lead.stage) === 'Lost';
+}
+
+export function isCustomerLead(lead: Pick<Lead, 'stage' | 'status'>): boolean {
+  return !isLostLead(lead) && normalizeStage(lead.stage) === 'Report sent';
+}
+
+export function isActivePipelineLead(lead: Pick<Lead, 'stage' | 'status'>): boolean {
+  return !isLostLead(lead) && !isCustomerLead(lead);
 }
 
 function getSecureRandomString(length: number, chars: string): string {

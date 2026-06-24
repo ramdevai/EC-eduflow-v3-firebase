@@ -34,34 +34,35 @@ To support a single-consultant workflow where Staff can manage the consultant's 
 
 ## Lead Identification Logic (Date Suffix)
 
-The system identifies "Leads" based on a specific naming convention used by the consultant. A contact is only imported if it contains a **6-digit date suffix** (DDMMYY).
+The system identifies "Leads" based on a specific naming convention used by the consultant. A contact is only imported if one of the checked fields ends with a **6-digit date suffix** (`DDMMYY`).
 
-### 1. Keyword Filtering
-The system searches for the `DDMMYY` pattern (e.g., `150426` for April 15, 2026) in:
+### 1. Date Suffix Filtering
+The system searches for the `DDMMYY` pattern (e.g., `150426` for April 15, 2026) at the end of:
 -   **Display Name** (e.g., "Rahul 150426")
 -   **Biography/Notes**
 -   **Organization Name**
 
+The current implementation does not use `[lead]`, `lead`, labels, fuzzy matching, or "Other Contacts" for lead detection.
+
 ### 2. Name Cleaning
-During import, the date suffix is stripped to keep the lead name clean in the CRM.
+During import, a date suffix is stripped from the Google display name to keep the lead name clean in the CRM.
 -   **Example**: "Rahul 150426" becomes "Rahul" in Firestore.
 
 ---
 
 ## Duplicate Check & Conflict Resolution
 
-The system uses a multi-layered check to prevent duplicates:
+The system uses the stored Google Contact ID to prevent duplicates:
 
-1.  **Google Contact ID**: Primary unique identifier (`resourceName`).
-2.  **Phone Number**: Normalized (digits only) comparison of the last 10 digits.
+1.  **Google Contact ID**: Primary unique identifier from the contact metadata source ID.
+2.  **Phone Number**: Not used for duplicate detection in the Google Contacts sync path.
 
 ### Conflict Resolution Table
 | Scenario | Action |
 | :--- | :--- |
-| **New Identifier** | Lead is added as a new entry in Firestore. |
-| **Existing ID/Phone** | The entry is considered a duplicate and skipped for creation. |
-| **Manual Sync Update** | If data has changed (phone, email) during a manual sync, the existing lead is **updated**. |
-| **Cron Sync Update** | Background sync **skips** existing leads to prevent accidental overwrites. |
+| **New Google Contact ID** | Lead is added as a new entry in Firestore. |
+| **Existing Google Contact ID, manual sync** | If name, email, or phone changed, the existing lead is updated. |
+| **Existing Google Contact ID, cron sync** | Existing lead is skipped to prevent accidental overwrites. |
 
 ---
 
@@ -73,5 +74,10 @@ The system uses a multi-layered check to prevent duplicates:
     -   `https://www.googleapis.com/auth/calendar` (Required for shared calendar operations)
 -   **Payload**: The system fetches `names`, `emailAddresses`, `phoneNumbers`, `biographies`, and `organizations`.
 -   **Quantity Limits**:
-    -   **Manual**: Processes top 10 most recently modified contacts for speed.
-    -   **Cron**: Processes top 100 contacts to ensure no leads are missed during off-hours.
+    -   **Manual**: Checks the top 10 most recently modified contacts for speed.
+    -   **Cron**: Checks the top 100 most recently modified contacts during off-hours.
+-   **Stored Field Truncation**:
+    -   The sync does not truncate stored lead fields by character length.
+    -   The phone value is saved as the raw Google Contacts phone value.
+    -   Email is lowercased before saving.
+    -   UI text truncation is visual only and does not alter stored Firestore data.

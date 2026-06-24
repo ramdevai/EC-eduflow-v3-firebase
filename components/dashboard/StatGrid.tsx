@@ -2,7 +2,7 @@ import React, { memo } from 'react';
 import { UserPlus, CheckCircle2, IndianRupee, Users } from 'lucide-react';
 import { Lead } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
-import { normalizeStage } from '@/lib/utils';
+import { isActivePipelineLead, isCustomerLead, isLostLead, normalizeStage } from '@/lib/utils';
 
 interface StatGridProps {
   leads: Lead[];
@@ -18,17 +18,14 @@ export const StatGrid = memo(function StatGrid({ leads, counts }: StatGridProps)
   const stats = [
     {
       label: 'Active Leads',
-      value: counts?.pipeline ?? leads.filter(l => {
-        const stage = normalizeStage(l.stage);
-        return stage !== 'Report sent' && stage !== 'Lost';
-      }).length,
+      value: counts?.pipeline ?? leads.filter(isActivePipelineLead).length,
       icon: UserPlus,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50 dark:bg-emerald-900/20',
     },
     {
       label: 'New Inquiries',
-      value: counts?.stages?.['New'] ?? leads.filter(l => normalizeStage(l.stage) === 'New').length,
+      value: counts?.stages?.['New'] ?? leads.filter(l => !isLostLead(l) && normalizeStage(l.stage) === 'New').length,
       icon: CheckCircle2,
       color: 'text-amber-600',
       bg: 'bg-amber-50 dark:bg-amber-900/20',
@@ -37,7 +34,7 @@ export const StatGrid = memo(function StatGrid({ leads, counts }: StatGridProps)
       label: 'Fees Pending',
       value: counts?.feesPending ?? leads.filter(l => {
         const stage = normalizeStage(l.stage);
-        return ['1:1 scheduled', 'Session complete'].includes(stage) && l.feesPaid === 'Due';
+        return !isLostLead(l) && ['1:1 scheduled', 'Session complete'].includes(stage) && l.feesPaid === 'Due';
       }).length,
       icon: IndianRupee,
       color: 'text-red-600',
@@ -45,7 +42,7 @@ export const StatGrid = memo(function StatGrid({ leads, counts }: StatGridProps)
     },
     {
       label: 'Total Customers',
-      value: counts?.customers ?? leads.filter(l => normalizeStage(l.stage) === 'Report sent').length,
+      value: counts?.customers ?? leads.filter(isCustomerLead).length,
       icon: Users,
       color: 'text-blue-600',
       bg: 'bg-blue-50 dark:bg-blue-900/20',

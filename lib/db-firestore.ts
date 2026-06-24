@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { Lead, LeadStage, LeadStatus, FeesPaidStatus, CommunityJoinedStatus, UserRole, SystemSettings, DEFAULT_SYSTEM_SETTINGS } from './types';
-import { generateRegistrationSid, generateRegistrationToken, safeFormat } from './utils';
+import { generateRegistrationSid, generateRegistrationToken, isLostLead, safeFormat } from './utils';
 import { adminDb } from './server-firebase';
 
 const LEADS_COLLECTION = 'leads';
@@ -154,33 +154,48 @@ export async function getLeadCounts(callerUid: string, role: UserRole): Promise<
   }
 
   const STAGES: LeadStage[] = [
-    'New', 'Registration requested', 'Registration done', 'Test sent', 'Test completed', 
-    '1:1 scheduled', 'Session complete', 'Report sent', 'Lost'
+    'New', 'Registration requested', 'Registration done', 'Test sent', 'Test completed',
+    '1:1 scheduled', 'Session complete', 'Report sent'
   ];
 
-  // Fetch counts for all stages in parallel
-  const [snapshots, feesPendingSnapshots] = await Promise.all([
+  // Fetch counts for all stages in parallel. Lost is a status, so stage counts
+  // subtract leads marked Lost while preserving the stage where they dropped.
+  const [stageSnapshots, lostStageSnapshots, legacyLostSnapshot, feesPendingSnapshots, lostFeesPendingSnapshots] = await Promise.all([
     Promise.all(STAGES.map(stage => baseQuery.where('stage', '==', stage).count().get())),
+    Promise.all(STAGES.map(stage => baseQuery.where('stage', '==', stage).where('status', '==', 'Lost').count().get())),
+    baseQuery.where('stage', '==', 'Lost').count().get(),
     Promise.all(
       (['1:1 scheduled', 'Session complete'] as LeadStage[]).map(stage =>
         baseQuery.where('stage', '==', stage).where('feesPaid', '==', 'Due').count().get()
+      )
+    ),
+    Promise.all(
+      (['1:1 scheduled', 'Session complete'] as LeadStage[]).map(stage =>
+        baseQuery.where('stage', '==', stage).where('feesPaid', '==', 'Due').where('status', '==', 'Lost').count().get()
       )
     ),
   ]);
 
   const stageCounts: Record<string, number> = {};
   STAGES.forEach((stage, i) => {
-    stageCounts[stage] = snapshots[i].data().count;
+    const totalAtStage = stageSnapshots[i].data().count;
+    const lostAtStage = lostStageSnapshots[i].data().count;
+    stageCounts[stage] = Math.max(totalAtStage - lostAtStage, 0);
   });
+  stageCounts['Lost'] = legacyLostSnapshot.data().count;
 
   const pipeline = STAGES
-    .filter(s => s !== 'Lost' && s !== 'Report sent')
+    .filter(s => s !== 'Report sent')
     .reduce((sum, s) => sum + stageCounts[s], 0);
 
   return {
     pipeline,
     customers: stageCounts['Report sent'] || 0,
-    feesPending: feesPendingSnapshots.reduce((sum, snapshot) => sum + snapshot.data().count, 0),
+    feesPending: Math.max(
+      feesPendingSnapshots.reduce((sum, snapshot) => sum + snapshot.data().count, 0) -
+        lostFeesPendingSnapshots.reduce((sum, snapshot) => sum + snapshot.data().count, 0),
+      0
+    ),
     stages: stageCounts,
   };
 }
@@ -207,7 +222,70 @@ export async function getAllLeads(
     // to avoid a complex composite index requirement.
     leadsRef = leadsRef.where('stage', '==', 'Report sent');
   } else if (options?.category === 'lost') {
-    leadsRef = leadsRef.where('stage', '==', 'Lost');
+    const [statusLostSnapshot, legacyStageLostSnapshot] = await Promise.all([
+      leadsRef.where('status', '==', 'Lost').get(),
+      leadsRef.where('stage', '==', 'Lost').get(),
+    ]);
+
+    const docsById = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+    statusLostSnapshot.docs.forEach(doc => docsById.set(doc.id, doc));
+    legacyStageLostSnapshot.docs.forEach(doc => docsById.set(doc.id, doc));
+
+    const leads = Array.from(docsById.values()).map(doc => {
+      const data = doc.data();
+      if (options?.summary) {
+        return {
+          id: doc.id,
+          name: data.name || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          studentName: data.studentName || '',
+          studentPhone: data.studentPhone || '',
+          studentEmail: data.studentEmail || '',
+          stage: data.stage || 'New',
+          status: data.status || 'Open',
+          feesPaid: data.feesPaid || 'Due',
+          updatedAt: data.updatedAt || '',
+          grade: data.grade || '',
+          board: data.board || '',
+          inquiryDate: data.inquiryDate || '',
+          address: data.address || '',
+          gender: data.gender || '',
+          dob: data.dob || '',
+          school: data.school || '',
+          hobbies: data.hobbies || '',
+          fatherName: data.fatherName || '',
+          fatherPhone: data.fatherPhone || '',
+          fatherEmail: data.fatherEmail || '',
+          fatherOccupation: data.fatherOccupation || '',
+          motherName: data.motherName || '',
+          motherPhone: data.motherPhone || '',
+          motherEmail: data.motherEmail || '',
+          motherOccupation: data.motherOccupation || '',
+          source: data.source || '',
+          comments: data.comments || '',
+          notes: data.notes || '',
+          testLink: data.testLink || '',
+          reportPdfUrl: data.reportPdfUrl || '',
+          feesAmount: data.feesAmount || '',
+          paymentMode: data.paymentMode || '',
+          transactionId: data.transactionId || '',
+          registrationToken: data.registrationToken || '',
+          registrationSid: data.registrationSid || '',
+          calendarEventId: data.calendarEventId || '',
+          appointmentTime: data.appointmentTime || '',
+          communityJoined: data.communityJoined || 'No',
+          communicateViaEmailOnly: data.communicateViaEmailOnly || false,
+          lastStageUpdate: data.lastStageUpdate || '',
+          privacy_consent: data.privacy_consent || false,
+          privacy_consent_date: data.privacy_consent_date || '',
+          primaryContactRecoveredAt: data.primaryContactRecoveredAt || '',
+        } as Lead;
+      }
+      return mapDocToLead({ ...data, id: doc.id });
+    });
+
+    return leads.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
   } else {
     // Default fallback ordering
     leadsRef = leadsRef.orderBy('updatedAt', 'desc');
@@ -230,7 +308,7 @@ export async function getAllLeads(
   }
 
   const snapshot = await leadsRef.get();
-  const leads = snapshot.docs.map(doc => {
+  let leads = snapshot.docs.map(doc => {
     const data = doc.data();
     if (options?.summary) {
       // Return essential fields for list view + all drawer/registration fields
@@ -284,6 +362,12 @@ export async function getAllLeads(
     }
     return mapDocToLead({ ...data, id: doc.id });
   });
+
+  if (options?.category === 'pipeline') {
+    leads = leads.filter(lead => !isLostLead(lead));
+  } else if (options?.category === 'customers') {
+    leads = leads.filter(lead => !isLostLead(lead));
+  }
 
   // Performance optimization: Sort in JS for categories that would otherwise require complex indexes
   if (options?.category === 'pipeline' || options?.category === 'customers') {

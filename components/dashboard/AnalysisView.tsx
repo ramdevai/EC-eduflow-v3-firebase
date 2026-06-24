@@ -13,11 +13,11 @@ import {
   Activity,
   ArrowDown
 } from 'lucide-react';
-import { Lead, LeadStage } from '@/lib/types';
+import { Lead } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { cn, normalizeStage, safeParseISO, safeFormat } from '@/lib/utils';
+import { cn, isActivePipelineLead, isLostLead, normalizeStage, safeParseISO, safeFormat } from '@/lib/utils';
 import { motion } from 'motion/react';
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
 
@@ -43,9 +43,9 @@ export const AnalysisView = memo(function AnalysisView({ leads }: AnalysisViewPr
     const total = leads.length;
     if (total === 0) return null;
 
-    const lostLeads = leads.filter(l => l.status === 'Lost');
-    const wonLeads = leads.filter(l => l.status === 'Won' || l.stage === 'Report sent');
-    const activeLeads = leads.filter(l => l.status === 'Open' && l.stage !== 'Report sent' && l.stage !== 'Lost');
+    const lostLeads = leads.filter(isLostLead);
+    const wonLeads = leads.filter(l => !isLostLead(l) && (l.status === 'Won' || l.stage === 'Report sent'));
+    const activeLeads = leads.filter(l => l.status === 'Open' && isActivePipelineLead(l));
     
     // Funnel Data Calculation
     const funnelData = STAGE_ORDER.map((groupName, index) => {
@@ -411,4 +411,3 @@ export const AnalysisView = memo(function AnalysisView({ leads }: AnalysisViewPr
     </div>
   );
 });
-

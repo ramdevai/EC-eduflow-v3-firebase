@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSession } from "next-auth/react";
 import { Lead } from '@/lib/types';
 import { differenceInDays } from 'date-fns';
-import { normalizeStage, safeParseISO, safeFormat } from '@/lib/utils';
+import { isActivePipelineLead, isCustomerLead, isLostLead, normalizeStage, safeParseISO, safeFormat } from '@/lib/utils';
 
-const isFeesPendingLead = (lead: Pick<Lead, 'stage' | 'feesPaid'>) => {
+const isFeesPendingLead = (lead: Pick<Lead, 'stage' | 'status' | 'feesPaid'>) => {
+  if (isLostLead(lead)) return false;
   const stage = normalizeStage(lead.stage);
   return ['1:1 scheduled', 'Session complete'].includes(stage) && lead.feesPaid === 'Due';
 };
@@ -31,6 +32,8 @@ export function useLeads() {
   const [hasMoreCustomers, setHasMoreCustomers] = useState(true);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const lastCustomerIdRef = useRef<string | null>(null);
+  const [allLeadsLoaded, setAllLeadsLoaded] = useState(false);
+  const allLeadsFetchRef = useRef<Promise<void> | null>(null);
 
   const fetchLeads = useCallback(async () => {
     if (!session?.user?.id || !session?.user?.role || isFetchingRef.current) return;
@@ -49,6 +52,7 @@ export function useLeads() {
       
       if (data.leads && Array.isArray(data.leads)) {
         setLeads(data.leads);
+        setAllLeadsLoaded(false);
         setCounts(data.counts || { pipeline: 0, customers: 0, feesPending: 0, stages: {} });
       }
     } catch (err: any) {
@@ -59,6 +63,36 @@ export function useLeads() {
       isFetchingRef.current = false;
     }
   }, [session?.user?.id, session?.user?.role]);
+
+  const fetchAllLeadsForSearch = useCallback(async () => {
+    if (!session?.user?.id || !session?.user?.role || allLeadsLoaded) return;
+    if (allLeadsFetchRef.current) return allLeadsFetchRef.current;
+
+    const request = (async () => {
+      try {
+        const res = await fetch('/api/leads?summary=true');
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Failed to load all searchable leads');
+        }
+
+        const data = await res.json();
+        if (Array.isArray(data.leads)) {
+          setLeads(data.leads);
+          setAllLeadsLoaded(true);
+          setCounts(data.counts || { pipeline: 0, customers: 0, feesPending: 0, stages: {} });
+        }
+      } catch (err: any) {
+        console.error('Fetch all searchable leads error:', err);
+        setError(err.message);
+      } finally {
+        allLeadsFetchRef.current = null;
+      }
+    })();
+
+    allLeadsFetchRef.current = request;
+    return request;
+  }, [session?.user?.id, session?.user?.role, allLeadsLoaded]);
 
   const fetchCustomers = useCallback(async (reset = false) => {
     if (!session?.user?.id || loadingCustomers || (!hasMoreCustomers && !reset)) return;
@@ -79,7 +113,7 @@ export function useLeads() {
       const allCustomers = data.leads || [];
       
       // Replace existing customers in local state to avoid duplication
-      setLeads(prev => [...prev.filter(l => normalizeStage(l.stage) !== 'Report sent'), ...allCustomers]);
+      setLeads(prev => [...prev.filter(l => !isCustomerLead(l)), ...allCustomers]);
 
       // Since we fetch all at once, there's no "more" to load
       setHasMoreCustomers(false);
@@ -90,6 +124,26 @@ export function useLeads() {
       setLoadingCustomers(false);
     }
   }, [session?.user?.id, loadingCustomers, hasMoreCustomers]);
+
+  const fetchLostLeads = useCallback(async () => {
+    if (!session?.user?.id || !session?.user?.role) return;
+
+    try {
+      const res = await fetch('/api/leads?category=lost&summary=true');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch lost leads');
+      }
+
+      const data = await res.json();
+      const lostLeads = data.leads || [];
+      setLeads(prev => [...prev.filter(l => !isLostLead(l)), ...lostLeads]);
+      setCounts(data.counts || { pipeline: 0, customers: 0, feesPending: 0, stages: {} });
+    } catch (err: any) {
+      console.error('Fetch Lost Leads Error:', err);
+      setError(err.message);
+    }
+  }, [session?.user?.id, session?.user?.role]);
 
   const fetchTemplates = useCallback(async () => {
     if (!session?.user?.id) return;
@@ -115,6 +169,7 @@ export function useLeads() {
 
   const reminders = useMemo(() => {
     return leads.filter(lead => {
+      if (isLostLead(lead)) return false;
       const stage = normalizeStage(lead.stage);
       const isFeesReminder = ['Test completed', '1:1 scheduled', 'Session complete', 'Report sent'].includes(stage) && lead.feesPaid === 'Due';
       const isStageReminder = 
@@ -148,27 +203,31 @@ export function useLeads() {
     const previousLeads = [...leads];
     const previousCounts = { ...counts };
     
-    // Calculate count changes if stage or fee status changed
-    if (finalUpdates.stage || finalUpdates.feesPaid) {
+    // Calculate count changes if stage, lost/won status, or fee status changed
+    if (finalUpdates.stage || finalUpdates.status || finalUpdates.feesPaid) {
       setCounts(prev => {
         const next = { ...prev, stages: { ...prev.stages } };
         const oldStage = normalizeStage(existingLead.stage);
         const nextLead = { ...existingLead, ...finalUpdates };
         const newStage = normalizeStage(nextLead.stage);
+        const wasPipeline = isActivePipelineLead(existingLead);
+        const isPipeline = isActivePipelineLead(nextLead);
+        const wasCustomer = isCustomerLead(existingLead);
+        const isCustomer = isCustomerLead(nextLead);
+        const countedOldStage = !isLostLead(existingLead);
+        const countedNewStage = !isLostLead(nextLead);
         
-        if (oldStage !== newStage) {
-          // Decrement old category
-          if (oldStage === 'Report sent') next.customers--;
-          else if (oldStage !== 'Lost') next.pipeline--;
-          
-          if (next.stages[oldStage] !== undefined) next.stages[oldStage]--;
+        if (wasCustomer !== isCustomer) next.customers += isCustomer ? 1 : -1;
+        if (wasPipeline !== isPipeline) next.pipeline += isPipeline ? 1 : -1;
 
-          // Increment new category
-          if (newStage === 'Report sent') next.customers++;
-          else if (newStage !== 'Lost') next.pipeline++;
-
-          if (next.stages[newStage] !== undefined) next.stages[newStage]++;
-          else next.stages[newStage] = 1;
+        if (oldStage !== newStage || countedOldStage !== countedNewStage) {
+          if (countedOldStage) {
+            if (next.stages[oldStage] !== undefined) next.stages[oldStage]--;
+          }
+          if (countedNewStage) {
+            if (next.stages[newStage] !== undefined) next.stages[newStage]++;
+            else next.stages[newStage] = 1;
+          }
         }
 
         const wasFeesPending = isFeesPendingLead(existingLead);
@@ -216,10 +275,10 @@ export function useLeads() {
     setCounts(prev => {
       const next = { ...prev, stages: { ...prev.stages } };
       const stage = normalizeStage(leadToDelete.stage);
-      if (stage === 'Report sent') next.customers--;
-      else if (stage !== 'Lost') next.pipeline--;
+      if (isCustomerLead(leadToDelete)) next.customers--;
+      else if (isActivePipelineLead(leadToDelete)) next.pipeline--;
       
-      if (next.stages[stage] !== undefined) next.stages[stage]--;
+      if (!isLostLead(leadToDelete) && next.stages[stage] !== undefined) next.stages[stage]--;
       if (isFeesPendingLead(leadToDelete)) next.feesPending--;
       return next;
     });
@@ -261,11 +320,13 @@ export function useLeads() {
       setCounts(prev => {
         const next = { ...prev, stages: { ...prev.stages } };
         const stage = normalizeStage(createdLead.stage);
-        if (stage === 'Report sent') next.customers++;
-        else if (stage !== 'Lost') next.pipeline++;
+        if (isCustomerLead(createdLead)) next.customers++;
+        else if (isActivePipelineLead(createdLead)) next.pipeline++;
 
-        if (next.stages[stage] !== undefined) next.stages[stage]++;
-        else next.stages[stage] = 1;
+        if (!isLostLead(createdLead)) {
+          if (next.stages[stage] !== undefined) next.stages[stage]++;
+          else next.stages[stage] = 1;
+        }
         if (isFeesPendingLead(createdLead)) next.feesPending++;
         return next;
       });
@@ -286,6 +347,8 @@ export function useLeads() {
     loadingCustomers,
     fetchLeads,
     fetchCustomers,
+    fetchLostLeads,
+    fetchAllLeadsForSearch,
     fetchTemplates,
     updateLead,
     deleteLead,

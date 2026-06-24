@@ -15,16 +15,15 @@ import {
   PieChart,
   Target
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { normalizeStage, safeFormat } from '@/lib/utils';
+import { isLostLead, safeFormat } from '@/lib/utils';
 
 interface LostLeadsViewProps {
   leads: Lead[];
-  updateLead: (id: string, updates: Partial<Lead>) => void;
+  updateLead: (id: string, updates: Partial<Lead>) => void | Promise<void>;
 }
 
 export function LostLeadsView({ leads, updateLead }: LostLeadsViewProps) {
-  const lostLeads = useMemo(() => leads.filter(l => l.status === 'Lost'), [leads]);
+  const lostLeads = useMemo(() => leads.filter(isLostLead), [leads]);
   
   const analytics = useMemo(() => {
     const total = leads.length;
@@ -56,10 +55,6 @@ export function LostLeadsView({ leads, updateLead }: LostLeadsViewProps) {
 
   const handleRestore = (id: string) => {
     updateLead(id, { status: 'Open' });
-  };
-
-  const handleMarkWon = (id: string) => {
-    updateLead(id, { status: 'Won' });
   };
 
   return (
@@ -163,14 +158,6 @@ export function LostLeadsView({ leads, updateLead }: LostLeadsViewProps) {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-8 px-3 rounded-lg text-[10px] font-bold gap-2 text-emerald-600 border-emerald-100 hover:bg-emerald-50"
-                        onClick={() => handleMarkWon(lead.id)}
-                      >
-                        Mark Won
-                      </Button>
                       <Button 
                         variant="outline" 
                         size="sm" 

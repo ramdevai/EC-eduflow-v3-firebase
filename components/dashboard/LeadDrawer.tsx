@@ -66,7 +66,7 @@ const TEST_OPTIONS = [
 interface LeadDrawerProps {
   lead: Lead;
   onClose: () => void;
-  onUpdate: (id: string, updates: Partial<Lead>) => void;
+  onUpdate: (id: string, updates: Partial<Lead>) => void | Promise<void>;
   onDelete: (id: string) => void;
   fetchLeads: () => void;
   stages: LeadStage[];
@@ -1208,10 +1208,14 @@ const data = await res.json();
                   <Button 
                       variant="outline" 
                       className="w-full h-12 rounded-xl gap-3 text-xs font-bold text-red-500 border-red-100 dark:border-red-900/20 hover:bg-red-50 dark:hover:bg-red-900/10" 
-                      onClick={() => {
+                      onClick={async () => {
                           if (confirm('Mark this lead as Lost?')) {
-                              onUpdate(lead.id, { status: 'Lost' });
+                            try {
+                              await onUpdate(lead.id, { status: 'Lost' });
                               onClose();
+                            } catch (err: any) {
+                              alert(err?.message || 'Failed to mark lead as lost');
+                            }
                           }
                       }}
                   >

@@ -3,7 +3,7 @@
 import React, { memo, useMemo } from 'react';
 import { Lead, LeadStage } from '@/lib/types';
 import { LeadCard } from './LeadCard';
-import { normalizeStage } from '@/lib/utils';
+import { isLostLead, normalizeStage } from '@/lib/utils';
 
 interface KanbanViewProps {
   leads: Lead[];
@@ -26,7 +26,7 @@ export const KanbanView = memo(function KanbanView({ leads, stages, onLeadClick,
       const countFromDb = counts?.stages?.[stage] ?? counts?.stages?.[normalizeStage(stage)];
       
       const stageLeads = leads
-        .filter(l => normalizeStage(l.stage) === normalizeStage(stage))
+        .filter(l => !isLostLead(l) && normalizeStage(l.stage) === normalizeStage(stage))
         .filter(l => !searchQuery || l.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
       return {

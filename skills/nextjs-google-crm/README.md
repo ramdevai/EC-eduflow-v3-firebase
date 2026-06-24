@@ -66,7 +66,7 @@ export async function getAllLeads() {
 Automated lead import from Google Contacts.
 
 - **Trigger:** Vercel Cron (`vercel.json`)
-- **Logic:** Filter contacts by suffix (e.g., `[LEAD]`), de-duplicate against the Sheet using `googleContactId`, and append new rows.
+- **Logic:** Filter contacts whose display name, notes, or organization ends with a 6-digit `DDMMYY` date suffix, de-duplicate using `googleContactId`, and append new rows.
 
 ## 🛡️ Stability & Error Handling Layer
 
@@ -117,7 +117,7 @@ const link = getWhatsAppLink(lead, 'onboarding', formLink);
 ```
 
 ### 7. Robust Contact Matching
-When syncing contacts, use fuzzy or multi-pattern matching to capture variations of lead suffixes and clean them before import. Query both 'My Contacts' and 'Other Contacts' to ensure no leads are missed.
+When syncing contacts, use the exact `DDMMYY` date suffix convention on the contact display name, notes, or organization. The active implementation queries recent "My Contacts" only and does not use fuzzy matching, `[lead]` labels, or "Other Contacts".
 
 ### 8. Bulletproof Form Mapping (ID Based)
 To handle siblings or returning leads, use the Lead ID as a primary key in Google Forms.

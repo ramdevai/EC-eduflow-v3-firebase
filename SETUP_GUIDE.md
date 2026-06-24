@@ -219,7 +219,8 @@ To allow the CRM to sync contacts in the background (even when you are logged ou
 - If you ever accidentally delete a column in Google Sheets, go to **Settings > CRM Database Maintenance** and click **"Fix sheet structure"**. This will repair the sheet without deleting any lead data.
 
 ### 3. Troubleshooting Sync
-- If contacts are not syncing, ensure you have added the label `[lead]` or `lead` anywhere in the contact's Name, Notes, or Organization field in Google Contacts.
+- If contacts are not syncing, ensure the contact's display name, notes, or organization ends with a 6-digit date suffix in `DDMMYY` format, such as `150426`.
+- The sync only checks the most recently modified contacts: 10 contacts for manual sync and 100 contacts for cron sync.
 
 ---
 

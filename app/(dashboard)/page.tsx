@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 import { useSession, signOut } from "next-auth/react";
 import { useLeads } from '@/hooks/useLeads';
 import { Lead, LeadStage, UserRole } from '@/lib/types';
+import { leadMatchesSearch } from '@/lib/lead-search';
 
 // Dynamically imported components
 const LoginScreen = dynamic(() => import('@/components/LoginScreen').then(mod => mod.LoginScreen), { ssr: false });
@@ -41,12 +42,12 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 
 // Utility functions
-import { cn, normalizeStage, safeFormat } from '@/lib/utils';
+import { cn, isActivePipelineLead, isCustomerLead, isLostLead, normalizeStage, safeFormat } from '@/lib/utils';
 import { getWhatsAppLink } from '@/lib/messaging-utils';
 
 const STAGES: LeadStage[] = [
   'New', 'Registration requested', 'Registration done', 'Test sent', 'Test completed', 
-  '1:1 scheduled', 'Session complete', 'Report sent', 'Lost'
+  '1:1 scheduled', 'Session complete', 'Report sent'
 ];
 
 export default function Dashboard() {
@@ -63,6 +64,8 @@ export default function Dashboard() {
     loadingCustomers,
     fetchLeads, 
     fetchCustomers,
+    fetchLostLeads,
+    fetchAllLeadsForSearch,
     updateLead, 
     deleteLead, 
     addLead 
@@ -203,12 +206,27 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (activeTab === 'customers') {
-      const customersLoaded = leads.some(l => normalizeStage(l.stage) === 'Report sent');
+      const customersLoaded = leads.some(isCustomerLead);
       if (!customersLoaded) {
         fetchCustomers();
       }
     }
   }, [activeTab, leads, fetchCustomers]);
+
+  useEffect(() => {
+    if (activeTab === 'lost') {
+      const lostLoaded = leads.some(isLostLead);
+      if (!lostLoaded) {
+        fetchLostLeads();
+      }
+    }
+  }, [activeTab, leads, fetchLostLeads]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      fetchAllLeadsForSearch();
+    }
+  }, [searchQuery, fetchAllLeadsForSearch]);
 
   const handleAddLead = useCallback(async (lead: Partial<Lead>) => {
     if (!session?.user?.id) return;
@@ -220,19 +238,16 @@ export default function Dashboard() {
     const isSearchActive = query.length > 0;
 
     return leads.filter(lead => {
-      const matchesSearch = !isSearchActive || 
-                           lead.name.toLowerCase().includes(query) ||
-                           (lead.studentName || '').toLowerCase().includes(query) ||
-                           lead.phone.includes(query) ||
-                           (lead.email && lead.email.toLowerCase().includes(query));
+      const matchesSearch = !isSearchActive || leadMatchesSearch(lead, query);
 
       const normalized = normalizeStage(lead.stage);
       const matchesStage = (isSearchActive || selectedStage === 'All') || normalized === selectedStage;
       
-      if (activeTab === 'lost') return lead.stage === 'Lost' && matchesSearch;
-      if (activeTab === 'customers') return normalized === 'Report sent' && matchesSearch;
+      if (activeTab === 'lost') return isLostLead(lead) && matchesSearch;
+      if (activeTab === 'customers') return isCustomerLead(lead) && matchesSearch;
+      if (isSearchActive) return matchesSearch;
       
-      return matchesSearch && matchesStage && lead.stage !== 'Lost' && normalized !== 'Report sent';
+      return matchesSearch && matchesStage && isActivePipelineLead(lead);
     });
   }, [leads, searchQuery, selectedStage, activeTab]);
 
@@ -240,7 +255,7 @@ export default function Dashboard() {
   const pipelineCount = counts.pipeline;
 
   const kanbanStages = useMemo(() => 
-    STAGES.filter(s => s !== 'Lost' && s !== 'Report sent'),
+    STAGES.filter(s => s !== 'Report sent'),
   []);
 
   const isSearchActive = searchQuery.trim().length > 0;

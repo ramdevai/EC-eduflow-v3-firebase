@@ -164,7 +164,7 @@ export function getEmailData(
 
   // Collect all valid recipients
   const recipientCandidates = type === 'report_email'
-    ? [lead.email, lead.fatherEmail, lead.motherEmail]
+    ? [lead.email, lead.studentEmail, lead.fatherEmail, lead.motherEmail]
     : [lead.email];
   const recipients = Array.from(new Map(recipientCandidates
     .filter(Boolean)

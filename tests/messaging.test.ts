@@ -80,10 +80,11 @@ describe('messaging utils', () => {
   it('normalizes and deduplicates report recipients', () => {
     const data = getEmailData({
       ...mockLead,
+      studentEmail: 'student@example.com',
       fatherEmail: ' JOHN@example.com ',
       motherEmail: 'mother@example.com',
     }, 'report_email');
-    expect(data.recipients).toEqual(['john@example.com', 'mother@example.com']);
+    expect(data.recipients).toEqual(['john@example.com', 'student@example.com', 'mother@example.com']);
   });
 });
 

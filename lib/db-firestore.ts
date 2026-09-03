@@ -1,12 +1,36 @@
 import 'server-only';
 
-import { Lead, LeadStage, LeadStatus, FeesPaidStatus, CommunityJoinedStatus, UserRole, SystemSettings, DEFAULT_SYSTEM_SETTINGS } from './types';
+import {
+  Lead,
+  LeadStage,
+  LeadStatus,
+  FeesPaidStatus,
+  CommunityJoinedStatus,
+  UserRole,
+  SystemSettings,
+  DEFAULT_SYSTEM_SETTINGS,
+  Institution,
+  ProgrammeCareer,
+  ProgrammeCareerStatus,
+  ProgrammeSession,
+  ProgrammeSessionStatus,
+  SchoolProgramme,
+  SchoolProgrammeSchedule,
+  Career,
+} from './types';
 import { generateRegistrationSid, generateRegistrationToken, isLostLead, safeFormat } from './utils';
 import { adminDb } from './server-firebase';
+import { buildProgrammeSessionEventBody, upsertProgrammeSessionEvent } from './calendar';
 
 const LEADS_COLLECTION = 'leads';
 const TEMPLATES_COLLECTION = 'templates';
 const USERS_COLLECTION = 'users';
+const INSTITUTIONS_COLLECTION = 'institutions';
+const SCHOOL_PROGRAMMES_COLLECTION = 'school_programmes';
+const DEFAULT_SCHOOL_PROGRAMME_ID = 'gundecha-2026-27-career-primer';
+const PROGRAMME_ID_PATTERN = /^[a-z0-9-]+$/;
+const CAREERS_COLLECTION = 'careers';
+const CAREER_COLORS: Career['color'][] = ['indigo', 'green', 'amber', 'sky', 'slate'];
 
 interface LeadDocument extends Omit<Lead, 'id'> {
   id?: string; // Firestore document ID
@@ -648,4 +672,411 @@ export async function getSystemSettings(): Promise<SystemSettings> {
 
 export async function updateSystemSettings(updates: Partial<SystemSettings>): Promise<void> {
   await adminDb.collection(SETTINGS_COLLECTION).doc(SETTINGS_DOC_ID).set(updates, { merge: true });
+}
+
+// NOTE: all of a programme's sessions live in one `sessions` array field on a
+// single school_programmes document, so every cancel/restore/career edit does
+// a full read-modify-write of the whole array (see updateSchoolProgrammeSession
+// below). That's fine at today's scale (~1 programme, ~260 sessions/year), but
+// won't hold up if programmes or schools multiply - a session gains a Firestore
+// 1MB document ceiling shared with every other session, and concurrent edits
+// to different sessions still serialize through the same document. Splitting
+// sessions into their own subcollection is the fix if that becomes a problem.
+function assertProgrammeId(programmeId: string): void {
+  if (!PROGRAMME_ID_PATTERN.test(programmeId)) {
+    throw new Error('Invalid programme id.');
+  }
+}
+
+function getProgrammeToday(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function isSessionRestorable(session: ProgrammeSession, today = getProgrammeToday()): boolean {
+  return session.date >= today;
+}
+
+function dedupeCareers(careers: ProgrammeCareer[]): ProgrammeCareer[] {
+  const seen = new Set<string>();
+  return careers.filter(career => {
+    if (seen.has(career.id)) return false;
+    seen.add(career.id);
+    return true;
+  });
+}
+
+function normaliseSchoolProgramme(programme: SchoolProgramme): SchoolProgramme {
+  const today = getProgrammeToday();
+  const sessions = [...(programme.sessions || [])]
+    .map(session => ({ ...session, careers: [...(session.careers || [])] }))
+    .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
+
+  sessions.forEach((session, index) => {
+    if (session.status !== 'cancelled_restorable' || isSessionRestorable(session, today)) {
+      return;
+    }
+
+    const careersToCarry = session.careers
+      .filter(career => career.status !== 'discussed')
+      .map(career => ({
+        ...career,
+        status: 'planned' as ProgrammeCareerStatus,
+        carriedForwardFrom: session.dateLabel,
+      }));
+
+    const nextSession = sessions
+      .slice(index + 1)
+      .find(candidate => candidate.status === 'scheduled' || candidate.status === 'completed');
+
+    session.status = 'cancelled_passed';
+
+    // Only clear this session's careers once we've confirmed somewhere to carry
+    // them forward to. With no upcoming session (e.g. the programme is ending),
+    // leaving them attached here is the only way they don't silently vanish.
+    if (nextSession && careersToCarry.length > 0) {
+      session.careers = session.careers.filter(career => career.status === 'discussed');
+      nextSession.careers = dedupeCareers([...careersToCarry, ...nextSession.careers]);
+      nextSession.carryForwardFrom = `From cancelled session on ${session.dateLabel}`;
+    }
+  });
+
+  return {
+    ...programme,
+    sessions,
+  };
+}
+
+function getCancelledStatusForDate(date: string): ProgrammeSessionStatus {
+  return isSessionRestorable({ date } as ProgrammeSession) ? 'cancelled_restorable' : 'cancelled_passed';
+}
+
+export async function getSchoolProgrammeSchedule(programmeId = DEFAULT_SCHOOL_PROGRAMME_ID): Promise<SchoolProgrammeSchedule | null> {
+  assertProgrammeId(programmeId);
+
+  const programmeDoc = await adminDb.collection(SCHOOL_PROGRAMMES_COLLECTION).doc(programmeId).get();
+  if (!programmeDoc.exists) {
+    return null;
+  }
+
+  const programme = {
+    id: programmeDoc.id,
+    ...programmeDoc.data(),
+  } as SchoolProgramme;
+  const normalisedProgramme = normaliseSchoolProgramme(programme);
+  normalisedProgramme.careerCoverage = await getActiveCareerCoverage();
+
+  const institutionDoc = await adminDb.collection(INSTITUTIONS_COLLECTION).doc(normalisedProgramme.institutionId).get();
+  if (!institutionDoc.exists) {
+    throw new Error(`Institution not found for programme ${normalisedProgramme.id}.`);
+  }
+
+  return {
+    institution: {
+      id: institutionDoc.id,
+      ...institutionDoc.data(),
+    } as Institution,
+    programme: normalisedProgramme,
+  };
+}
+
+/**
+ * Mirrors a session onto the primary Google Calendar (same calendar used for
+ * 1:1 lead appointments, so the counsellor plans off one place). Best-effort:
+ * missing credentials (e.g. local dev) or a Calendar API error are logged and
+ * swallowed rather than failing the caller - the calendar event is a mirror
+ * of Firestore, never the source of truth for the session itself.
+ */
+async function syncProgrammeSessionCalendarEvent(
+  programmeRef: FirebaseFirestore.DocumentReference,
+  session: ProgrammeSession,
+  institutionName: string
+): Promise<void> {
+  try {
+    const cancelled = session.status === 'cancelled_restorable' || session.status === 'cancelled_passed';
+    const eventBody = buildProgrammeSessionEventBody(
+      { ...session, school: institutionName || session.school },
+      cancelled
+    );
+    const event = await upsertProgrammeSessionEvent(eventBody, session.calendarEventId);
+
+    if (event.id && event.id !== session.calendarEventId) {
+      await adminDb.runTransaction(async transaction => {
+        const snapshot = await transaction.get(programmeRef);
+        if (!snapshot.exists) return;
+
+        const programme = snapshot.data() as SchoolProgramme;
+        const sessions = [...(programme.sessions || [])];
+        const index = sessions.findIndex(candidate => candidate.id === session.id);
+        if (index === -1) return;
+
+        sessions[index] = { ...sessions[index], calendarEventId: event.id! };
+        transaction.set(programmeRef, { sessions }, { merge: true });
+      });
+    }
+  } catch (error: any) {
+    console.error('School programme calendar sync failed:', error.message);
+  }
+}
+
+export type SchoolProgrammeSessionUpdate =
+  | { action: 'cancel'; reason?: string }
+  | { action: 'restore' }
+  | { action: 'setCareerStatus'; careerId: string; status: ProgrammeCareerStatus }
+  | { action: 'setCareers'; careerIds: string[] }
+  | { action: 'setNote'; note: string };
+
+export async function updateSchoolProgrammeSession(
+  programmeId: string,
+  sessionId: string,
+  update: SchoolProgrammeSessionUpdate
+): Promise<SchoolProgrammeSchedule | null> {
+  assertProgrammeId(programmeId);
+  if (!PROGRAMME_ID_PATTERN.test(sessionId)) {
+    throw new Error('Invalid session id.');
+  }
+
+  const programmeRef = adminDb.collection(SCHOOL_PROGRAMMES_COLLECTION).doc(programmeId);
+  const activeCareerCoverage = update.action === 'setCareers' ? await getActiveCareerCoverage() : null;
+
+  let updatedSession: ProgrammeSession | null = null;
+  let institutionName = '';
+
+  await adminDb.runTransaction(async transaction => {
+    const snapshot = await transaction.get(programmeRef);
+    if (!snapshot.exists) {
+      throw new Error('School programme not found');
+    }
+
+    const programme = {
+      id: snapshot.id,
+      ...snapshot.data(),
+    } as SchoolProgramme;
+
+    const sessionIndex = (programme.sessions || []).findIndex(session => session.id === sessionId);
+    if (sessionIndex === -1) {
+      throw new Error('Programme session not found');
+    }
+
+    const sessions = [...programme.sessions];
+    const session = {
+      ...sessions[sessionIndex],
+      careers: [...(sessions[sessionIndex].careers || [])],
+    };
+
+    if (update.action === 'cancel') {
+      const reason = (update.reason || '').trim();
+      if (reason.length > 120) {
+        throw new Error('Cancellation reason must be 120 characters or less.');
+      }
+
+      session.status = getCancelledStatusForDate(session.date);
+      session.reason = reason;
+    } else if (update.action === 'restore') {
+      if (session.status !== 'cancelled_restorable') {
+        throw new Error('Only restorable cancelled sessions can be restored.');
+      }
+      if (!isSessionRestorable(session)) {
+        throw new Error('This session has passed and can no longer be restored.');
+      }
+
+      session.status = 'scheduled';
+      session.reason = '';
+    } else if (update.action === 'setCareerStatus') {
+      if (!['planned', 'discussed'].includes(update.status)) {
+        throw new Error('Invalid career status.');
+      }
+
+      const careerIndex = session.careers.findIndex(career => career.id === update.careerId);
+      if (careerIndex === -1) {
+        throw new Error('Career not found on this session.');
+      }
+
+      session.careers[careerIndex] = {
+        ...session.careers[careerIndex],
+        status: update.status,
+      };
+    } else if (update.action === 'setNote') {
+      const note = (update.note || '').trim();
+      if (note.length > 500) {
+        throw new Error('Note must be 500 characters or less.');
+      }
+
+      session.note = note;
+    } else if (update.action === 'setCareers') {
+      const careerIds = Array.from(new Set(update.careerIds));
+      if (careerIds.length > 8 || careerIds.some(id => !PROGRAMME_ID_PATTERN.test(id))) {
+        throw new Error('Invalid career selection.');
+      }
+
+      const existingById = new Map(session.careers.map(career => [career.id, career]));
+      const coverageById = new Map((activeCareerCoverage || []).map(career => [career.id, career]));
+
+      session.careers = careerIds.map(id => {
+        const existing = existingById.get(id);
+        const coverage = coverageById.get(id);
+        if (!existing && !coverage) {
+          throw new Error('Career not found in this programme.');
+        }
+        return {
+          ...(coverage || existing!),
+          ...(existing ? { status: existing.status } : { status: 'planned' as ProgrammeCareerStatus }),
+        };
+      });
+    }
+
+    sessions[sessionIndex] = session;
+    updatedSession = session;
+    institutionName = programme.institutionName;
+    transaction.set(
+      programmeRef,
+      {
+        sessions,
+        updatedAt: safeFormat(new Date()),
+      },
+      { merge: true }
+    );
+  });
+
+  if (updatedSession) {
+    await syncProgrammeSessionCalendarEvent(programmeRef, updatedSession, institutionName);
+  }
+
+  return getSchoolProgrammeSchedule(programmeId);
+}
+
+// Placeholder starter set so the Careers master isn't empty on first use.
+// School programmes read session-assignable careers live from this
+// collection via getActiveCareerCoverage() - see updateSchoolProgrammeSession
+// and getSchoolProgrammeSchedule above.
+const DEFAULT_CAREERS: Array<Pick<Career, 'id' | 'name' | 'area' | 'color' | 'description'>> = [
+  { id: 'cybersecurity-analyst', name: 'Cybersecurity Analyst', area: 'Technology', color: 'indigo', description: 'Works to protect systems, networks and data from cyber threats.' },
+  { id: 'sports-management', name: 'Sports Management', area: 'Sports + Business', color: 'green', description: 'Involves the business and operations side of sports and events.' },
+  { id: 'genetic-counsellor', name: 'Genetic Counsellor', area: 'Healthcare', color: 'green', description: 'Helps individuals and families understand genetic conditions.' },
+  { id: 'architect', name: 'Architect', area: 'Design', color: 'amber', description: 'Designs buildings and spaces that are functional, safe and aesthetically pleasing.' },
+  { id: 'environmental-scientist', name: 'Environmental Scientist', area: 'Science', color: 'sky', description: 'Studies environmental systems and solves ecological problems.' },
+  { id: 'actuary', name: 'Actuary', area: 'Finance + Math', color: 'green', description: 'Uses statistics to understand financial risk and uncertainty.' },
+  { id: 'product-designer', name: 'Product Designer', area: 'Design', color: 'amber', description: 'Designs digital or physical products around user needs.' },
+  { id: 'digital-marketing', name: 'Digital Marketing', area: 'Business', color: 'indigo', description: 'Plans online campaigns across search, social, content and analytics.' },
+  { id: 'nutritionist', name: 'Nutritionist', area: 'Healthcare', color: 'green', description: 'Guides people on food choices, health goals and diet planning.' },
+  { id: 'civil-services', name: 'Civil Services', area: 'Public Service', color: 'amber', description: 'Works in government administration, policy and public service delivery.' },
+];
+
+async function ensureDefaultCareers(): Promise<void> {
+  const snapshot = await adminDb.collection(CAREERS_COLLECTION).limit(1).get();
+  if (!snapshot.empty) return;
+
+  const now = safeFormat(new Date());
+  const batch = adminDb.batch();
+  for (const career of DEFAULT_CAREERS) {
+    const docRef = adminDb.collection(CAREERS_COLLECTION).doc(career.id);
+    batch.set(docRef, { ...career, status: 'active', createdAt: now, updatedAt: now }, { merge: true });
+  }
+  await batch.commit();
+}
+
+export async function getCareers(): Promise<Career[]> {
+  await ensureDefaultCareers();
+  const snapshot = await adminDb.collection(CAREERS_COLLECTION).orderBy('name').get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Career));
+}
+
+// School programmes select session careers from the live, active subset of
+// the Careers master rather than a frozen per-programme copy. `status` here
+// is a placeholder - coverage entries aren't tied to any session, only a
+// session's own `careers` array tracks planned/discussed.
+export async function getActiveCareerCoverage(): Promise<ProgrammeCareer[]> {
+  const careers = await getCareers();
+  return careers
+    .filter(career => career.status === 'active')
+    .map(career => ({
+      id: career.id,
+      name: career.name,
+      area: career.area,
+      color: career.color,
+      description: career.description,
+      status: 'planned' as ProgrammeCareerStatus,
+    }));
+}
+
+function slugifyCareerName(name: string): string {
+  const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return slug || `career-${Date.now()}`;
+}
+
+function assertCareerFields(input: { name?: string; area?: string; color?: string; description?: string }): void {
+  if (input.name !== undefined && !input.name.trim()) {
+    throw new Error('Career name is required.');
+  }
+  if (input.area !== undefined && !input.area.trim()) {
+    throw new Error('Career area is required.');
+  }
+  if (input.color !== undefined && !CAREER_COLORS.includes(input.color as Career['color'])) {
+    throw new Error('Invalid career color.');
+  }
+  if (input.description !== undefined && input.description.length > 300) {
+    throw new Error('Career description must be 300 characters or less.');
+  }
+}
+
+export async function createCareer(input: {
+  name: string;
+  area: string;
+  color: Career['color'];
+  description: string;
+}): Promise<Career> {
+  assertCareerFields(input);
+
+  const name = input.name.trim();
+  const id = slugifyCareerName(name);
+  const docRef = adminDb.collection(CAREERS_COLLECTION).doc(id);
+  const existing = await docRef.get();
+  if (existing.exists) {
+    throw new Error('A career with this name already exists.');
+  }
+
+  const now = safeFormat(new Date());
+  const career: Career = {
+    id,
+    name,
+    area: input.area.trim(),
+    color: input.color,
+    description: input.description.trim(),
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await docRef.set(career);
+  return career;
+}
+
+export async function updateCareer(
+  careerId: string,
+  updates: Partial<Pick<Career, 'name' | 'area' | 'color' | 'description' | 'status'>>
+): Promise<Career> {
+  assertCareerFields(updates);
+  if (updates.status !== undefined && !['active', 'archived'].includes(updates.status)) {
+    throw new Error('Invalid career status.');
+  }
+
+  const docRef = adminDb.collection(CAREERS_COLLECTION).doc(careerId);
+  const doc = await docRef.get();
+  if (!doc.exists) {
+    throw new Error('Career not found.');
+  }
+
+  const patch: Record<string, unknown> = { updatedAt: safeFormat(new Date()) };
+  if (updates.name !== undefined) patch.name = updates.name.trim();
+  if (updates.area !== undefined) patch.area = updates.area.trim();
+  if (updates.color !== undefined) patch.color = updates.color;
+  if (updates.description !== undefined) patch.description = updates.description.trim();
+  if (updates.status !== undefined) patch.status = updates.status;
+
+  await docRef.set(patch, { merge: true });
+  return { ...(doc.data() as Career), ...patch, id: careerId } as Career;
 }

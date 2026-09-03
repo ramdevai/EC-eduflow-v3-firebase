@@ -35,3 +35,10 @@ params.txt
 test_urls.md
 
 AI_ideas.md
+
+# local source photos (large binaries) - transcribed data lives in README.md next to them
+docs/source-data/school-programmes/timetables/*.JPG
+docs/source-data/school-programmes/timetables/*.jpg
+
+# stray local Firestore emulator export dumps
+firebase-export-*/

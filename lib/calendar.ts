@@ -110,3 +110,82 @@ export async function deleteCalendarEvent(eventId: string) {
     }
   }
 }
+
+// School programme sessions share the same primary calendar as 1:1 lead
+// appointments (the counsellor plans off one calendar), but get a distinct
+// color so ~250+ recurring class blocks don't visually blend into leads.
+const PROGRAMME_SESSION_COLOR_ID = '9'; // Blueberry
+
+function programmeSessionDisplayTimeTo24Hour(displayTime: string): string {
+  const match = displayTime.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) {
+    throw new Error(`Unrecognised session time format: ${displayTime}`);
+  }
+
+  const [, hourStr, minute, suffix] = match;
+  let hour = parseInt(hourStr, 10) % 12;
+  if (suffix.toUpperCase() === 'PM') hour += 12;
+
+  return `${String(hour).padStart(2, '0')}:${minute}`;
+}
+
+export function buildProgrammeSessionEventBody(session: {
+  school: string;
+  grade: string;
+  division: string;
+  room: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  teacher: string;
+  careers: { name: string; status: string }[];
+}, cancelled: boolean) {
+  const careerLines = session.careers.length
+    ? session.careers.map(career => `- ${career.name} (${career.status})`).join('\n')
+    : 'No careers assigned yet.';
+
+  return {
+    summary: `${cancelled ? '[Cancelled] ' : ''}School Programme: ${session.school} — ${session.grade} ${session.division} (${session.room})`,
+    description: `Career primer session with ${session.teacher}.\n\nCareers:\n${careerLines}`,
+    start: {
+      dateTime: `${session.date}T${programmeSessionDisplayTimeTo24Hour(session.startTime)}:00`,
+      timeZone: 'Asia/Kolkata',
+    },
+    end: {
+      dateTime: `${session.date}T${programmeSessionDisplayTimeTo24Hour(session.endTime)}:00`,
+      timeZone: 'Asia/Kolkata',
+    },
+    colorId: PROGRAMME_SESSION_COLOR_ID,
+  };
+}
+
+/**
+ * Creates or updates the calendar event mirroring a school programme session.
+ * If the linked event was deleted directly on Google Calendar (update returns
+ * 404), this falls back to creating a fresh one instead of failing the caller
+ * - so calendar-side drift never blocks an in-app cancel/restore/edit.
+ */
+export async function upsertProgrammeSessionEvent(eventBody: ReturnType<typeof buildProgrammeSessionEventBody>, eventId?: string) {
+  const calendar = await getCalendarClient();
+
+  if (eventId) {
+    try {
+      const response = await calendar.events.update({
+        calendarId: 'primary',
+        eventId,
+        requestBody: eventBody,
+      });
+      return response.data;
+    } catch (error: any) {
+      if (error.code !== 404) {
+        throw error;
+      }
+    }
+  }
+
+  const response = await calendar.events.insert({
+    calendarId: 'primary',
+    requestBody: eventBody,
+  });
+  return response.data;
+}

@@ -17,6 +17,8 @@
     "db:migrate:production": "node scripts/firestore-migrate.mjs --production --apply",
     "db:recover-primary-contacts:local": "NEXT_PUBLIC_APP_ENV=local FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 node scripts/recover-primary-contacts.mjs",
     "db:recover-primary-contacts:production": "node scripts/recover-primary-contacts.mjs --production",
+    "db:sync-school-programme-calendar:dry-run": "node scripts/sync-school-programme-calendar.mjs",
+    "db:sync-school-programme-calendar": "node scripts/sync-school-programme-calendar.mjs --apply",
     "firebase:deploy:production": "firebase deploy --only firestore:rules,firestore:indexes --project production",
     "clean-dev": "rm -rf .next && npm run dev:local",
     "build": "next build",

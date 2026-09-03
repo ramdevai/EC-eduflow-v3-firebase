@@ -86,6 +86,21 @@
 - Stage timestamps (when entered each stage)
 - Days in current stage
 
+### 3.8 Institution and School Programme Data
+
+**Institutions Collection (`institutions`):**
+- Shared institution identity: name, campus, address, status
+- Known contacts for school administration and coordination
+- Reusable by School Programmes and future Partnerships
+
+**School Programmes Collection (`school_programmes`):**
+- Programme identity: institution ID, institution name, academic year, programme name, status
+- Programme-owned classes, timetable slots, generated sessions, holidays, and career coverage
+- Timetable slots retain source-image references when seeded from photographed school timetables
+- Career topic assignments can be stored per session; placeholder topics must be replaced when source data is available
+
+**Known limitation:** a programme's sessions are stored as one array field on a single `school_programmes` document, so every session update rewrites the whole array. Acceptable at today's scale (one programme, ~260 sessions/year); would need a `sessions` subcollection if programmes or partner schools multiply.
+
 ---
 
 ## 4. Pipeline Stages
@@ -312,7 +327,8 @@ Action buttons change dynamically based on current stage:
 **Stage = 1:1 Scheduled:**
 - Shows appointment card with date/time
 - Edit button → reopens slot picker
-- Cancel button → removes appointment
+- Cancel button → marks future or same-day appointment as Cancelled while keeping it visible
+- Restore session button → available for cancelled sessions until the scheduled calendar date has passed
 - Mark session as complete button → advances stage to Session Complete
 - Community invite button → sends group invite via WhatsApp
 - Reschedule option → slot picker for new time
@@ -416,7 +432,25 @@ Five collapsible sections (all collapsed by default, click to expand):
 - LeadDrawer shows appointment card with:
   - Date and time (formatted)
   - **Edit** button → reopens slot picker
-  - **Cancel** button → removes appointment
+  - **Cancel** button → marks future or same-day appointment as Cancelled
+
+**Step 7 - Cancelled Appointment State**
+- When a future or same-day session is cancelled, the appointment immediately enters a **Cancelled** internal state
+- Cancelled appointments remain visible in calendar and appointment lists as muted rows
+- Planned careers remain attached to the cancelled session until the scheduled calendar date has passed
+- Same-day cancellations remain restorable until the end of that calendar day, not only until the session end time
+- Before the scheduled date has passed, the muted row shows:
+  - Status: **Cancelled**
+  - Event type: **School event**
+  - Action: **Restore session**
+  - Helper text: **Careers will be carried forward after this session date passes.**
+- After the scheduled date has passed, the muted row shows:
+  - Status: **Cancelled**
+  - Event type: **School event**
+  - Message: **This session has passed and can no longer be restored.**
+  - Message: **Its planned careers have been carried forward.**
+- Once the scheduled date is in the past, cancellation is effectively permanent: restore is hidden, and undiscussed planned careers are released back into the upcoming career sequence
+- The UI must not display the word **Finalised** for this lifecycle; that term may remain internal only
 
 **Error Handling:**
 - If slot becomes busy during selection → show error message, refresh availability
@@ -1288,12 +1322,12 @@ When multiple overlays are open, they stack in this order (topmost closes first)
 - **Elements:** Tab icons, active indicator, hamburger menu trigger
 
 ### 8.4 LeadCard
-- **States:** Default, hover, selected, attention needed
-- **Elements:** Name, grade/board, days in stage badge, appointment time badge, stage color indicator
+- **States:** Default, hover, selected, attention needed, cancelled appointment muted
+- **Elements:** Name, grade/board, days in stage badge, appointment time badge, cancelled badge, stage color indicator
 
 ### 8.5 LeadDrawer
-- **States:** Open, loading, error
-- **Elements:** Header (name, stage), action buttons, collapsible sections, form fields
+- **States:** Open, loading, error, appointment scheduled, appointment cancelled/restorable, appointment cancelled/passed
+- **Elements:** Header (name, stage), action buttons, appointment card, restore session action, cancellation helper text, collapsible sections, form fields
 
 ### 8.6 KanbanView
 - **States:** Default, loading, empty
@@ -1324,8 +1358,8 @@ When multiple overlays are open, they stack in this order (topmost closes first)
 - **Elements:** Date selector, time slots grid, adjustment buttons, confirm button
 
 ### 8.13 TodayView
-- **States:** Loading, has events, no events, has birthdays, no birthdays
-- **Elements:** Appointments list, birthday list, meet buttons, wish buttons
+- **States:** Loading, has events, has cancelled events, no events, has birthdays, no birthdays
+- **Elements:** Appointments list, muted cancelled rows, restore session button when restorable, birthday list, meet buttons, wish buttons
 
 ### 8.14 TemplatesView
 - **States:** Loading, has templates, empty
@@ -1476,6 +1510,56 @@ The following features are planned or considered for future implementation:
 - Video conferencing (Zoom, Teams)
 - Payment gateway integration
 
+### 11.6 Career Tracking System Wireframe
+
+**Purpose:** Track careers planned and discussed during school counselling sessions while keeping the calendar history understandable and reversible.
+
+**EduFlow IA Reference:** [Career Tracking EduFlow IA V1](docs/wireframes/career-tracking-eduflow-ia-v1.svg)
+
+**Responsive Wireframe Reference:** [Career Tracking Responsive Schedule V1](docs/wireframes/career-tracking-responsive-schedule-v1.html)
+
+**Cancellation Flow Reference:** [Career Tracking Cancel/Restore V1](docs/wireframes/career-tracking-cancel-restore-v1.png)
+
+**Information Architecture:**
+- School career-primer sessions live in a new **School Programmes** module
+- **School Programmes** is a sibling of **Leads**, not a child of the lead pipeline
+- **Schedule** is the default School Programmes screen
+- There is no separate School Programmes landing page in the primary workflow
+- On mobile, School Programmes opens directly into a schedule-first agenda view
+- On desktop and larger screens, School Programmes uses a split layout: schedule list on the left and selected session detail on the right
+- School Programmes contains **Schedule**, **Coverage**, **Classes**, and **Programme Settings**, but **Schedule** is the daily working surface
+- The schedule filter icon opens filters for **School**, academic year, grade, and status
+- **Institutions** is a small shared master for institution identity and known contacts
+- The Institution Master can be reused by future **Partnerships** without storing partnership terms on school programme records
+- School Programme records own timetable, classes, sessions, holidays, and career coverage
+- Partnership records own referral relationships, one-point contacts, terms, admissions, and outcomes
+
+**Session Calendar Row States:**
+- **Scheduled:** Normal row with school name, session date/time, planned careers, and available session actions
+- **Cancelled / Restorable:** Muted row shown for future or same-day cancelled sessions until the scheduled calendar date has passed
+- **Cancelled / Passed:** Muted historical row shown after the scheduled date has passed; restore is no longer available
+
+**Cancelled / Restorable Row:**
+- Status label: **Cancelled**
+- Event type label: **School event**
+- Primary action: **Restore session**
+- Helper text: **Careers will be carried forward after this session date passes.**
+- Planned careers remain attached to the cancelled session
+- Same-day cancellations remain restorable until the end of that calendar day
+
+**Cancelled / Passed Row:**
+- Status label: **Cancelled**
+- Event type label: **School event**
+- Message: **This session has passed and can no longer be restored.**
+- Message: **Its planned careers have been carried forward.**
+- Planned careers that were not discussed are released back into the upcoming career sequence
+- The UI must not show **Finalised** or **Finalized**; any final lifecycle naming stays internal
+
+**Lifecycle Rule:**
+- Cancelling a future or same-day session changes only the session state at first
+- Career sequence changes happen only after the scheduled calendar date has passed
+- Restoring a session before the date passes keeps the original planned careers attached to that session
+
 ---
 
 ## 12. Appendix: Environment Configuration
@@ -1513,8 +1597,8 @@ The following features are planned or considered for future implementation:
 
 ---
 
-*Document Version: 1.0*  
-*Last Updated: April 2026*  
+*Document Version: 1.2*
+*Last Updated: August 31, 2026*
 *Purpose: Feature parity specification for rebuilding EduCompass CRM*
 
 ---

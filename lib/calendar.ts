@@ -116,7 +116,7 @@ export async function deleteCalendarEvent(eventId: string) {
 // color so ~250+ recurring class blocks don't visually blend into leads.
 const PROGRAMME_SESSION_COLOR_ID = '9'; // Blueberry
 
-function programmeSessionDisplayTimeTo24Hour(displayTime: string): string {
+export function programmeSessionDisplayTimeTo24Hour(displayTime: string): string {
   const match = displayTime.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (!match) {
     throw new Error(`Unrecognised session time format: ${displayTime}`);

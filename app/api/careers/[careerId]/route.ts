@@ -47,7 +47,8 @@ export async function PATCH(
   } catch (error: any) {
     console.error('PATCH career error:', error.message);
     const message = error.message || 'Failed to update career';
-    const status = message.includes('not found') ? 404 : message.includes('required') || message.includes('Invalid') ? 400 : 500;
+    const isValidationMessage = message.includes('required') || message.includes('Invalid') || message.includes('must be');
+    const status = message.includes('not found') ? 404 : isValidationMessage ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

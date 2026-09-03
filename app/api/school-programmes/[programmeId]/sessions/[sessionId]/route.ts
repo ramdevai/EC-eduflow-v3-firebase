@@ -77,7 +77,11 @@ export async function PATCH(
   } catch (error: any) {
     console.error('PATCH school programme session error:', error.message);
     const message = error.message || 'Failed to update programme session';
-    const status = message.includes('not found') ? 404 : message.startsWith('Invalid') ? 400 : 500;
+    const isValidationMessage = message.startsWith('Invalid')
+      || message.includes('must be')
+      || message.includes('can no longer')
+      || message.includes('Only restorable');
+    const status = message.includes('not found') ? 404 : isValidationMessage ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

@@ -47,7 +47,8 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error('POST careers error:', error.message);
     const message = error.message || 'Failed to create career';
-    const status = message.includes('already exists') ? 409 : message.includes('required') || message.includes('Invalid') ? 400 : 500;
+    const isValidationMessage = message.includes('required') || message.includes('Invalid') || message.includes('must be');
+    const status = message.includes('already exists') ? 409 : isValidationMessage ? 400 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }

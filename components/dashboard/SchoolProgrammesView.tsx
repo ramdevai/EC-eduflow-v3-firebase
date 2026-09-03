@@ -714,7 +714,11 @@ export function SchoolProgrammesView({ onMobileMenuClick }: SchoolProgrammesView
     }, {});
   }, [displayedSessions]);
 
-  const sessionDatesAll = useMemo(() => new Set(sessions.map(session => session.date)), [sessions]);
+  // Drives which day chips are clickable - scoped to the active filters so a
+  // chip never looks clickable for a date whose only sessions are filtered
+  // out (that used to silently no-op: the click fell back to an unfiltered
+  // match that the auto-reselect effect above immediately reverted).
+  const availableSessionDates = useMemo(() => new Set(displayedSessions.map(session => session.date)), [displayedSessions]);
   const programmeDateRange = useMemo(() => {
     if (sessions.length === 0) return null;
     const dates = sessions.map(session => session.date).sort();
@@ -886,7 +890,7 @@ export function SchoolProgrammesView({ onMobileMenuClick }: SchoolProgrammesView
 
       <div className="-mx-1 mb-5 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-2 lg:max-w-md">
         {dayStripDates.map(date => {
-          const hasSession = sessionDatesAll.has(date);
+          const hasSession = availableSessionDates.has(date);
           const chip = formatDayChip(date);
           const isSelectedDay = date === selectedSession.date;
           return (
@@ -896,8 +900,7 @@ export function SchoolProgrammesView({ onMobileMenuClick }: SchoolProgrammesView
               type="button"
               disabled={!hasSession}
               onClick={() => {
-                const match = displayedSessions.find(session => session.date === date)
-                  || sessions.find(session => session.date === date);
+                const match = displayedSessions.find(session => session.date === date);
                 if (match) setSelectedSessionId(match.id);
                 dateGroupRefs.current[date]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }}

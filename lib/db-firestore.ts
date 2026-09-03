@@ -20,7 +20,7 @@ import {
 } from './types';
 import { generateRegistrationSid, generateRegistrationToken, isLostLead, safeFormat } from './utils';
 import { adminDb } from './server-firebase';
-import { buildProgrammeSessionEventBody, upsertProgrammeSessionEvent } from './calendar';
+import { buildProgrammeSessionEventBody, upsertProgrammeSessionEvent, programmeSessionDisplayTimeTo24Hour } from './calendar';
 
 const LEADS_COLLECTION = 'leads';
 const TEMPLATES_COLLECTION = 'templates';
@@ -710,16 +710,31 @@ function dedupeCareers(careers: ProgrammeCareer[]): ProgrammeCareer[] {
   });
 }
 
-function normaliseSchoolProgramme(programme: SchoolProgramme): SchoolProgramme {
+function sortableSessionTime(session: Pick<ProgrammeSession, 'date' | 'startTime'>): string {
+  // startTime is a 12-hour "HH:MM AM/PM" display string, which does not sort
+  // lexicographically in chronological order (e.g. "01:15 PM" < "12:35 PM" as
+  // strings, but 12:35 PM comes first). Sort on the 24-hour equivalent instead.
+  return `${session.date} ${programmeSessionDisplayTimeTo24Hour(session.startTime)}`;
+}
+
+// Returns the normalised programme plus whether any session's status or
+// careers actually changed - callers that read this (getSchoolProgrammeSchedule)
+// need to persist a change, since carry-forward has to be visible to the next
+// write (e.g. marking a carried career "discussed") to actually work.
+function normaliseSchoolProgramme(programme: SchoolProgramme): { programme: SchoolProgramme; changed: boolean } {
   const today = getProgrammeToday();
   const sessions = [...(programme.sessions || [])]
     .map(session => ({ ...session, careers: [...(session.careers || [])] }))
-    .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
+    .sort((a, b) => sortableSessionTime(a).localeCompare(sortableSessionTime(b)));
+
+  let changed = false;
 
   sessions.forEach((session, index) => {
     if (session.status !== 'cancelled_restorable' || isSessionRestorable(session, today)) {
       return;
     }
+
+    changed = true;
 
     const careersToCarry = session.careers
       .filter(career => career.status !== 'discussed')
@@ -740,14 +755,17 @@ function normaliseSchoolProgramme(programme: SchoolProgramme): SchoolProgramme {
     // leaving them attached here is the only way they don't silently vanish.
     if (nextSession && careersToCarry.length > 0) {
       session.careers = session.careers.filter(career => career.status === 'discussed');
-      nextSession.careers = dedupeCareers([...careersToCarry, ...nextSession.careers]);
+      // nextSession's own careers go first so an already-"discussed" entry
+      // there wins the dedupe instead of being reset to "planned" by the
+      // incoming carried copy.
+      nextSession.careers = dedupeCareers([...nextSession.careers, ...careersToCarry]);
       nextSession.carryForwardFrom = `From cancelled session on ${session.dateLabel}`;
     }
   });
 
   return {
-    ...programme,
-    sessions,
+    programme: { ...programme, sessions },
+    changed,
   };
 }
 
@@ -758,7 +776,8 @@ function getCancelledStatusForDate(date: string): ProgrammeSessionStatus {
 export async function getSchoolProgrammeSchedule(programmeId = DEFAULT_SCHOOL_PROGRAMME_ID): Promise<SchoolProgrammeSchedule | null> {
   assertProgrammeId(programmeId);
 
-  const programmeDoc = await adminDb.collection(SCHOOL_PROGRAMMES_COLLECTION).doc(programmeId).get();
+  const programmeRef = adminDb.collection(SCHOOL_PROGRAMMES_COLLECTION).doc(programmeId);
+  const programmeDoc = await programmeRef.get();
   if (!programmeDoc.exists) {
     return null;
   }
@@ -767,10 +786,20 @@ export async function getSchoolProgrammeSchedule(programmeId = DEFAULT_SCHOOL_PR
     id: programmeDoc.id,
     ...programmeDoc.data(),
   } as SchoolProgramme;
-  const normalisedProgramme = normaliseSchoolProgramme(programme);
-  normalisedProgramme.careerCoverage = await getActiveCareerCoverage();
+  const { programme: normalisedProgramme, changed } = normaliseSchoolProgramme(programme);
 
-  const institutionDoc = await adminDb.collection(INSTITUTIONS_COLLECTION).doc(normalisedProgramme.institutionId).get();
+  const [careerCoverage, institutionDoc] = await Promise.all([
+    getActiveCareerCoverage(),
+    adminDb.collection(INSTITUTIONS_COLLECTION).doc(normalisedProgramme.institutionId).get(),
+    // Persist status/career transitions (e.g. cancelled_restorable -> cancelled_passed
+    // carrying careers forward) so a later write - like marking a carried
+    // career "discussed" - finds them already on the target session.
+    changed
+      ? programmeRef.set({ sessions: normalisedProgramme.sessions, updatedAt: safeFormat(new Date()) }, { merge: true })
+      : Promise.resolve(),
+  ]);
+  normalisedProgramme.careerCoverage = careerCoverage;
+
   if (!institutionDoc.exists) {
     throw new Error(`Institution not found for programme ${normalisedProgramme.id}.`);
   }
@@ -942,7 +971,9 @@ export async function updateSchoolProgrammeSession(
     );
   });
 
-  if (updatedSession) {
+  // A note change touches no field the calendar event body is built from
+  // (see buildProgrammeSessionEventBody) - skip the API round-trip for it.
+  if (updatedSession && update.action !== 'setNote') {
     await syncProgrammeSessionCalendarEvent(programmeRef, updatedSession, institutionName);
   }
 

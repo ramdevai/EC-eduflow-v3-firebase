@@ -19,6 +19,16 @@ export enum UserRole {
   Staff = 'staff',
 }
 
+export type DashboardTab =
+  | 'leads'
+  | 'today'
+  | 'school-programmes'
+  | 'careers'
+  | 'templates'
+  | 'lost'
+  | 'analysis'
+  | 'customers';
+
 export interface User {
   uid: string;
   email: string;
@@ -110,3 +120,116 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   defaultSessionDuration: 90,
   calendarLookaheadDays: 3,
 };
+
+export type ProgrammeCareerStatus = 'planned' | 'discussed';
+export type ProgrammeSessionStatus = 'scheduled' | 'cancelled_restorable' | 'cancelled_passed' | 'completed';
+
+export interface InstitutionContact {
+  name: string;
+  role: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface Institution {
+  id: string;
+  name: string;
+  campus: string;
+  address: string;
+  status: 'active' | 'inactive';
+  contacts: InstitutionContact[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProgrammeClass {
+  id: string;
+  grade: 'IX' | 'X' | string;
+  division: string;
+  room: string;
+  classTeacher: string;
+}
+
+export interface ProgrammeTimetableSlot {
+  id: string;
+  classId: string;
+  grade: 'IX' | 'X' | string;
+  division: string;
+  room: string;
+  weekday: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  period: string;
+  teacher: string;
+  sourceImage: string;
+}
+
+export interface ProgrammeCareer {
+  id: string;
+  name: string;
+  area: string;
+  color: 'indigo' | 'green' | 'amber' | 'sky' | 'slate';
+  status: ProgrammeCareerStatus;
+  description: string;
+  carriedForwardFrom?: string;
+}
+
+export interface ProgrammeSession {
+  id: string;
+  school: string;
+  grade: 'IX' | 'X' | string;
+  division: string;
+  room: string;
+  date: string;
+  dateLabel: string;
+  dayLabel: string;
+  startTime: string;
+  endTime: string;
+  duration: string;
+  period: string;
+  teacher: string;
+  status: ProgrammeSessionStatus;
+  reason?: string;
+  note?: string;
+  carryForwardFrom?: string;
+  timetableSlotId: string;
+  careers: ProgrammeCareer[];
+  calendarEventId?: string;
+}
+
+export interface SchoolProgramme {
+  id: string;
+  institutionId: string;
+  institutionName: string;
+  name: string;
+  academicYear: string;
+  status: 'active' | 'archived';
+  classes: ProgrammeClass[];
+  timetableSlots: ProgrammeTimetableSlot[];
+  sessions: ProgrammeSession[];
+  holidays: string[];
+  careerCoverage: ProgrammeCareer[];
+  sourceNote: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SchoolProgrammeSchedule {
+  institution: Institution;
+  programme: SchoolProgramme;
+}
+
+// Shared careers master. Session-level career tracking (ProgrammeCareer) is
+// still its own copy embedded per programme for now - not yet wired to read
+// from this collection.
+export interface Career {
+  id: string;
+  name: string;
+  area: string;
+  color: 'indigo' | 'green' | 'amber' | 'sky' | 'slate';
+  description: string;
+  status: 'active' | 'archived';
+  createdAt: string;
+  updatedAt: string;
+}

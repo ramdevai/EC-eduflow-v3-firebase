@@ -4,13 +4,16 @@ import React from 'react';
 import { 
   LayoutDashboard, 
   Calendar, 
+  School,
   RefreshCw
 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
+import { DashboardTab, UserRole } from '@/lib/types';
 
 interface BottomNavProps {
-  activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers';
-  setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers') => void;
+  activeTab: DashboardTab;
+  setActiveTab: (tab: DashboardTab) => void;
   onSyncContacts: () => void;
   isSyncing?: boolean;
   pipelineCount?: number;
@@ -18,6 +21,7 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ activeTab, setActiveTab, onSyncContacts, isSyncing = false, pipelineCount, customerCount }: BottomNavProps) {
+  const { data: session } = useSession();
   const NavItem = ({ 
     icon: Icon, 
     label, 
@@ -74,6 +78,14 @@ export function BottomNav({ activeTab, setActiveTab, onSyncContacts, isSyncing =
         isActive={activeTab === 'today'} 
         onClick={() => setActiveTab('today')} 
       />
+      {session?.user?.role === UserRole.Admin && (
+        <NavItem
+          icon={School}
+          label="School"
+          isActive={activeTab === 'school-programmes'}
+          onClick={() => setActiveTab('school-programmes')}
+        />
+      )}
       <NavItem 
         icon={RefreshCw} 
         label="Sync" 

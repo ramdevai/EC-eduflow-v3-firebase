@@ -25,7 +25,9 @@ import {
     History,
     FileCode,
     Download,
-    Upload
+    Upload,
+    Info,
+    GraduationCap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Card } from '@/components/ui/Card';
@@ -35,13 +37,14 @@ import { UserRole, SystemSettings, DEFAULT_SYSTEM_SETTINGS } from '@/lib/types';
 import { useSession } from 'next-auth/react';
 import { DuplicateFinder } from './DuplicateFinder';
 import { formatBackupTimestamp } from '@/lib/utils';
+import { APP_NAME, APP_DESCRIPTION, APP_VERSION, APP_VERSION_DATE } from '@/lib/appInfo';
 
 interface Props {
     onClose: () => void;
     onImportLeads: () => void;
 }
 
-type Tab = 'general' | 'integrations' | 'staff' | 'utilities';
+type Tab = 'general' | 'integrations' | 'staff' | 'utilities' | 'about';
 
 export const SettingsModal = ({ onClose, onImportLeads }: Props) => {
     const { data: session } = useSession();
@@ -339,55 +342,61 @@ export const SettingsModal = ({ onClose, onImportLeads }: Props) => {
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }} 
-                animate={{ opacity: 1, y: 0 }} 
-                className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20"
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full max-w-2xl max-h-[90vh] flex flex-col bg-white dark:bg-slate-900 rounded-[1.75rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20"
             >
                 {/* Header */}
-                <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-primary-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary-200 dark:shadow-none">
-                            <Settings size={28} />
+                <div className="p-5 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50 shrink-0">
+                    <div className="flex items-center gap-3 md:gap-4 min-w-0">
+                        <div className="w-10 h-10 md:w-12 md:h-12 bg-primary-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary-200 dark:shadow-none shrink-0">
+                            <Settings size={24} />
                         </div>
-                        <div>
-                            <h2 className="text-2xl font-black tracking-tight">System Settings</h2>
-                            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">EduCompass Admin Console</p>
+                        <div className="min-w-0">
+                            <h2 className="text-lg md:text-2xl font-black tracking-tight truncate">System Settings</h2>
+                            <p className="text-slate-500 text-[10px] md:text-xs font-bold uppercase tracking-widest truncate">EduCompass Admin Console</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all"><X size={20} /></button>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all shrink-0"><X size={20} /></button>
                 </div>
 
                 {/* Tabs Nav */}
-                <div className="flex px-8 border-b border-slate-100 dark:border-slate-800">
-                    <button 
+                <div className="flex gap-1 overflow-x-auto px-4 md:px-8 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                    <button
                         onClick={() => setActiveTab('general')}
-                        className={`py-4 px-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'general' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        className={`shrink-0 py-4 px-3 md:px-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${activeTab === 'general' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                     >
                         General
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('integrations')}
-                        className={`py-4 px-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'integrations' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        className={`shrink-0 py-4 px-3 md:px-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${activeTab === 'integrations' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                     >
                         Integrations
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('staff')}
-                        className={`py-4 px-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'staff' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        className={`shrink-0 py-4 px-3 md:px-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${activeTab === 'staff' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                     >
-                        Staff Management
+                        Staff
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('utilities')}
-                        className={`py-4 px-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all ${activeTab === 'utilities' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        className={`shrink-0 py-4 px-3 md:px-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${activeTab === 'utilities' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
                     >
                         Utilities
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('about')}
+                        className={`shrink-0 py-4 px-3 md:px-4 text-xs font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${activeTab === 'about' ? 'border-primary-600 text-primary-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                    >
+                        About
                     </button>
                 </div>
 
                 {/* Tab Content */}
-                <div className="p-8 max-h-[60vh] overflow-y-auto no-scrollbar">
+                <div className="p-5 md:p-8 flex-1 overflow-y-auto">
                     <AnimatePresence mode="wait">
                         {activeTab === 'general' && (
                             <motion.div key="general" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-8">
@@ -820,11 +829,45 @@ export const SettingsModal = ({ onClose, onImportLeads }: Props) => {
                                 </section>
                             </motion.div>
                         )}
+
+                        {activeTab === 'about' && (
+                            <motion.div key="about" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-8">
+                                <section className="space-y-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-slate-800 text-primary-600 flex items-center justify-center shrink-0">
+                                            <GraduationCap size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-lg font-black">{APP_NAME}</h3>
+                                            <Badge variant="info" className="mt-1">v{APP_VERSION}</Badge>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{APP_DESCRIPTION}</p>
+                                </section>
+
+                                <section className="space-y-4">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Version Details</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl space-y-1">
+                                            <p className="text-[10px] uppercase font-black text-slate-400 flex items-center gap-1.5"><Info size={12} /> Version</p>
+                                            <p className="font-bold">{APP_VERSION}</p>
+                                        </div>
+                                        <div className="p-5 bg-slate-50 dark:bg-slate-800 rounded-3xl space-y-1">
+                                            <p className="text-[10px] uppercase font-black text-slate-400 flex items-center gap-1.5"><CalendarIcon size={12} /> Last Updated</p>
+                                            <p className="font-bold">{APP_VERSION_DATE}</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                                        Version and description are maintained in <code className="font-mono">lib/appInfo.ts</code> and updated with each major commit. See CHANGELOG.md for full release history.
+                                    </p>
+                                </section>
+                            </motion.div>
+                        )}
                     </AnimatePresence>
                 </div>
 
                 {/* Footer Alert */}
-                <div className="px-8 pb-8 pt-4">
+                <div className="px-5 md:px-8 pb-5 md:pb-8 pt-4 shrink-0">
                     <p className="text-center text-[9px] text-slate-400 font-medium tracking-tight">
                         Warning: Accessing system settings requires Administrative privileges. Changes here affect global synchronization and data integrity.
                     </p>

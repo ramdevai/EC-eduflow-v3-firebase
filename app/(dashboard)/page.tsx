@@ -16,7 +16,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useRouter } from 'next/navigation';
 import { useSession, signOut } from "next-auth/react";
 import { useLeads } from '@/hooks/useLeads';
-import { Lead, LeadStage, UserRole } from '@/lib/types';
+import { DashboardTab, Lead, LeadStage, UserRole } from '@/lib/types';
 import { leadMatchesSearch } from '@/lib/lead-search';
 
 // Dynamically imported components
@@ -28,6 +28,8 @@ const ListView = dynamic(() => import('@/components/dashboard/ListView').then(mo
 const AnalysisView = dynamic(() => import('@/components/dashboard/AnalysisView').then(mod => mod.AnalysisView), { ssr: false });
 const BottomNav = dynamic(() => import('@/components/dashboard/BottomNav').then(mod => mod.BottomNav), { ssr: false });
 const TodayView = dynamic(() => import('@/components/dashboard/TodayView').then(mod => mod.TodayView), { ssr: false });
+const SchoolProgrammesView = dynamic(() => import('@/components/dashboard/SchoolProgrammesView').then(mod => mod.SchoolProgrammesView), { ssr: false });
+const CareersView = dynamic(() => import('@/components/dashboard/CareersView').then(mod => mod.CareersView), { ssr: false });
 const TemplatesView = dynamic(() => import('@/components/dashboard/TemplatesView').then(mod => mod.TemplatesView), { ssr: false });
 const LostLeadsView = dynamic(() => import('@/components/dashboard/LostLeadsView').then(mod => mod.LostLeadsView), { ssr: false });
 const ImportModal = dynamic(() => import('@/components/dashboard/ImportModal').then(mod => mod.ImportModal), { ssr: false });
@@ -80,7 +82,7 @@ export default function Dashboard() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [activeTab, setActiveTab] = useState<'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers'>('leads');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('leads');
   const [isSyncing, setIsSyncing] = useState(false);
   const historyStateRef = useRef<string>('root');
 
@@ -105,6 +107,18 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (activeTab === 'analysis' && session?.user?.role !== UserRole.Admin) {
+      setActiveTab('leads');
+    }
+  }, [activeTab, session?.user?.role]);
+
+  useEffect(() => {
+    if (activeTab === 'school-programmes' && session?.user?.role !== UserRole.Admin) {
+      setActiveTab('leads');
+    }
+  }, [activeTab, session?.user?.role]);
+
+  useEffect(() => {
+    if (activeTab === 'careers' && session?.user?.role !== UserRole.Admin) {
       setActiveTab('leads');
     }
   }, [activeTab, session?.user?.role]);
@@ -297,6 +311,7 @@ export default function Dashboard() {
       </div>
 
       <main className="flex-1 px-4 py-6 md:py-10 md:px-10 max-w-7xl mx-auto w-full overflow-hidden">
+        {activeTab !== 'school-programmes' && activeTab !== 'careers' && (
         <header className="flex flex-col gap-6 mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -347,6 +362,7 @@ export default function Dashboard() {
           </div>
           {activeTab === 'leads' && !isSearchActive && !isSearchFocused && <StatGrid leads={leads} counts={counts} />}
         </header>
+        )}
 
         {(activeTab === 'leads' || activeTab === 'customers') && (
           <div className="space-y-10">
@@ -464,6 +480,8 @@ export default function Dashboard() {
         )}
 
         {activeTab === 'today' && <TodayView leads={leads} templates={templates} />}
+        {activeTab === 'school-programmes' && session?.user?.role === UserRole.Admin && <SchoolProgrammesView onMobileMenuClick={() => setIsSidebarOpen(true)} />}
+        {activeTab === 'careers' && session?.user?.role === UserRole.Admin && <CareersView onMobileMenuClick={() => setIsSidebarOpen(true)} />}
         {activeTab === 'templates' && <TemplatesView />}
         {activeTab === 'lost' && <LostLeadsView leads={leads} updateLead={updateLead} />}
         {activeTab === 'analysis' && session?.user?.role === UserRole.Admin && <AnalysisView leads={leads} />}

@@ -11,17 +11,19 @@ import {
   LogOut,
   MessageSquare,
   TrendingDown,
-  BarChart3
+  BarChart3,
+  School,
+  Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LeadStage, UserRole } from '@/lib/types';
+import { DashboardTab, UserRole } from '@/lib/types';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useSession, signOut } from "next-auth/react";
 import { UserAvatar } from './UserAvatar';
 
 interface SidebarProps {
-  activeTab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers';
-  setActiveTab: (tab: 'leads' | 'today' | 'templates' | 'lost' | 'analysis' | 'customers') => void;
+  activeTab: DashboardTab;
+  setActiveTab: (tab: DashboardTab) => void;
   onMobileClose?: () => void;
   onPreferencesClick?: () => void;
   pipelineCount?: number;
@@ -114,6 +116,14 @@ export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobile
               isActive={activeTab === 'today'} 
               onClick={() => setActiveTab('today')} 
             />
+            {session?.user?.role === UserRole.Admin && (
+              <NavButton
+                icon={School}
+                label="School Programmes"
+                isActive={activeTab === 'school-programmes'}
+                onClick={() => setActiveTab('school-programmes')}
+              />
+            )}
             <NavButton 
               icon={TrendingDown} 
               label="Deals Lost" 
@@ -133,11 +143,19 @@ export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobile
               onClick={() => setActiveTab('templates')} 
             />
             {session?.user?.role === UserRole.Admin && (
-              <NavButton 
-                  icon={Settings} 
-                  label="System Settings" 
-                  isActive={false} 
-                  onClick={() => onPreferencesClick?.()} 
+              <NavButton
+                icon={Briefcase}
+                label="Careers"
+                isActive={activeTab === 'careers'}
+                onClick={() => setActiveTab('careers')}
+              />
+            )}
+            {session?.user?.role === UserRole.Admin && (
+              <NavButton
+                  icon={Settings}
+                  label="System Settings"
+                  isActive={false}
+                  onClick={() => onPreferencesClick?.()}
               />
             )}
             <NavButton 

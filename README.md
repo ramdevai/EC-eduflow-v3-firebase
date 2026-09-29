@@ -6,7 +6,7 @@ A modern Next.js application integrated with Firebase, featuring advanced lead m
 
 ## Features
 - **Google Sheets Database:** Your CRM data lives in a Google Sheet for easy access.
-- **Google Contacts Sync:** Automatically import leads from Google Contacts when the contact display name, notes, or organization ends with a 6-digit date suffix such as `150426`.
+- **Google Contacts Sync:** Automatically import newly modified Google Contacts when the contact display name, notes, or organization ends with a valid in-window date suffix such as `150426`.
 - **Next.js 15 (App Router):** Fast, modern, and serverless-ready.
 - **Kanban & List Views:** Manage your workflow visually.
 

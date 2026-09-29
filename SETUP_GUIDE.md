@@ -220,7 +220,8 @@ To allow the CRM to sync contacts in the background (even when you are logged ou
 
 ### 3. Troubleshooting Sync
 - If contacts are not syncing, ensure the contact's display name, notes, or organization ends with a 6-digit date suffix in `DDMMYY` format, such as `150426`.
-- The sync only checks the most recently modified contacts: 10 contacts for manual sync and 100 contacts for cron sync.
+- Manual sync checks the 10 most recently modified contacts. Automated sync checks all contacts modified since its previous successful run and only imports contacts whose valid suffix date falls within that cron window.
+- The first automated run after incremental sync is enabled establishes a baseline and intentionally imports no historical contacts.
 
 ---
 

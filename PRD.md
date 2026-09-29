@@ -683,13 +683,14 @@ Pre-fill fields where data already exists in lead record:
 - Show loading state with spinner
 - Message: Syncing contacts...
 - Query Google Contacts API
-- Fetch recent contacts:
-  - 10 for manual trigger
-  - 100 for cron trigger
+- Manual trigger: fetch the 10 most recently modified contacts
+- Cron trigger: fetch every page containing contacts modified after the previous successful cron and through the current run start
+- On the first cron run, save the current time as the baseline without importing historical contacts
 
 **Step A2 - Filter Valid Contacts**
 - Look for contacts with 6-digit date suffix (DDMMYY)
 - Search fields: Name, Organization field, Bio/notes
+- For cron imports, require a valid suffix date between the previous successful cron date and the current run date in Asia/Kolkata
 - Example match: **John Sharma** with suffix **150425** in organization
 
 **Step A3 - Create Leads**

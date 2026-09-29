@@ -3,6 +3,18 @@ import { Lead, UserRole } from './types';
 import { adminDb } from './server-firebase';
 import { addLeads, updateLeads } from './db-firestore';
 import { getAdminAuthClient } from './google-auth';
+import {
+  collectContactsModifiedInWindow,
+  extractLeadDate,
+  getContactSource,
+  GOOGLE_CONTACT_PERSON_FIELDS,
+  GoogleContactPerson,
+  isLeadDateInCronWindow,
+  stripLeadDateSuffix,
+} from './google-contacts-core';
+
+const CONTACT_SYNC_STATE_COLLECTION = 'system_sync_state';
+const CONTACT_SYNC_STATE_DOC = 'google_contacts_cron';
 
 export async function getPeopleClient() {
   const auth = getAdminAuthClient();
@@ -14,29 +26,82 @@ export async function getPeopleClient() {
  * Format: DDMMYY (e.g., "Madhuri 170326")
  */
 export async function syncGoogleContacts(callerUid: string, triggerType: 'manual' | 'cron') {
-  const people = await getPeopleClient();
-  
-  // Debug: Check which account we are actually syncing
-  const me = await people.people.get({
-    resourceName: 'people/me',
-    personFields: 'emailAddresses',
-  });
-  const myEmail = me.data.emailAddresses?.[0]?.value;
-  console.log(`--- Sync Debug: Authenticated as ${myEmail} ---`);
-
+  const runStartedAt = new Date();
   const leadsRef = adminDb.collection('leads');
-  const pageSize = triggerType === 'manual' ? 10 : 100;
-  
-  // 1. Fetch recent contacts from "My Contacts"
-  // Expanded personFields to include biographies and organizations per GOOGLE_CONTACT_SYNC.md
-  const response = await people.people.connections.list({
-    resourceName: 'people/me',
-    pageSize,
-    sortOrder: 'LAST_MODIFIED_DESCENDING',
-    personFields: 'names,emailAddresses,phoneNumbers,metadata,biographies,organizations',
-  });
+  const syncStateRef = adminDb
+    .collection(CONTACT_SYNC_STATE_COLLECTION)
+    .doc(CONTACT_SYNC_STATE_DOC);
+  let cronWindowStart: Date | null = null;
+  let checked = 0;
+  let pages = 1;
+  let connections: GoogleContactPerson[] = [];
 
-  const connections = response.data.connections || [];
+  if (triggerType === 'cron') {
+    const stateSnapshot = await syncStateRef.get();
+    const lastSuccessfulAtValue = stateSnapshot.data()?.lastSuccessfulAt;
+    const lastSuccessfulAt = typeof lastSuccessfulAtValue === 'string'
+      ? new Date(lastSuccessfulAtValue)
+      : null;
+
+    if (
+      !lastSuccessfulAt
+      || Number.isNaN(lastSuccessfulAt.getTime())
+      || lastSuccessfulAt > runStartedAt
+    ) {
+      const baseline = runStartedAt.toISOString();
+      await syncStateRef.set({
+        initializedAt: baseline,
+        lastStartedAt: baseline,
+        lastCompletedAt: baseline,
+        lastSuccessfulAt: baseline,
+        checked: 0,
+        added: 0,
+        updated: 0,
+        pages: 0,
+      }, { merge: true });
+
+      return {
+        checked: 0,
+        added: 0,
+        updated: 0,
+        pages: 0,
+        initialized: true,
+      };
+    }
+
+    cronWindowStart = lastSuccessfulAt;
+  }
+
+  const people = await getPeopleClient();
+
+  if (triggerType === 'cron' && cronWindowStart) {
+    const result = await collectContactsModifiedInWindow(
+      async (params) => {
+        const response = await people.people.connections.list(params);
+        return {
+          data: {
+            connections: response.data.connections as GoogleContactPerson[] | undefined,
+            nextPageToken: response.data.nextPageToken,
+          },
+        };
+      },
+      { fromExclusive: cronWindowStart, toInclusive: runStartedAt },
+    );
+    connections = result.contacts;
+    checked = result.checked;
+    pages = result.pages;
+  } else {
+    const response = await people.people.connections.list({
+      resourceName: 'people/me',
+      pageSize: 10,
+      sortOrder: 'LAST_MODIFIED_DESCENDING',
+      personFields: GOOGLE_CONTACT_PERSON_FIELDS,
+      sources: ['READ_SOURCE_TYPE_CONTACT'],
+    });
+    connections = (response.data.connections || []) as GoogleContactPerson[];
+    checked = connections.length;
+  }
+
   const leadsToAdd: Partial<Lead>[] = [];
   const leadsToUpdate: { id: string; data: Partial<Lead> }[] = [];
   
@@ -54,7 +119,7 @@ export async function syncGoogleContacts(callerUid: string, triggerType: 'manual
   const dateSuffixRegex = /\s+(\d{6})$/;
 
   for (const person of connections) {
-    const contactId = person.metadata?.sources?.[0]?.id;
+    const contactId = getContactSource(person)?.id;
     if (!contactId) continue;
 
     const googleName = person.names?.[0]?.displayName || '';
@@ -62,18 +127,24 @@ export async function syncGoogleContacts(callerUid: string, triggerType: 'manual
     const googleOrg = person.organizations?.[0]?.name || '';
     const email = person.emailAddresses?.[0]?.value?.toLowerCase() || '';
     const rawPhone = person.phoneNumbers?.[0]?.value || '';
-    const phone = rawPhone.replace(/\D/g, '');
-
     // Suffix Search: Check Display Name, Biography/Notes, and Organization Name
     const nameMatch = googleName.match(dateSuffixRegex);
     const bioMatch = googleBio.match(dateSuffixRegex);
     const orgMatch = googleOrg.match(dateSuffixRegex);
     
     const match = nameMatch || bioMatch || orgMatch;
-    const dateCode = match ? match[1] : null;
+    let dateCode = match ? match[1] : null;
+
+    if (triggerType === 'cron' && cronWindowStart) {
+      const leadDate = extractLeadDate(person);
+      if (!leadDate || !isLeadDateInCronWindow(leadDate.isoDate, cronWindowStart, runStartedAt)) {
+        continue;
+      }
+      dateCode = leadDate.code;
+    }
 
     if (dateCode) {
-      const cleanName = googleName.replace(dateSuffixRegex, '').trim();
+      const cleanName = stripLeadDateSuffix(googleName);
       const leadData: Partial<Lead> = {
         name: cleanName,
         email,
@@ -116,9 +187,23 @@ export async function syncGoogleContacts(callerUid: string, triggerType: 'manual
     await updateLeads(callerUid, UserRole.Staff as any, leadsToUpdate);
   }
 
+  if (triggerType === 'cron') {
+    await syncStateRef.set({
+      lastStartedAt: runStartedAt.toISOString(),
+      lastCompletedAt: new Date().toISOString(),
+      lastSuccessfulAt: runStartedAt.toISOString(),
+      checked,
+      added: leadsToAdd.length,
+      updated: leadsToUpdate.length,
+      pages,
+    }, { merge: true });
+  }
+
   return {
-    checked: connections.length,
+    checked,
     added: leadsToAdd.length,
     updated: leadsToUpdate.length,
+    pages,
+    initialized: false,
   };
 }

@@ -85,6 +85,17 @@ export function safeFormat(date: any, formatStr: string = 'dd MMM yyyy'): string
   return format(dateObj, formatStr);
 }
 
+export function compareDateValuesDesc(a: unknown, b: unknown): number {
+  const timestamp = (value: unknown) => {
+    if (!value) return 0;
+    const parsed = safeParseISO(value);
+    const time = parsed.getTime();
+    return Number.isFinite(time) ? time : 0;
+  };
+
+  return timestamp(b) - timestamp(a);
+}
+
 /**
  * Converts any date string to YYYY-MM-DD for HTML inputs
  */

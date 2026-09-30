@@ -18,7 +18,7 @@ import {
   SchoolProgrammeSchedule,
   Career,
 } from './types';
-import { generateRegistrationSid, generateRegistrationToken, isLostLead, safeFormat } from './utils';
+import { compareDateValuesDesc, generateRegistrationSid, generateRegistrationToken, isLostLead, safeFormat } from './utils';
 import { adminDb } from './server-firebase';
 import { buildProgrammeSessionEventBody, upsertProgrammeSessionEvent, programmeSessionDisplayTimeTo24Hour } from './calendar';
 
@@ -309,7 +309,7 @@ export async function getAllLeads(
       return mapDocToLead({ ...data, id: doc.id });
     });
 
-    return leads.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    return leads.sort((a, b) => compareDateValuesDesc(a.updatedAt, b.updatedAt));
   } else {
     // Default fallback ordering
     leadsRef = leadsRef.orderBy('updatedAt', 'desc');
@@ -395,7 +395,7 @@ export async function getAllLeads(
 
   // Performance optimization: Sort in JS for categories that would otherwise require complex indexes
   if (options?.category === 'pipeline' || options?.category === 'customers') {
-    const sorted = leads.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    const sorted = leads.sort((a, b) => compareDateValuesDesc(a.updatedAt, b.updatedAt));
     
     // For customers, we simulate lazy loading by returning only the requested slice
     // This allows the frontend to keep its lazy-loading logic while the server handles the full set in memory

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeLeadStatus, isActivePipelineLead, isCustomerLead, isLostLead, normalizeStage } from '@/lib/utils';
+import { compareDateValuesDesc, computeLeadStatus, isActivePipelineLead, isCustomerLead, isLostLead, normalizeStage } from '@/lib/utils';
 import { Lead } from '@/lib/types';
 
 const leadAt = (stage: Lead['stage'], status: Lead['status']) => ({ stage, status } as Lead);
@@ -29,5 +29,23 @@ describe('lead status and pipeline classification', () => {
     expect(computeLeadStatus('Lost')).toBe('Lost');
     expect(isLostLead(legacyLost)).toBe(true);
     expect(isActivePipelineLead(legacyLost)).toBe(false);
+  });
+});
+
+describe('lead date ordering', () => {
+  it('sorts mixed legacy and ISO timestamps chronologically, newest first', () => {
+    const dates = [
+      '30 Sep 2026',
+      '2026-09-30T19:31:37.537Z',
+      '29 Sep 2026',
+      '',
+    ];
+
+    expect(dates.sort(compareDateValuesDesc)).toEqual([
+      '2026-09-30T19:31:37.537Z',
+      '30 Sep 2026',
+      '29 Sep 2026',
+      '',
+    ]);
   });
 });

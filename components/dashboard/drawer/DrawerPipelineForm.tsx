@@ -65,9 +65,9 @@ export function DrawerPipelineForm({ lead, onUpdate, stageAge }: Props) {
             </div>
         </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 leading-relaxed">
                   Inquiry Date {lead.inquiryDate ? `: ${safeFormat(lead.inquiryDate, 'dd MMM yyyy')}` : '(Not set)'}
               </label>
               <input 
@@ -82,7 +82,7 @@ export function DrawerPipelineForm({ lead, onUpdate, stageAge }: Props) {
               />
           </div>
           <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Source</label>
+              <label className="block text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 leading-relaxed">Source</label>
               <input value={lead.source || 'Manual'} readOnly className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold" />
           </div>
       </div>

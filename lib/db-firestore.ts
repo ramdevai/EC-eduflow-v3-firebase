@@ -10,6 +10,7 @@ import {
   SystemSettings,
   DEFAULT_SYSTEM_SETTINGS,
   Institution,
+  InstitutionContact,
   ProgrammeCareer,
   ProgrammeCareerStatus,
   ProgrammeSession,
@@ -17,9 +18,15 @@ import {
   SchoolProgramme,
   SchoolProgrammeSchedule,
   Career,
+  Partnership,
+  PartnershipStatus,
+  Referral,
+  ReferralStatus,
+  ReferralTimelineEntry,
 } from './types';
 import { generateRegistrationSid, generateRegistrationToken, isLostLead, safeFormat } from './utils';
 import { adminDb } from './server-firebase';
+import { EDUCOMPASS_LOCATION_MAP_URL, EDUCOMPASS_LOCATION_PIN } from './messaging-utils';
 import { buildProgrammeSessionEventBody, upsertProgrammeSessionEvent, programmeSessionDisplayTimeTo24Hour } from './calendar';
 
 const LEADS_COLLECTION = 'leads';
@@ -31,6 +38,8 @@ const DEFAULT_SCHOOL_PROGRAMME_ID = 'gundecha-2026-27-career-primer';
 const PROGRAMME_ID_PATTERN = /^[a-z0-9-]+$/;
 const CAREERS_COLLECTION = 'careers';
 const CAREER_COLORS: Career['color'][] = ['indigo', 'green', 'amber', 'sky', 'slate'];
+const PARTNERSHIPS_COLLECTION = 'partnerships';
+const REFERRALS_COLLECTION = 'referrals';
 
 interface LeadDocument extends Omit<Lead, 'id'> {
   id?: string; // Firestore document ID
@@ -566,20 +575,22 @@ const DEFAULT_TEMPLATES = [
   { id: 'birthday', label: 'Birthday Wish', subject: 'Happy Birthday {studentName}! 🎂', message: 'Hi {name}, please wish {studentName} a very Happy Birthday! 🎂 Hope they have a fantastic day ahead! - Binal from EduCompass' },
   { id: 'report_email', label: 'Report Email', subject: '{studentName} - Career Counseling Report', message: "Dear Parent,\n\nPlease find attached the career counseling report for {studentName}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass" },
   { id: 'fees_reminder', label: 'Fees Reminder', subject: 'Professional Fees Reminder - EduCompass', message: 'Hi {name}, just a gentle reminder regarding the professional fees for the career counseling session. Please ignore if already paid. Thanks!' },
+  { id: 'location', label: 'EduCompass Location', subject: 'EduCompass Location', message: `Hi {name}, sharing the EduCompass location for your visit.\n\nAddress: EduCompass, Mumbai, Maharashtra\nPin: ${EDUCOMPASS_LOCATION_PIN}\nGoogle Maps: ${EDUCOMPASS_LOCATION_MAP_URL}` },
 ];
 
 export async function ensureDefaultTemplates() {
-  
-  // Idempotency check: only run if collection is empty or missing
-  const snapshot = await adminDb.collection(TEMPLATES_COLLECTION).limit(1).get();
-  if (!snapshot.empty) return;
-
-  const batch = adminDb.batch();
-  for (const template of DEFAULT_TEMPLATES) {
-    const docRef = adminDb.collection(TEMPLATES_COLLECTION).doc(template.id);
-    batch.set(docRef, template, { merge: true });
-  }
-  await batch.commit();
+  const refs = DEFAULT_TEMPLATES.map(template =>
+    adminDb.collection(TEMPLATES_COLLECTION).doc(template.id)
+  );
+  // Read and create atomically so recovery cannot overwrite a concurrent edit.
+  await adminDb.runTransaction(async transaction => {
+    const snapshots = await transaction.getAll(...refs);
+    snapshots.forEach((snapshot, index) => {
+      if (!snapshot.exists) {
+        transaction.create(snapshot.ref, DEFAULT_TEMPLATES[index]);
+      }
+    });
+  });
 }
 
 export async function getTemplates(): Promise<TemplateDocument[]> {
@@ -1110,4 +1121,266 @@ export async function updateCareer(
 
   await docRef.set(patch, { merge: true });
   return { ...(doc.data() as Career), ...patch, id: careerId } as Career;
+}
+
+// Institution master (shared identity + known contacts). Previously only
+// ever read nested inside a School Programme (getSchoolProgrammeSchedule
+// above); this is real CRUD so Partnerships (and any future School
+// Programme) can list from / add to a shared directory instead of each
+// duplicating institution identity and contacts.
+function assertInstitutionFields(input: { name?: string; campus?: string; address?: string }): void {
+  if (input.name !== undefined && !input.name.trim()) {
+    throw new Error('Institution name is required.');
+  }
+}
+
+export async function getInstitutions(): Promise<Institution[]> {
+  const snapshot = await adminDb.collection(INSTITUTIONS_COLLECTION).orderBy('name').get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Institution));
+}
+
+export async function getInstitutionById(institutionId: string): Promise<Institution | null> {
+  const doc = await adminDb.collection(INSTITUTIONS_COLLECTION).doc(institutionId).get();
+  if (!doc.exists) return null;
+  return { id: doc.id, ...doc.data() } as Institution;
+}
+
+export async function addInstitution(input: {
+  name: string;
+  campus?: string;
+  address?: string;
+  status?: Institution['status'];
+  contacts?: InstitutionContact[];
+}): Promise<Institution> {
+  assertInstitutionFields(input);
+
+  const now = safeFormat(new Date());
+  const docRef = adminDb.collection(INSTITUTIONS_COLLECTION).doc();
+  const institution: Institution = {
+    id: docRef.id,
+    name: input.name.trim(),
+    campus: input.campus?.trim() || '',
+    address: input.address?.trim() || '',
+    status: input.status || 'active',
+    contacts: input.contacts || [],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await docRef.set(institution);
+  return institution;
+}
+
+export async function updateInstitution(
+  institutionId: string,
+  updates: Partial<Pick<Institution, 'name' | 'campus' | 'address' | 'status' | 'contacts'>>
+): Promise<Institution> {
+  assertInstitutionFields(updates);
+
+  const docRef = adminDb.collection(INSTITUTIONS_COLLECTION).doc(institutionId);
+  const doc = await docRef.get();
+  if (!doc.exists) {
+    throw new Error('Institution not found.');
+  }
+
+  const patch: Record<string, unknown> = { updatedAt: safeFormat(new Date()) };
+  if (updates.name !== undefined) patch.name = updates.name.trim();
+  if (updates.campus !== undefined) patch.campus = updates.campus.trim();
+  if (updates.address !== undefined) patch.address = updates.address.trim();
+  if (updates.status !== undefined) patch.status = updates.status;
+  if (updates.contacts !== undefined) patch.contacts = updates.contacts;
+
+  await docRef.set(patch, { merge: true });
+  return { ...(doc.data() as Institution), ...patch, id: institutionId } as Institution;
+}
+
+// Partnerships: the commercial/admissions relationship with an Institution.
+// Company-wide (not per-counselor, matches how Leads/Users already work) -
+// no ownerUid filtering, every staff/admin sees the same list. Delete is
+// admin-only, matching deleteLead.
+function assertPartnershipStatus(status?: string): void {
+  if (status !== undefined && !['Prospecting', 'Active', 'Inactive'].includes(status)) {
+    throw new Error('Invalid partnership status.');
+  }
+}
+
+export async function getPartnerships(): Promise<Partnership[]> {
+  const snapshot = await adminDb.collection(PARTNERSHIPS_COLLECTION).orderBy('institutionName').get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Partnership));
+}
+
+export async function getPartnershipById(partnershipId: string): Promise<Partnership | null> {
+  const doc = await adminDb.collection(PARTNERSHIPS_COLLECTION).doc(partnershipId).get();
+  if (!doc.exists) return null;
+  return { id: doc.id, ...doc.data() } as Partnership;
+}
+
+export async function addPartnership(callerUid: string, input: {
+  institutionId: string;
+  institutionName: string;
+  status?: PartnershipStatus;
+  pointOfContact?: InstitutionContact;
+  mouSigned?: boolean;
+  commissionTerms?: string;
+  notes?: string;
+  tags?: string[];
+}): Promise<Partnership> {
+  if (!input.institutionId) {
+    throw new Error('An institution is required.');
+  }
+  assertPartnershipStatus(input.status);
+
+  const now = safeFormat(new Date());
+  const docRef = adminDb.collection(PARTNERSHIPS_COLLECTION).doc();
+  const partnership: Partnership = {
+    id: docRef.id,
+    institutionId: input.institutionId,
+    institutionName: input.institutionName,
+    status: input.status || 'Prospecting',
+    pointOfContact: input.pointOfContact?.name?.trim() ? input.pointOfContact : { name: '', role: '' },
+    mouSigned: input.mouSigned || false,
+    commissionTerms: input.commissionTerms?.trim() || '',
+    notes: input.notes?.trim() || '',
+    tags: input.tags || [],
+    createdAt: now,
+    updatedAt: now,
+    createdBy: callerUid,
+  };
+
+  await docRef.set(partnership);
+  return partnership;
+}
+
+export async function updatePartnership(
+  partnershipId: string,
+  updates: Partial<Pick<Partnership, 'status' | 'pointOfContact' | 'mouSigned' | 'commissionTerms' | 'notes' | 'tags'>>
+): Promise<Partnership> {
+  assertPartnershipStatus(updates.status);
+
+  const docRef = adminDb.collection(PARTNERSHIPS_COLLECTION).doc(partnershipId);
+  const doc = await docRef.get();
+  if (!doc.exists) {
+    throw new Error('Partnership not found.');
+  }
+
+  const patch: Record<string, unknown> = { updatedAt: safeFormat(new Date()) };
+  if (updates.status !== undefined) patch.status = updates.status;
+  if (updates.pointOfContact !== undefined) patch.pointOfContact = updates.pointOfContact;
+  if (updates.mouSigned !== undefined) patch.mouSigned = updates.mouSigned;
+  if (updates.commissionTerms !== undefined) patch.commissionTerms = updates.commissionTerms.trim();
+  if (updates.notes !== undefined) patch.notes = updates.notes.trim();
+  if (updates.tags !== undefined) patch.tags = updates.tags;
+
+  await docRef.set(patch, { merge: true });
+  return { ...(doc.data() as Partnership), ...patch, id: partnershipId } as Partnership;
+}
+
+export async function deletePartnership(callerUid: string, role: UserRole, partnershipId: string): Promise<void> {
+  if (role !== UserRole.Admin) {
+    throw new Error('Unauthorized: Only admins can delete partnerships.');
+  }
+  await adminDb.collection(PARTNERSHIPS_COLLECTION).doc(partnershipId).delete();
+}
+
+// Referrals: one lead referred to one partner institution, tracked through
+// to commission outcome. Kept as its own top-level collection (rather than
+// embedded on Partnership) so it can be queried by due-date across every
+// partnership (Today's "Partner Follow-ups") and by lead (Lead drawer).
+const REFERRAL_STATUSES: ReferralStatus[] = [
+  'Referred', 'Intimated', 'Acknowledged', 'Admitted', 'Commission Due', 'Commission Paid', 'Declined',
+];
+const OPEN_REFERRAL_STATUSES: ReferralStatus[] = REFERRAL_STATUSES.filter(
+  status => status !== 'Commission Paid' && status !== 'Declined'
+);
+
+export async function getReferrals(options?: {
+  leadId?: string;
+  partnershipId?: string;
+  dueForFollowUp?: boolean;
+}): Promise<Referral[]> {
+  let ref: FirebaseFirestore.Query = adminDb.collection(REFERRALS_COLLECTION);
+
+  if (options?.leadId) {
+    ref = ref.where('leadId', '==', options.leadId);
+  }
+  if (options?.partnershipId) {
+    ref = ref.where('partnershipId', '==', options.partnershipId);
+  }
+
+  const snapshot = await ref.get();
+  let referrals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Referral));
+
+  if (options?.dueForFollowUp) {
+    const today = safeFormat(new Date());
+    referrals = referrals.filter(referral =>
+      !!referral.nextFollowUpDate &&
+      referral.nextFollowUpDate <= today &&
+      OPEN_REFERRAL_STATUSES.includes(referral.status)
+    );
+  }
+
+  return referrals.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+}
+
+export async function addReferral(callerUid: string, input: {
+  leadId: string;
+  leadName: string;
+  partnershipId: string;
+  institutionId: string;
+  institutionName: string;
+}): Promise<Referral> {
+  if (!input.leadId || !input.partnershipId) {
+    throw new Error('A lead and a partnership are required.');
+  }
+
+  const now = safeFormat(new Date());
+  const docRef = adminDb.collection(REFERRALS_COLLECTION).doc();
+  const referral: Referral = {
+    id: docRef.id,
+    leadId: input.leadId,
+    leadName: input.leadName,
+    partnershipId: input.partnershipId,
+    institutionId: input.institutionId,
+    institutionName: input.institutionName,
+    status: 'Referred',
+    referredAt: now,
+    referredBy: callerUid,
+    timeline: [{ date: now, note: `Referred to ${input.institutionName}`, byUid: callerUid }],
+    updatedAt: now,
+  };
+
+  await docRef.set(referral);
+  return referral;
+}
+
+export async function updateReferral(
+  callerUid: string,
+  referralId: string,
+  updates: Partial<Pick<Referral,
+    'status' | 'intimatedAt' | 'intimatedBy' | 'nextFollowUpDate' | 'lastFollowUpNote' |
+    'commissionAmount' | 'commissionStatus'
+  >>,
+  timelineNote?: string
+): Promise<Referral> {
+  if (updates.status !== undefined && !REFERRAL_STATUSES.includes(updates.status)) {
+    throw new Error('Invalid referral status.');
+  }
+
+  const docRef = adminDb.collection(REFERRALS_COLLECTION).doc(referralId);
+  const doc = await docRef.get();
+  if (!doc.exists) {
+    throw new Error('Referral not found.');
+  }
+
+  const now = safeFormat(new Date());
+  const existing = doc.data() as Referral;
+  const patch: Record<string, unknown> = { ...updates, updatedAt: now };
+
+  const note = timelineNote || (updates.status !== undefined ? `Status changed to ${updates.status}` : undefined);
+  if (note) {
+    patch.timeline = [...(existing.timeline || []), { date: now, note, byUid: callerUid } as ReferralTimelineEntry];
+  }
+
+  await docRef.set(patch, { merge: true });
+  return { ...existing, ...patch, id: referralId } as Referral;
 }

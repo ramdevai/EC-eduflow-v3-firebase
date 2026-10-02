@@ -31,6 +31,7 @@ import {
   Pencil,
   Minus,
   Plus,
+  Handshake,
 } from 'lucide-react';
 
 import { differenceInDays } from 'date-fns';
@@ -40,7 +41,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
 import { SlotCard } from '@/components/ui/SlotCard';
 import { cn, normalizeStage, generateRegistrationSid, generateRegistrationToken, safeParseISO, safeFormat, toInputFormat } from '@/lib/utils';
-import { getWhatsAppLink, getEmailLink, getTestLinkByGrade, getReportEmailData, getEmailData, MessageType } from '@/lib/messaging-utils';
+import { openWhatsApp, getEmailLink, getTestLinkByGrade, getReportEmailData, getEmailData, MessageType } from '@/lib/messaging-utils';
 import { RefreshCw, Sparkles } from 'lucide-react';
 import { EmailComposer } from './EmailComposer';
 import { DrawerProfileForm } from './drawer/DrawerProfileForm';
@@ -48,6 +49,7 @@ import { DrawerFamilyForm } from './drawer/DrawerFamilyForm';
 import { DrawerCounselingForm } from './drawer/DrawerCounselingForm';
 import { DrawerPipelineForm } from './drawer/DrawerPipelineForm';
 import { DrawerFeesForm } from './drawer/DrawerFeesForm';
+import { DrawerPartnershipForm } from './drawer/DrawerPartnershipForm';
 
 const TEST_OPTIONS = [
   { name: "Career Analysis for 2nd to 7th class", url: "https://careertest.edumilestones.com/student-dashboard/suitability-registration/login/OTI2/as11" },
@@ -208,7 +210,7 @@ const handleSchedule = async (startTime: string) => {
     if (lead.communicateViaEmailOnly) {
         setEmailComposerType(type);
     } else {
-        window.open(getWhatsAppLink(lead, type, templates), '_blank');
+        openWhatsApp(lead, type, templates);
     }
   };
 
@@ -392,7 +394,7 @@ const data = await res.json();
         return;
     }
     
-    window.open(getWhatsAppLink({ ...lead, registrationToken: currentToken, registrationSid: currentSid }, 'onboarding', templates), '_blank');
+    openWhatsApp({ ...lead, registrationToken: currentToken, registrationSid: currentSid }, 'onboarding', templates);
     if (normalizeStage(lead.stage) === 'New') {
         handleStageChange('Registration requested');
     }
@@ -410,11 +412,7 @@ const data = await res.json();
         return;
     }
 
-    // Generate WhatsApp link first before starting any state updates or renders
-    const whatsappUrl = getWhatsAppLink(lead, 'test', templates);
-    
-    // Open the window immediately using the current stable lead and templates data
-    window.open(whatsappUrl, '_blank');
+    openWhatsApp(lead, 'test', templates);
 
     // Update state and lead stage in the background
     onUpdate(lead.id, { stage: 'Test sent' });
@@ -614,7 +612,7 @@ const data = await res.json();
                     )} 
                     onClick={() => {
                         if (lead.communicateViaEmailOnly) setEmailComposerType('followup');
-                        else window.open(getWhatsAppLink(lead, 'followup', templates), '_blank');
+                        else openWhatsApp(lead, 'followup', templates);
                     }}
                 >
                     {lead.communicateViaEmailOnly ? <Mail size={18} /> : <MessageSquare size={18} />}
@@ -641,7 +639,7 @@ const data = await res.json();
                 )}
                 onClick={() => {
                     if (lead.communicateViaEmailOnly) setEmailComposerType('followup');
-                    else window.open(getWhatsAppLink(lead, 'followup', templates), '_blank');
+                    else openWhatsApp(lead, 'followup', templates);
                 }}
             >
                 {lead.communicateViaEmailOnly ? <Mail size={18} /> : <MessageSquare size={18} />}
@@ -711,7 +709,7 @@ const data = await res.json();
                 )}
                 onClick={() => {
                     if (lead.communicateViaEmailOnly) setEmailComposerType('test_nudge');
-                    else window.open(getWhatsAppLink(lead, 'test_nudge', templates), '_blank');
+                    else openWhatsApp(lead, 'test_nudge', templates);
                 }}
             >
                 {lead.communicateViaEmailOnly ? <Mail size={18} /> : null}
@@ -776,7 +774,7 @@ const data = await res.json();
                         className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" 
                         onClick={() => {
                             if (lead.communicateViaEmailOnly) setEmailComposerType('community');
-                            else window.open(getWhatsAppLink(lead, 'community', templates), '_blank');
+                            else openWhatsApp(lead, 'community', templates);
                         }}
                     >
                         {lead.communicateViaEmailOnly ? <Mail size={16} /> : <MessageSquare size={16} />}
@@ -799,7 +797,7 @@ const data = await res.json();
                         className="flex-1 h-12 rounded-xl flex gap-2 text-xs font-bold" 
                         onClick={() => {
                             if (lead.communicateViaEmailOnly) setEmailComposerType('review');
-                            else window.open(getWhatsAppLink(lead, 'review', templates), '_blank');
+                            else openWhatsApp(lead, 'review', templates);
                         }}
                     >
                         {lead.communicateViaEmailOnly ? <Mail size={16} /> : <MessageSquare size={16} />}
@@ -914,6 +912,12 @@ const data = await res.json();
                 <SectionHeader id="fees" title="Fees" icon={CreditCard} />
                 {activeSection === 'fees' && (
                     <DrawerFeesForm lead={lead} onUpdate={onUpdate} />
+                )}
+
+                {/* Partnerships Section */}
+                <SectionHeader id="partnerships" title="Partnerships" icon={Handshake} />
+                {activeSection === 'partnerships' && (
+                    <DrawerPartnershipForm lead={lead} />
                 )}
 
 
@@ -1200,6 +1204,18 @@ const data = await res.json();
                 )}
                 */}
                 </> )}
+              </div>
+
+              <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
+                <Button
+                  variant="outline"
+                  className="w-full h-14 rounded-2xl bg-white dark:bg-slate-900 gap-3 text-sm font-bold text-emerald-600 border-emerald-100 hover:bg-emerald-50 dark:border-emerald-900/30 dark:hover:bg-emerald-950/20"
+                  onClick={() => openWhatsApp(lead, 'location', templates)}
+                  disabled={!lead.phone}
+                >
+                  <MapPin size={18} />
+                  WhatsApp EduCompass location
+                </Button>
               </div>
 
               {/* Danger Zone */}

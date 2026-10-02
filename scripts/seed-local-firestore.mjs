@@ -215,24 +215,7 @@ batch.set(
   { merge: true }
 );
 
-const templates = [
-  {
-    id: 'registration',
-    label: 'Registration',
-    subject: 'Complete your registration',
-    message: 'Hello {name}, please complete your test registration.',
-  },
-  {
-    id: 'appointment',
-    label: 'Appointment',
-    subject: 'Counseling appointment',
-    message: 'Hello {name}, your test counseling appointment is scheduled.',
-  },
-];
-
-for (const template of templates) {
-  batch.set(db.collection('templates').doc(template.id), template, { merge: true });
-}
+// The app initializes the standard message templates on first load.
 
 const placeholderCareers = {
   technology: [

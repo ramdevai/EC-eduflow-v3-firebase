@@ -24,6 +24,7 @@ export type DashboardTab =
   | 'today'
   | 'school-programmes'
   | 'careers'
+  | 'partnerships'
   | 'templates'
   | 'lost'
   | 'analysis'
@@ -231,5 +232,67 @@ export interface Career {
   description: string;
   status: 'active' | 'archived';
   createdAt: string;
+  updatedAt: string;
+}
+
+// Partnerships: the commercial/admissions relationship with an Institution
+// (MOU, commission terms, referral point of contact). Institution identity
+// and general contacts stay on the shared Institution master above -
+// Partnership only owns the terms and the referral point of contact, which
+// may differ from Institution.contacts.
+export type PartnershipStatus = 'Prospecting' | 'Active' | 'Inactive';
+
+export interface Partnership {
+  id: string;
+  institutionId: string;
+  institutionName: string; // denormalized for lists
+  status: PartnershipStatus;
+  pointOfContact: InstitutionContact;
+  mouSigned: boolean;
+  commissionTerms?: string; // free text, e.g. "10% of first-year tuition"
+  notes?: string;
+  tags?: string[];
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+// A single lead referred to a partner institution for admission, tracked
+// through to commission outcome. Kept as its own top-level collection
+// (rather than embedded on Partnership, the way SchoolProgramme embeds
+// sessions) so it can be queried by due-date across every partnership and
+// by lead.
+export type ReferralStatus =
+  | 'Referred'
+  | 'Intimated'
+  | 'Acknowledged'
+  | 'Admitted'
+  | 'Commission Due'
+  | 'Commission Paid'
+  | 'Declined';
+
+export interface ReferralTimelineEntry {
+  date: string;
+  note: string;
+  byUid: string;
+}
+
+export interface Referral {
+  id: string;
+  leadId: string;
+  leadName: string; // denormalized
+  partnershipId: string;
+  institutionId: string;
+  institutionName: string; // denormalized
+  status: ReferralStatus;
+  referredAt: string;
+  referredBy: string;
+  intimatedAt?: string;
+  intimatedBy?: string;
+  nextFollowUpDate?: string;
+  lastFollowUpNote?: string;
+  commissionAmount?: string;
+  commissionStatus?: 'Pending' | 'Paid';
+  timeline: ReferralTimelineEntry[];
   updatedAt: string;
 }

@@ -30,6 +30,7 @@ const BottomNav = dynamic(() => import('@/components/dashboard/BottomNav').then(
 const TodayView = dynamic(() => import('@/components/dashboard/TodayView').then(mod => mod.TodayView), { ssr: false });
 const SchoolProgrammesView = dynamic(() => import('@/components/dashboard/SchoolProgrammesView').then(mod => mod.SchoolProgrammesView), { ssr: false });
 const CareersView = dynamic(() => import('@/components/dashboard/CareersView').then(mod => mod.CareersView), { ssr: false });
+const PartnershipsView = dynamic(() => import('@/components/dashboard/PartnershipsView').then(mod => mod.PartnershipsView), { ssr: false });
 const TemplatesView = dynamic(() => import('@/components/dashboard/TemplatesView').then(mod => mod.TemplatesView), { ssr: false });
 const LostLeadsView = dynamic(() => import('@/components/dashboard/LostLeadsView').then(mod => mod.LostLeadsView), { ssr: false });
 const ImportModal = dynamic(() => import('@/components/dashboard/ImportModal').then(mod => mod.ImportModal), { ssr: false });
@@ -45,7 +46,7 @@ import { Badge } from '@/components/ui/Badge';
 
 // Utility functions
 import { cn, isActivePipelineLead, isCustomerLead, isLostLead, normalizeStage, safeFormat } from '@/lib/utils';
-import { getWhatsAppLink } from '@/lib/messaging-utils';
+import { openWhatsApp } from '@/lib/messaging-utils';
 
 const STAGES: LeadStage[] = [
   'New', 'Registration requested', 'Registration done', 'Test sent', 'Test completed', 
@@ -311,7 +312,7 @@ export default function Dashboard() {
       </div>
 
       <main className="flex-1 px-4 py-6 md:py-10 md:px-10 max-w-7xl mx-auto w-full overflow-hidden">
-        {activeTab !== 'school-programmes' && activeTab !== 'careers' && (
+        {activeTab !== 'school-programmes' && activeTab !== 'careers' && activeTab !== 'partnerships' && (
         <header className="flex flex-col gap-6 mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -391,7 +392,7 @@ export default function Dashboard() {
                         </p>
                         <div className="flex gap-2 mt-auto">
                           {isFeesReminder && <Button size="sm" variant="outline" className="flex-1 rounded-xl text-[10px] bg-emerald-50 hover:bg-emerald-100 border-emerald-100 text-emerald-600" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); updateLead(lead.id, { feesPaid: 'Paid' }); }}>Mark Paid</Button>}
-                          <Button size="sm" className="flex-1 rounded-xl text-[10px]" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); if (isFeesReminder) { window.open(getWhatsAppLink(lead, 'fees_reminder', templates), '_blank'); } else if (stage === 'Report sent') { window.open(getWhatsAppLink(lead, 'review', templates), '_blank'); } else if (stage === 'Test sent') { window.open(getWhatsAppLink(lead, 'test_nudge', templates), '_blank'); } else { window.open(getWhatsAppLink(lead, 'followup', templates), '_blank'); } }}>
+                          <Button size="sm" className="flex-1 rounded-xl text-[10px]" onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); if (isFeesReminder) { openWhatsApp(lead, 'fees_reminder', templates); } else if (stage === 'Report sent') { openWhatsApp(lead, 'review', templates); } else if (stage === 'Test sent') { openWhatsApp(lead, 'test_nudge', templates); } else { openWhatsApp(lead, 'followup', templates); } }}>
                             {isFeesReminder ? 'Remind' : stage === 'New' ? 'Follow up' : stage === 'Registration requested' ? 'Remind' : stage === 'Test sent' ? 'Remind' : stage === 'Registration done' ? 'WhatsApp' : stage === 'Report sent' ? 'Ask Review' : 'WhatsApp'}
                           </Button>
                         </div>
@@ -479,9 +480,27 @@ export default function Dashboard() {
           </div>
         )}
 
-        {activeTab === 'today' && <TodayView leads={leads} templates={templates} />}
+        {activeTab === 'today' && (
+          <TodayView
+            leads={leads}
+            templates={templates}
+            onOpenLead={(leadId) => {
+              const lead = leads.find(l => l.id === leadId);
+              if (lead) setSelectedLead(lead);
+            }}
+          />
+        )}
         {activeTab === 'school-programmes' && session?.user?.role === UserRole.Admin && <SchoolProgrammesView onMobileMenuClick={() => setIsSidebarOpen(true)} />}
         {activeTab === 'careers' && session?.user?.role === UserRole.Admin && <CareersView onMobileMenuClick={() => setIsSidebarOpen(true)} />}
+        {activeTab === 'partnerships' && (
+          <PartnershipsView
+            onMobileMenuClick={() => setIsSidebarOpen(true)}
+            onOpenLead={(leadId) => {
+              const lead = leads.find(l => l.id === leadId);
+              if (lead) setSelectedLead(lead);
+            }}
+          />
+        )}
         {activeTab === 'templates' && <TemplatesView />}
         {activeTab === 'lost' && <LostLeadsView leads={leads} updateLead={updateLead} />}
         {activeTab === 'analysis' && session?.user?.role === UserRole.Admin && <AnalysisView leads={leads} />}

@@ -13,7 +13,8 @@ import {
   TrendingDown,
   BarChart3,
   School,
-  Briefcase
+  Briefcase,
+  Handshake
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardTab, UserRole } from '@/lib/types';
@@ -124,8 +125,14 @@ export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobile
                 onClick={() => setActiveTab('school-programmes')}
               />
             )}
-            <NavButton 
-              icon={TrendingDown} 
+            <NavButton
+              icon={Handshake}
+              label="Partnerships"
+              isActive={activeTab === 'partnerships'}
+              onClick={() => setActiveTab('partnerships')}
+            />
+            <NavButton
+              icon={TrendingDown}
               label="Deals Lost" 
               isActive={activeTab === 'lost'} 
               onClick={() => setActiveTab('lost')} 

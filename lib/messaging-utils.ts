@@ -2,8 +2,10 @@ import { Lead, TEST_LINKS } from './types';
 import { normalizeStage } from './utils';
 
 export const WHATSAPP_GROUP_LINK = "https://chat.whatsapp.com/example-group-link";
+export const EDUCOMPASS_LOCATION_MAP_URL = "https://www.google.com/maps/place/eduCompass/@19.2100178,72.8707115,17z/data=!3m1!4b1!4m6!3m5!1s0x3be7b700dc01c081:0x9420b8a61dcc37e8!8m2!3d19.2100128!4d72.8732864!16s%2Fg%2F11fm3m4lky?entry=ttu";
+export const EDUCOMPASS_LOCATION_PIN = "6V6F+28 Mumbai, Maharashtra";
 
-export type MessageType = 'onboarding' | 'test' | 'test_nudge' | 'followup' | 'community' | 'review' | 'birthday' | 'fees_reminder' | 'report_email';
+export type MessageType = 'onboarding' | 'test' | 'test_nudge' | 'followup' | 'community' | 'review' | 'birthday' | 'fees_reminder' | 'report_email' | 'location';
 
 export function getMessageBody(
   lead: Lead,
@@ -49,6 +51,9 @@ export function getMessageBody(
             break;
         case 'report_email':
             message = `Dear Parent,\n\nPlease find attached the career counseling report for {studentName}.\n\nBased on our 1:1 session, we discussed the following career choices and recommendations:\n{notes}\n\n[PLEASE ATTACH THE PDF DOWNLOADED FROM EDUMILESTONES]\n\nIf you have any questions, feel free to reach out.\n\nBest regards,\nBinal\nFounder, EduCompass`;
+            break;
+        case 'location':
+            message = `Hi {name}, sharing the EduCompass location for your visit.\n\nAddress: EduCompass, Mumbai, Maharashtra\nPin: ${EDUCOMPASS_LOCATION_PIN}\nGoogle Maps: ${EDUCOMPASS_LOCATION_MAP_URL}`;
             break;
     }
   }
@@ -111,6 +116,10 @@ export function getWhatsAppLink(
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }
 
+export function openWhatsApp(lead: Lead, type: MessageType, templates?: any[]) {
+  window.open(getWhatsAppLink(lead, type, templates), 'eduflow-whatsapp');
+}
+
 export function getEmailData(
   lead: Lead,
   type: MessageType,
@@ -151,6 +160,9 @@ export function getEmailData(
           break;
       case 'report_email':
           subject = `{studentName} - Career Counseling Report`;
+          break;
+      case 'location':
+          subject = `EduCompass Location`;
           break;
     }
   }

@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.2.0] - 2026-10-02
+
+### Added
+- Partnerships directory with institution contacts, MOU and commission details, lead referrals, and partner referral reminders.
+- WhatsApp action to share the EduCompass location from lead details.
+- Editable EduCompass location message template.
+
+### Fixed
+- Restore missing standard message templates without overwriting saved customizations.
+- Reuse one named WhatsApp tab across all CRM message actions where the browser allows it.
+- Local fixture setup no longer substitutes two sample templates for the standard set.
+
+Lead follow-up history and WhatsApp message logging are deferred and are not included in this release.
+
 ## [Unreleased]
 
 ### Added

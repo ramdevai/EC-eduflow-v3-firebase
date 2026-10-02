@@ -55,10 +55,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const userEmail = token.email?.toLowerCase() || "";
         const isAdmin = ALL_ADMINS.includes(userEmail);
 
-        if (isAdmin && account.refresh_token) {
-          console.log(">> ROTATION_TOKEN_START <<", account.refresh_token, ">> ROTATION_TOKEN_END <<");
-        }
-
         let role = UserRole.Staff;
         if (isAdmin) {
           role = UserRole.Admin;
@@ -84,7 +80,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.sub;
         session.user.role = token.role as UserRole;
-        (session.user as any).googleRefreshToken = token.googleRefreshToken;
         if (token.picture) session.user.image = token.picture;
       }
       return session;

@@ -23,6 +23,16 @@ All notable changes to this project will be documented in this file.
 - Prevented duplicate lead creation when rapidly clicking the "Create Lead Profile" button by disabling it during submission.
 - Fixed grade-to-test matching logic that incorrectly routed Grade 12 students into the 2nd-7th test bucket due to order-sensitive `includes('2')` check.
 
+## [v0.1.2] - 2026-10-02
+### Fixed
+- Stacked Inquiry Date and Source fields in Lead Details on mobile and corrected label spacing.
+
+## [v0.1.1] - 2026-09-29
+### Fixed
+- Changed the automated Google Contacts sync to process the complete window since the previous successful run.
+- Prevented historical contacts from being imported merely because they were recently modified.
+- Added a safe first-run baseline and advanced the sync watermark only after successful lead writes.
+
 ## [v0.1.0] - 2026-04-09
 ### Added
 - Implementation of Google Contacts synchronization for daily lead fetching.

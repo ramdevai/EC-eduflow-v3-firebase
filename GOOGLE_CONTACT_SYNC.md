@@ -44,6 +44,8 @@ The system searches for the `DDMMYY` pattern (e.g., `150426` for April 15, 2026)
 
 The current implementation does not use `[lead]`, `lead`, labels, fuzzy matching, or "Other Contacts" for lead detection.
 
+For automated sync, the suffix must also be a real calendar date within the cron window, from the previous successful cron date through the current run date in `Asia/Kolkata`. An old suffix is not imported merely because the Google contact was modified recently.
+
 ### 2. Name Cleaning
 During import, a date suffix is stripped from the Google display name to keep the lead name clean in the CRM.
 -   **Example**: "Rahul 150426" becomes "Rahul" in Firestore.
@@ -64,6 +66,8 @@ The system uses the stored Google Contact ID to prevent duplicates:
 | **Existing Google Contact ID, manual sync** | If name, email, or phone changed, the existing lead is updated. |
 | **Existing Google Contact ID, cron sync** | Existing lead is skipped to prevent accidental overwrites. |
 
+This Google Contact ID-only lookup is intentionally unchanged by the incremental cron fix. Migrating to a lead-occurrence key so one parent contact can create sibling leads years apart is tracked as a separate backlog activity. Two sibling leads from the same Google contact on the same date remain an explicitly documented low-priority limitation.
+
 ---
 
 ## Technical Details
@@ -73,9 +77,11 @@ The system uses the stored Google Contact ID to prevent duplicates:
     -   `https://www.googleapis.com/auth/contacts.readonly`
     -   `https://www.googleapis.com/auth/calendar` (Required for shared calendar operations)
 -   **Payload**: The system fetches `names`, `emailAddresses`, `phoneNumbers`, `biographies`, and `organizations`.
--   **Quantity Limits**:
+-   **Fetch Windows**:
     -   **Manual**: Checks the top 10 most recently modified contacts for speed.
-    -   **Cron**: Checks the top 100 most recently modified contacts during off-hours.
+    -   **Cron**: Pages through all contacts modified after the previous successful cron and no later than the current run start.
+    -   The first cron run after this behavior is deployed establishes a baseline and imports no contacts, preventing historical contacts from being imported during initialization.
+    -   The cron watermark advances only after lead writes complete successfully. A failed run retries the same window next time.
 -   **Stored Field Truncation**:
     -   The sync does not truncate stored lead fields by character length.
     -   The phone value is saved as the raw Google Contacts phone value.

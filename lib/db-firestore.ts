@@ -1,4 +1,5 @@
 import 'server-only';
+import { FieldValue } from 'firebase-admin/firestore';
 
 import {
   Lead,
@@ -26,6 +27,7 @@ import {
 } from './types';
 import { compareDateValuesDesc, generateRegistrationSid, generateRegistrationToken, isLostLead, safeFormat } from './utils';
 import { adminDb } from './server-firebase';
+import { REFERRAL_FOLLOWUP_TEMPLATE, REFERRAL_STATUSES, referralForRole, referralReminderDate, referralUpdate } from './partnership-workflow';
 import { EDUCOMPASS_LOCATION_MAP_URL, EDUCOMPASS_LOCATION_PIN } from './messaging-utils';
 import { buildProgrammeSessionEventBody, upsertProgrammeSessionEvent, programmeSessionDisplayTimeTo24Hour } from './calendar';
 
@@ -566,6 +568,7 @@ export async function consumeRegistrationLink(
 
 // Template Functions
 const DEFAULT_TEMPLATES = [
+  REFERRAL_FOLLOWUP_TEMPLATE,
   { id: 'onboarding', label: 'Onboarding Message', subject: 'Registration Form - EduCompass Career Counseling', message: 'Hi {name}, this is Binal from EduCompass. Great to have you onboard! Please fill this registration form to share student details: [REGISTRATION_LINK]' },
   { id: 'test', label: 'Assessment Link', subject: 'Career Assessment Link - {name}', message: 'Hi {name}, based on your details, here is the career assessment link: {url}. Please complete this before our 1:1 session.' },
   { id: 'test_nudge', label: 'Test Nudge', subject: 'Reminder: Career Assessment Pending', message: 'Hi {name}, hope you are doing well. Just a gentle nudge to complete the career assessment test so we can proceed with our 1:1 counseling session. Link: {url}' },
@@ -1196,23 +1199,24 @@ export async function updateInstitution(
 
 // Partnerships: the commercial/admissions relationship with an Institution.
 // Company-wide (not per-counselor, matches how Leads/Users already work) -
-// no ownerUid filtering, every staff/admin sees the same list. Delete is
-// admin-only, matching deleteLead.
+// no ownerUid filtering. Master access is admin-only; staff get referral contacts.
 function assertPartnershipStatus(status?: string): void {
-  if (status !== undefined && !['Prospecting', 'Active', 'Inactive'].includes(status)) {
+  if (status !== undefined && !['Active', 'Inactive'].includes(status)) {
     throw new Error('Invalid partnership status.');
   }
 }
 
 export async function getPartnerships(): Promise<Partnership[]> {
   const snapshot = await adminDb.collection(PARTNERSHIPS_COLLECTION).orderBy('institutionName').get();
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Partnership));
+  return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id,
+    status: doc.data().status === 'Active' ? 'Active' : 'Inactive' } as Partnership));
 }
 
 export async function getPartnershipById(partnershipId: string): Promise<Partnership | null> {
   const doc = await adminDb.collection(PARTNERSHIPS_COLLECTION).doc(partnershipId).get();
   if (!doc.exists) return null;
-  return { id: doc.id, ...doc.data() } as Partnership;
+  return { ...doc.data(), id: doc.id,
+    status: doc.data()?.status === 'Active' ? 'Active' : 'Inactive' } as Partnership;
 }
 
 export async function addPartnership(callerUid: string, input: {
@@ -1236,7 +1240,7 @@ export async function addPartnership(callerUid: string, input: {
     id: docRef.id,
     institutionId: input.institutionId,
     institutionName: input.institutionName,
-    status: input.status || 'Prospecting',
+    status: input.status || 'Active',
     pointOfContact: input.pointOfContact?.name?.trim() ? input.pointOfContact : { name: '', role: '' },
     mouSigned: input.mouSigned || false,
     commissionTerms: input.commissionTerms?.trim() || '',
@@ -1272,7 +1276,9 @@ export async function updatePartnership(
   if (updates.tags !== undefined) patch.tags = updates.tags;
 
   await docRef.set(patch, { merge: true });
-  return { ...(doc.data() as Partnership), ...patch, id: partnershipId } as Partnership;
+  return { ...(doc.data() as Partnership),
+    status: doc.data()?.status === 'Active' ? 'Active' : 'Inactive',
+    ...patch, id: partnershipId } as Partnership;
 }
 
 export async function deletePartnership(callerUid: string, role: UserRole, partnershipId: string): Promise<void> {
@@ -1284,19 +1290,11 @@ export async function deletePartnership(callerUid: string, role: UserRole, partn
 
 // Referrals: one lead referred to one partner institution, tracked through
 // to commission outcome. Kept as its own top-level collection (rather than
-// embedded on Partnership) so it can be queried by due-date across every
-// partnership (Today's "Partner Follow-ups") and by lead (Lead drawer).
-const REFERRAL_STATUSES: ReferralStatus[] = [
-  'Referred', 'Intimated', 'Acknowledged', 'Admitted', 'Commission Due', 'Commission Paid', 'Declined',
-];
-const OPEN_REFERRAL_STATUSES: ReferralStatus[] = REFERRAL_STATUSES.filter(
-  status => status !== 'Commission Paid' && status !== 'Declined'
-);
+// embedded on Partnership) so it can be queried by partnership and by lead.
 
 export async function getReferrals(options?: {
   leadId?: string;
   partnershipId?: string;
-  dueForFollowUp?: boolean;
 }): Promise<Referral[]> {
   let ref: FirebaseFirestore.Query = adminDb.collection(REFERRALS_COLLECTION);
 
@@ -1308,16 +1306,8 @@ export async function getReferrals(options?: {
   }
 
   const snapshot = await ref.get();
-  let referrals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Referral));
+  const referrals = snapshot.docs.map(doc => referralForRole({ ...doc.data(), id: doc.id } as Referral, UserRole.Admin));
 
-  if (options?.dueForFollowUp) {
-    const today = safeFormat(new Date());
-    referrals = referrals.filter(referral =>
-      !!referral.nextFollowUpDate &&
-      referral.nextFollowUpDate <= today &&
-      OPEN_REFERRAL_STATUSES.includes(referral.status)
-    );
-  }
 
   return referrals.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
 }
@@ -1333,7 +1323,8 @@ export async function addReferral(callerUid: string, input: {
     throw new Error('A lead and a partnership are required.');
   }
 
-  const now = safeFormat(new Date());
+  const created = new Date();
+  const now = created.toISOString();
   const docRef = adminDb.collection(REFERRALS_COLLECTION).doc();
   const referral: Referral = {
     id: docRef.id,
@@ -1343,6 +1334,7 @@ export async function addReferral(callerUid: string, input: {
     institutionId: input.institutionId,
     institutionName: input.institutionName,
     status: 'Referred',
+    nextFollowUpDate: referralReminderDate(created),
     referredAt: now,
     referredBy: callerUid,
     timeline: [{ date: now, note: `Referred to ${input.institutionName}`, byUid: callerUid }],
@@ -1357,8 +1349,7 @@ export async function updateReferral(
   callerUid: string,
   referralId: string,
   updates: Partial<Pick<Referral,
-    'status' | 'intimatedAt' | 'intimatedBy' | 'nextFollowUpDate' | 'lastFollowUpNote' |
-    'commissionAmount' | 'commissionStatus'
+    'status' | 'intimatedAt' | 'intimatedBy' | 'notificationChannel' | 'followUpChannel'
   >>,
   timelineNote?: string
 ): Promise<Referral> {
@@ -1367,20 +1358,32 @@ export async function updateReferral(
   }
 
   const docRef = adminDb.collection(REFERRALS_COLLECTION).doc(referralId);
-  const doc = await docRef.get();
-  if (!doc.exists) {
-    throw new Error('Referral not found.');
-  }
-
-  const now = safeFormat(new Date());
-  const existing = doc.data() as Referral;
-  const patch: Record<string, unknown> = { ...updates, updatedAt: now };
-
-  const note = timelineNote || (updates.status !== undefined ? `Status changed to ${updates.status}` : undefined);
-  if (note) {
-    patch.timeline = [...(existing.timeline || []), { date: now, note, byUid: callerUid } as ReferralTimelineEntry];
-  }
-
-  await docRef.set(patch, { merge: true });
-  return { ...existing, ...patch, id: referralId } as Referral;
+  return adminDb.runTransaction(async transaction => {
+    const doc = await transaction.get(docRef);
+    if (!doc.exists) throw new Error('Referral not found.');
+    const existing = doc.data() as Referral;
+    const joining = updates.status === 'Due' && referralForRole(existing, UserRole.Admin).status !== 'Due';
+    const otherReferrals = joining
+      ? await transaction.get(adminDb.collection(REFERRALS_COLLECTION).where('leadId', '==', existing.leadId))
+      : null;
+    const now = new Date();
+    const patch = referralUpdate(existing, updates, now);
+    const note = timelineNote || (updates.status !== undefined ? `Status changed to ${updates.status}` : undefined);
+    if (note) patch.timeline = [...(existing.timeline || []), { date: now.toISOString(), note, byUid: callerUid }];
+    transaction.set(docRef, { ...patch, commissionStatus: FieldValue.delete() }, { merge: true });
+    for (const other of otherReferrals?.docs || []) {
+      if (other.id === referralId) continue;
+      const otherReferral = other.data() as Referral;
+      if (referralForRole(otherReferral, UserRole.Admin).status !== 'Referred') continue;
+      const closed = referralUpdate(otherReferral, { status: 'Didnt join' }, now);
+      closed.timeline = [...(otherReferral.timeline || []), {
+        date: now.toISOString(), byUid: callerUid,
+        note: `Automatically marked Didn't Join because the student joined ${existing.institutionName}`,
+      }];
+      transaction.set(other.ref, { ...closed, commissionStatus: FieldValue.delete() }, { merge: true });
+    }
+    // Remove legacy commission state so future reads use the new status.
+    const { commissionStatus: _legacy, ...result } = { ...existing, ...patch, id: referralId } as Referral & { commissionStatus?: string };
+    return referralForRole(result, UserRole.Admin);
+  });
 }

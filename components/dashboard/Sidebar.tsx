@@ -125,12 +125,12 @@ export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobile
                 onClick={() => setActiveTab('school-programmes')}
               />
             )}
-            <NavButton
-              icon={Handshake}
-              label="Partnerships"
-              isActive={activeTab === 'partnerships'}
-              onClick={() => setActiveTab('partnerships')}
-            />
+              <NavButton
+                icon={Handshake}
+                label={session?.user?.role === UserRole.Admin ? 'Partnerships' : 'Referrals'}
+                isActive={activeTab === 'partnerships'}
+                onClick={() => setActiveTab('partnerships')}
+              />
             <NavButton
               icon={TrendingDown}
               label="Deals Lost" 

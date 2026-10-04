@@ -73,6 +73,9 @@ interface LeadDrawerProps {
   fetchLeads: () => void;
   stages: LeadStage[];
   templates?: any[];
+  initialSection?: string;
+  focusedReferralId?: string;
+  onReferralsChanged?: () => void;
 }
 
 type BusySlot = {
@@ -82,11 +85,17 @@ type BusySlot = {
   end: string;
 };
 
-export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates }: LeadDrawerProps) {
+export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates, initialSection, focusedReferralId, onReferralsChanged }: LeadDrawerProps) {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === UserRole.Admin;
 
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(initialSection || null);
+  useEffect(() => {
+    if (!initialSection) return;
+    setActiveSection(initialSection);
+    const frame = requestAnimationFrame(() => document.getElementById(`lead-section-${initialSection}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    return () => cancelAnimationFrame(frame);
+  }, [initialSection, focusedReferralId]);
   const [localStage, setLocalStage] = useState<LeadStage | null>(lead.stage);
   const [localFeesPaid, setLocalFeesPaid] = useState<FeesPaidStatus>(lead.feesPaid || 'Due');
   const [copied, setCopied] = useState(false);
@@ -426,6 +435,8 @@ const data = await res.json();
   const SectionHeader = ({ id, title, icon: Icon }: { id: string, title: string, icon: any }) => (
     <button
       type="button"
+      id={`lead-section-${id}`}
+      aria-expanded={activeSection === id}
       onMouseDown={(e) => e.preventDefault()}
       onClick={(e) => {
         e.preventDefault();
@@ -449,24 +460,13 @@ const data = await res.json();
     const duration = systemSettings.defaultSessionDuration || 90;
     const days = systemSettings.calendarLookaheadDays || 3;
 
-    // Combine busy and available slots
-    const allSlots = [
-      // Busy
-      ...busySlots.map(slot => ({
-        type: 'booked' as const,
-        start: new Date(slot.start),
-        end: new Date(slot.end),
-        data: slot,
-      })),
-      // Available (with adjustments)
-      ...freeSlots.map(slot => ({
-        type: 'available' as const,
+    const availableSlots = freeSlots
+      .map(slot => ({
         start: new Date(slot),
         end: new Date(new Date(slot).getTime() + duration * 60 * 1000),
-        title: `${duration} MIN`,
         data: slot,
-      })),
-    ].sort((a, b) => a.start.getTime() - b.start.getTime());
+      }))
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
 
     return (
       <Card className="p-5 sm:p-6 border border-emerald-100 dark:border-emerald-900 bg-emerald-50/60 dark:bg-slate-950 mt-3 shadow-sm">
@@ -493,14 +493,14 @@ const data = await res.json();
           <div className="flex items-center gap-3 text-sm text-slate-400 py-12 justify-center">
             <RefreshCw className="animate-spin" size={18} /> Checking calendar...
           </div>
-        ) : allSlots.length === 0 ? (
+        ) : availableSlots.length === 0 ? (
           <div className="py-12 text-center border border-dashed border-slate-200 dark:border-slate-700 rounded-3xl">
             <AlertCircle className="mx-auto text-amber-500 mb-3" size={28} />
             <p className="font-medium text-slate-600 dark:text-slate-400">No slots available in the next {days} days.</p>
           </div>
         ) : (
           <div className="space-y-8">
-            {Object.entries(allSlots.reduce((acc, slot) => {
+            {Object.entries(availableSlots.reduce((acc, slot) => {
               const dayKey = safeFormat(slot.start, 'yyyy-MM-dd');
               if (!acc[dayKey]) acc[dayKey] = [];
               acc[dayKey].push(slot);
@@ -513,29 +513,7 @@ const data = await res.json();
                     {dayName}
                   </div>
 
-                  {/* All slots sorted by time (busy appears naturally in chronological order) */}
                   {daySlots.map((slot, i) => {
-                    const isBusy = slot.type === 'booked';
-                    const start = slot.start;
-                    const end = slot.end;
-
-                    if (isBusy) {
-                      return (
-                        <SlotCard key={i} variant="busy" className="p-4 flex items-center gap-4">
-                          <div className="px-4 py-2 bg-red-100 dark:bg-red-900/80 text-red-600 dark:text-red-300 text-[10px] font-black tracking-widest rounded-2xl">
-                            BUSY
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-semibold text-red-600 dark:text-red-400 text-sm truncate">{slot.data.title || 'Busy'}</div>
-                            <div className="text-xs text-red-600/80 dark:text-red-400/80 font-medium">
-                              {safeFormat(start, 'h:mm a')} – {safeFormat(end, 'h:mm a')}
-                            </div>
-                          </div>
-                        </SlotCard>
-                      );
-                    }
-
-                    // Available slot
                     const originalStart = slot.data;
                     const adjustedStart = getAdjustedStart(originalStart);
                     const endTime = new Date(adjustedStart.getTime() + duration * 60 * 1000);
@@ -917,7 +895,7 @@ const data = await res.json();
                 {/* Partnerships Section */}
                 <SectionHeader id="partnerships" title="Partnerships" icon={Handshake} />
                 {activeSection === 'partnerships' && (
-                    <DrawerPartnershipForm lead={lead} />
+                    <DrawerPartnershipForm lead={lead} focusedReferralId={focusedReferralId} templates={templates} onChanged={onReferralsChanged} />
                 )}
 
 

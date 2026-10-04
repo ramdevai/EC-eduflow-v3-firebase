@@ -152,10 +152,15 @@ export function TemplatesView() {
                                     placeholder={`Enter ${template.label}...`}
                                 />
                             </div>
-                            <div className="flex gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                            <div className="flex flex-wrap gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
                                 <span>Placeholders:</span>
-                                <code className="text-primary-600 dark:text-primary-400">{'{name}'}</code>
+                                {template.id !== 'referral_followup' && <code className="text-primary-600 dark:text-primary-400">{'{name}'}</code>}
                                 <code className="text-primary-600 dark:text-primary-400">{'{studentName}'}</code>
+                                {template.id === 'referral_followup' && <>
+                                    <code className="text-primary-600 dark:text-primary-400">{'{institutionName}'}</code>
+                                    <code className="text-primary-600 dark:text-primary-400">{'{contactName}'}</code>
+                                    <code className="text-primary-600 dark:text-primary-400">{'{followUpRequest}'}</code>
+                                </>}
                                 {template.id === 'onboarding' || template.id === 'followup' || template.id === 'fees_reminder' ? (
                                     <code className="text-primary-600 dark:text-primary-400">{'{REGISTRATION_LINK}'}</code>
                                 ) : null}

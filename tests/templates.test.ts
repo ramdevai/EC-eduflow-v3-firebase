@@ -43,7 +43,7 @@ import { getTemplates } from '@/lib/db-firestore';
 
 const expectedIds = [
   'onboarding', 'test', 'test_nudge', 'followup', 'community',
-  'review', 'birthday', 'report_email', 'fees_reminder', 'location',
+  'review', 'birthday', 'report_email', 'fees_reminder', 'location', 'referral_followup',
 ];
 
 describe('template recovery', () => {
@@ -59,7 +59,7 @@ describe('template recovery', () => {
     const templates = await getTemplates();
 
     expect(templates.map(template => template.id)).toEqual(expect.arrayContaining(expectedIds));
-    expect(templates).toHaveLength(12);
+    expect(templates).toHaveLength(13);
     expect(documents.get('registration')?.message).toBe('Local registration');
   });
 

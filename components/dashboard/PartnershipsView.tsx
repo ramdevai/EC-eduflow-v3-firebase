@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Building2, ChevronLeft, Loader2, Mail, Menu, Phone, Plus, X } from 'lucide-react';
+import { AlertCircle, Building2, ChevronLeft, Loader2, Mail, Phone, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
+import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
 import { Institution, Partnership, PartnershipStatus, Referral } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const STATUS_BADGE: Record<PartnershipStatus, 'default' | 'success' | 'warning'> = {
-  Prospecting: 'warning',
   Active: 'success',
   Inactive: 'default',
 };
@@ -30,7 +30,7 @@ type PartnershipFormValues = {
 const EMPTY_FORM: PartnershipFormValues = {
   institutionId: '',
   newInstitutionName: '',
-  status: 'Prospecting',
+  status: 'Active',
   mouSigned: false,
   commissionTerms: '',
   notes: '',
@@ -124,23 +124,18 @@ function PartnershipFormModal({
           <div className="grid grid-cols-2 gap-3">
             <label className="grid gap-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Status</span>
-              <select
-                value={values.status}
-                onChange={event => onChange({ ...values, status: event.target.value as PartnershipStatus })}
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-primary-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
-              >
-                <option value="Prospecting">Prospecting</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
-              </select>
+              <span className="flex h-10 items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                <ToggleSwitch label="Partnership active"
+                  checked={values.status === 'Active'}
+                  onChange={checked => onChange({ ...values, status: checked ? 'Active' : 'Inactive' })} />
+                {values.status}
+              </span>
             </label>
             <label className="grid gap-2 self-end pb-2.5">
               <span className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-                <input
-                  type="checkbox"
+                <ToggleSwitch label="MOU signed"
                   checked={values.mouSigned}
-                  onChange={event => onChange({ ...values, mouSigned: event.target.checked })}
-                  className="h-4 w-4 rounded border-slate-300"
+                  onChange={checked => onChange({ ...values, mouSigned: checked })}
                 />
                 MOU Signed
               </span>
@@ -209,24 +204,17 @@ function PartnershipFormModal({
   );
 }
 
-function commissionTotal(referrals: Referral[], status: 'Pending' | 'Paid'): number {
-  return referrals
-    .filter(r => r.commissionStatus === status)
-    .reduce((sum, r) => {
-      const parsed = parseFloat((r.commissionAmount || '').replace(/[^0-9.]/g, ''));
-      return sum + (Number.isFinite(parsed) ? parsed : 0);
-    }, 0);
-}
-
 function PartnershipDetail({
   partnership,
   onBack,
   onOpenLead,
   onUpdate,
+  saving,
 }: {
   partnership: Partnership;
   onBack: () => void;
-  onOpenLead?: (leadId: string) => void;
+  onOpenLead?: (leadId: string, referralId?: string) => void;
+  saving: boolean;
   onUpdate: (id: string, updates: Partial<Pick<Partnership, 'status' | 'pointOfContact' | 'mouSigned' | 'commissionTerms' | 'notes'>>) => void;
 }) {
   const [referrals, setReferrals] = useState<Referral[]>([]);
@@ -254,8 +242,9 @@ function PartnershipDetail({
     return () => { cancelled = true; };
   }, [partnership.id]);
 
-  const pending = commissionTotal(referrals, 'Pending');
-  const paid = commissionTotal(referrals, 'Paid');
+  const pending = referrals.filter(r => r.status === 'Due').length;
+  const paid = referrals.filter(r => r.status === 'Paid').length;
+  const isInactive = partnership.status === 'Inactive';
 
   return (
     <div>
@@ -263,30 +252,34 @@ function PartnershipDetail({
         <ChevronLeft size={16} /> Back to Partnerships
       </button>
 
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <h2 className="mb-5 break-words text-2xl font-black text-slate-950 dark:text-white">{partnership.institutionName}</h2>
+
+      <div className="mb-6 grid gap-4 border-y border-slate-200 py-4 dark:border-slate-800 sm:grid-cols-2">
         <div>
-          <select
-            value={partnership.status}
-            onChange={e => onUpdate(partnership.id, { status: e.target.value as Partnership['status'] })}
-            className="text-[10px] font-black uppercase tracking-widest text-primary-600 bg-transparent outline-none -ml-1"
-          >
-            <option value="Prospecting">Prospecting</option>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
-          </select>
-          <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">{partnership.institutionName}</h2>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Partnership Status</p>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            <ToggleSwitch label="Partnership active"
+              disabled={saving}
+              checked={partnership.status === 'Active'}
+              onChange={checked => onUpdate(partnership.id, { status: checked ? 'Active' : 'Inactive' })} />
+            <Badge variant={STATUS_BADGE[partnership.status]}>{partnership.status}</Badge>
+          </label>
         </div>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
+        <div>
+          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-400">MOU</p>
+          <label className={cn("inline-flex items-center gap-2", isInactive ? "cursor-not-allowed opacity-60" : "cursor-pointer")}>
+          <ToggleSwitch label="MOU signed"
+            disabled={isInactive || saving}
             checked={partnership.mouSigned}
-            onChange={e => onUpdate(partnership.id, { mouSigned: e.target.checked })}
-            className="h-4 w-4 rounded border-slate-300"
+            onChange={checked => onUpdate(partnership.id, { mouSigned: checked })}
           />
           <Badge variant={partnership.mouSigned ? 'success' : 'default'}>{partnership.mouSigned ? 'MOU Signed' : 'No MOU'}</Badge>
-        </label>
+          </label>
+        </div>
       </div>
 
+      <fieldset disabled={isInactive || saving} aria-label="Partnership details"
+        className={cn("min-w-0 border-0 p-0", isInactive && "opacity-60 [&_input]:cursor-not-allowed [&_textarea]:cursor-not-allowed")}>
       <div className="grid gap-4 sm:grid-cols-2 mb-6">
         <Card className="p-4">
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Point of Contact</p>
@@ -326,8 +319,8 @@ function PartnershipDetail({
             className="w-full h-9 mb-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-2 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-primary-400"
           />
           <div className="flex gap-4">
-            <div><p className="text-lg font-black text-amber-600">{pending.toLocaleString()}</p><p className="text-[10px] font-bold uppercase text-slate-400">Pending</p></div>
-            <div><p className="text-lg font-black text-emerald-600">{paid.toLocaleString()}</p><p className="text-[10px] font-bold uppercase text-slate-400">Paid</p></div>
+            <div><p className="text-lg font-black text-amber-600">{pending}</p><p className="text-[10px] font-bold uppercase text-slate-400">Referrals - Commission Due</p></div>
+            <div><p className="text-lg font-black text-emerald-600">{paid}</p><p className="text-[10px] font-bold uppercase text-slate-400">Referrals - Commission Paid</p></div>
           </div>
         </Card>
       </div>
@@ -342,6 +335,8 @@ function PartnershipDetail({
         />
       </Card>
 
+      </fieldset>
+
       <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Referral History</p>
       {loading ? (
         <div className="flex items-center justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-primary-600" /></div>
@@ -353,7 +348,7 @@ function PartnershipDetail({
             <Card
               key={referral.id}
               className={cn("p-4 flex items-center justify-between gap-3", onOpenLead && "cursor-pointer hover:border-primary-300")}
-              onClick={() => onOpenLead?.(referral.leadId)}
+              onClick={() => onOpenLead?.(referral.leadId, referral.id)}
             >
               <div>
                 <p className="text-sm font-bold text-slate-900 dark:text-white">{referral.leadName}</p>
@@ -361,9 +356,6 @@ function PartnershipDetail({
               </div>
               <div className="text-right">
                 <Badge variant="info">{referral.status}</Badge>
-                {referral.commissionAmount && (
-                  <p className="mt-1 text-xs font-bold text-slate-500">{referral.commissionAmount} · {referral.commissionStatus || 'Pending'}</p>
-                )}
               </div>
             </Card>
           ))}
@@ -375,7 +367,7 @@ function PartnershipDetail({
 
 interface PartnershipsViewProps {
   onMobileMenuClick?: () => void;
-  onOpenLead?: (leadId: string) => void;
+  onOpenLead?: (leadId: string, referralId?: string) => void;
 }
 
 export function PartnershipsView({ onMobileMenuClick, onOpenLead }: PartnershipsViewProps) {
@@ -477,6 +469,7 @@ export function PartnershipsView({ onMobileMenuClick, onOpenLead }: Partnerships
   }
 
   async function updatePartnership(id: string, updates: Partial<Pick<Partnership, 'status' | 'pointOfContact' | 'mouSigned' | 'commissionTerms' | 'notes'>>) {
+    setBusy(true);
     setActionError(null);
     try {
       const res = await fetch(`/api/partnerships/${id}`, {
@@ -489,6 +482,8 @@ export function PartnershipsView({ onMobileMenuClick, onOpenLead }: Partnerships
       setPartnerships(current => current.map(p => p.id === id ? data.partnership : p));
     } catch (err: any) {
       setActionError(err.message || 'Failed to update partnership');
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -520,13 +515,6 @@ export function PartnershipsView({ onMobileMenuClick, onOpenLead }: Partnerships
   return (
     <div className="min-h-[calc(100vh-8rem)]">
       <div className="mb-6 flex items-center justify-between gap-3 lg:hidden">
-        <button
-          onClick={onMobileMenuClick}
-          className="rounded-xl border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
-          aria-label="Open navigation"
-        >
-          <Menu size={20} />
-        </button>
         <h2 className="text-base font-black text-slate-950 dark:text-white">Partnerships</h2>
         {!selectedPartnership && (
           <Button size="sm" className="rounded-xl text-[10px]" onClick={openAddForm}>
@@ -555,7 +543,7 @@ export function PartnershipsView({ onMobileMenuClick, onOpenLead }: Partnerships
       )}
 
       {selectedPartnership ? (
-        <PartnershipDetail partnership={selectedPartnership} onBack={() => setSelectedPartnershipId(null)} onOpenLead={onOpenLead} onUpdate={updatePartnership} />
+        <PartnershipDetail partnership={selectedPartnership} saving={busy} onBack={() => setSelectedPartnershipId(null)} onOpenLead={onOpenLead} onUpdate={updatePartnership} />
       ) : partnerships.length === 0 ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm font-bold text-slate-500 dark:border-slate-800 dark:bg-slate-900">
           No partnerships yet. Add one to start referring students for admission.

@@ -12,6 +12,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
+  if (session.user.role !== UserRole.Admin) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
   const { id } = await params;
 
   try {
@@ -43,6 +46,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
+  if (session.user.role !== UserRole.Admin) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
   const { id } = await params;
 
   try {

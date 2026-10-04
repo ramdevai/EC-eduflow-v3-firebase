@@ -30,7 +30,7 @@ const BottomNav = dynamic(() => import('@/components/dashboard/BottomNav').then(
 const TodayView = dynamic(() => import('@/components/dashboard/TodayView').then(mod => mod.TodayView), { ssr: false });
 const SchoolProgrammesView = dynamic(() => import('@/components/dashboard/SchoolProgrammesView').then(mod => mod.SchoolProgrammesView), { ssr: false });
 const CareersView = dynamic(() => import('@/components/dashboard/CareersView').then(mod => mod.CareersView), { ssr: false });
-const PartnershipsView = dynamic(() => import('@/components/dashboard/PartnershipsView').then(mod => mod.PartnershipsView), { ssr: false });
+const PartnershipsHub = dynamic(() => import('@/components/dashboard/PartnershipsHub').then(mod => mod.PartnershipsHub), { ssr: false });
 const TemplatesView = dynamic(() => import('@/components/dashboard/TemplatesView').then(mod => mod.TemplatesView), { ssr: false });
 const LostLeadsView = dynamic(() => import('@/components/dashboard/LostLeadsView').then(mod => mod.LostLeadsView), { ssr: false });
 const ImportModal = dynamic(() => import('@/components/dashboard/ImportModal').then(mod => mod.ImportModal), { ssr: false });
@@ -78,6 +78,8 @@ export default function Dashboard() {
   const [selectedStage, setSelectedStage] = useState<LeadStage | 'All'>('All');
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [referralFocus, setReferralFocus] = useState<{ leadId: string; referralId?: string } | null>(null);
+  const [referralsRevision, setReferralsRevision] = useState(0);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -123,6 +125,14 @@ export default function Dashboard() {
       setActiveTab('leads');
     }
   }, [activeTab, session?.user?.role]);
+
+  const openReferralLead = (leadId: string, referralId?: string) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (lead) {
+      setReferralFocus({ leadId, referralId });
+      setSelectedLead(lead);
+    }
+  };
 
   const closeTopOverlay = useCallback(() => {
     if (selectedLead) {
@@ -484,21 +494,17 @@ export default function Dashboard() {
           <TodayView
             leads={leads}
             templates={templates}
-            onOpenLead={(leadId) => {
-              const lead = leads.find(l => l.id === leadId);
-              if (lead) setSelectedLead(lead);
-            }}
+            onOpenLead={openReferralLead}
+            referralsRevision={referralsRevision}
           />
         )}
         {activeTab === 'school-programmes' && session?.user?.role === UserRole.Admin && <SchoolProgrammesView onMobileMenuClick={() => setIsSidebarOpen(true)} />}
         {activeTab === 'careers' && session?.user?.role === UserRole.Admin && <CareersView onMobileMenuClick={() => setIsSidebarOpen(true)} />}
         {activeTab === 'partnerships' && (
-          <PartnershipsView
+          <PartnershipsHub
             onMobileMenuClick={() => setIsSidebarOpen(true)}
-            onOpenLead={(leadId) => {
-              const lead = leads.find(l => l.id === leadId);
-              if (lead) setSelectedLead(lead);
-            }}
+            onOpenLead={openReferralLead}
+            reloadKey={referralsRevision}
           />
         )}
         {activeTab === 'templates' && <TemplatesView />}
@@ -510,7 +516,10 @@ export default function Dashboard() {
 
       <AnimatePresence>
         {currentLead && (
-          <LeadDrawer key={`lead-drawer-${currentLead.id}`} lead={currentLead} onClose={() => setSelectedLead(null)} onUpdate={updateLead} onDelete={deleteLead} fetchLeads={fetchLeads} stages={STAGES} templates={templates} />
+          <LeadDrawer key={`lead-drawer-${currentLead.id}`} lead={currentLead} onClose={() => { setSelectedLead(null); setReferralFocus(null); }} onUpdate={updateLead} onDelete={deleteLead} fetchLeads={fetchLeads} stages={STAGES} templates={templates}
+            initialSection={referralFocus?.leadId === currentLead.id ? 'partnerships' : undefined}
+            focusedReferralId={referralFocus?.leadId === currentLead.id ? referralFocus.referralId : undefined}
+            onReferralsChanged={() => setReferralsRevision(value => value + 1)} />
         )}
       </AnimatePresence>
       <AnimatePresence mode="wait">

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSession } from "next-auth/react";
 import { Lead } from '@/lib/types';
+import { FollowUpSummary } from '@/lib/follow-ups';
 import { differenceInDays } from 'date-fns';
 import { isActivePipelineLead, isCustomerLead, isLostLead, normalizeStage, safeParseISO, safeFormat } from '@/lib/utils';
 
@@ -336,7 +337,12 @@ export function useLeads() {
     }
   }, [session?.user?.id, session?.user?.role]);
 
+  const applyFollowUpSummary = useCallback((id: string, summary: FollowUpSummary) => {
+    setLeads(current => current.map(lead => lead.id === id ? { ...lead, ...summary } : lead));
+  }, []);
+
   return {
+    applyFollowUpSummary,
     leads,
     counts,
     templates,

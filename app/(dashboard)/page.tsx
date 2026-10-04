@@ -47,6 +47,7 @@ import { Badge } from '@/components/ui/Badge';
 // Utility functions
 import { cn, isActivePipelineLead, isCustomerLead, isLostLead, normalizeStage, safeFormat } from '@/lib/utils';
 import { openWhatsApp } from '@/lib/messaging-utils';
+import { WHATSAPP_FOLLOW_UP_EVENT, WhatsAppFollowUpDraft } from '@/lib/follow-ups';
 
 const STAGES: LeadStage[] = [
   'New', 'Registration requested', 'Registration done', 'Test sent', 'Test completed', 
@@ -71,13 +72,15 @@ export default function Dashboard() {
     fetchAllLeadsForSearch,
     updateLead, 
     deleteLead, 
-    addLead 
+    addLead,
+    applyFollowUpSummary
   } = useLeads();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<LeadStage | 'All'>('All');
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [followUpDraft, setFollowUpDraft] = useState<WhatsAppFollowUpDraft | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -91,6 +94,18 @@ export default function Dashboard() {
     if (!selectedLead) return null;
     return leads.find(l => l.id === selectedLead.id) || selectedLead;
   }, [leads, selectedLead]);
+
+  useEffect(() => {
+    const handleWhatsApp = (event: Event) => {
+      const draft = (event as CustomEvent<WhatsAppFollowUpDraft>).detail;
+      const lead = leads.find(item => item.id === draft.leadId);
+      if (lead) { setSelectedLead(lead); setFollowUpDraft(draft); }
+    };
+    window.addEventListener(WHATSAPP_FOLLOW_UP_EVENT, handleWhatsApp);
+    return () => window.removeEventListener(WHATSAPP_FOLLOW_UP_EVENT, handleWhatsApp);
+  }, [leads]);
+
+  useEffect(() => { if (!selectedLead) setFollowUpDraft(null); }, [selectedLead]);
 
   useEffect(() => {
     if ((session as any)?.error === "RefreshAccessTokenError") {
@@ -510,7 +525,7 @@ export default function Dashboard() {
 
       <AnimatePresence>
         {currentLead && (
-          <LeadDrawer key={`lead-drawer-${currentLead.id}`} lead={currentLead} onClose={() => setSelectedLead(null)} onUpdate={updateLead} onDelete={deleteLead} fetchLeads={fetchLeads} stages={STAGES} templates={templates} />
+          <LeadDrawer key={`lead-drawer-${currentLead.id}`} lead={currentLead} onClose={() => setSelectedLead(null)} onUpdate={updateLead} onDelete={deleteLead} fetchLeads={fetchLeads} stages={STAGES} templates={templates} followUpDraft={followUpDraft?.leadId === currentLead.id ? followUpDraft : null} onFollowUpRecorded={summary => applyFollowUpSummary(currentLead.id, summary)} onFollowUpDraftConsumed={() => setFollowUpDraft(null)} />
         )}
       </AnimatePresence>
       <AnimatePresence mode="wait">

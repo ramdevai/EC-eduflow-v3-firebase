@@ -50,6 +50,8 @@ import { DrawerCounselingForm } from './drawer/DrawerCounselingForm';
 import { DrawerPipelineForm } from './drawer/DrawerPipelineForm';
 import { DrawerFeesForm } from './drawer/DrawerFeesForm';
 import { DrawerPartnershipForm } from './drawer/DrawerPartnershipForm';
+import { DrawerFollowUps } from './drawer/DrawerFollowUps';
+import { FollowUpSummary, WhatsAppFollowUpDraft } from '@/lib/follow-ups';
 
 const TEST_OPTIONS = [
   { name: "Career Analysis for 2nd to 7th class", url: "https://careertest.edumilestones.com/student-dashboard/suitability-registration/login/OTI2/as11" },
@@ -73,6 +75,9 @@ interface LeadDrawerProps {
   fetchLeads: () => void;
   stages: LeadStage[];
   templates?: any[];
+  followUpDraft?: WhatsAppFollowUpDraft | null;
+  onFollowUpRecorded: (summary: FollowUpSummary) => void;
+  onFollowUpDraftConsumed: () => void;
 }
 
 type BusySlot = {
@@ -82,7 +87,7 @@ type BusySlot = {
   end: string;
 };
 
-export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates }: LeadDrawerProps) {
+export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates, followUpDraft, onFollowUpRecorded, onFollowUpDraftConsumed }: LeadDrawerProps) {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === UserRole.Admin;
 
@@ -98,6 +103,7 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
   const [isScheduling, setIsScheduling] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [emailComposerType, setEmailComposerType] = useState<MessageType | null>(null);
+  const [followUpRefreshKey, setFollowUpRefreshKey] = useState(0);
   const [slotAdjustments, setSlotAdjustments] = useState<Record<string, number>>({});
 
   // Scheduling Settings (loaded from admin settings - hardcoded for now to avoid server bundle issues)
@@ -845,6 +851,7 @@ const data = await res.json();
               </div>
 
               {/* Dynamic Action Area */}
+              <DrawerFollowUps lead={lead} draft={followUpDraft} onRecorded={onFollowUpRecorded} onDraftConsumed={onFollowUpDraftConsumed} refreshKey={followUpRefreshKey} />
               <div className="mb-8">
                   {renderActionArea()}
               </div>
@@ -1235,6 +1242,10 @@ const data = await res.json();
           lead={lead}
           onClose={() => setEmailComposerType(null)}
           onSuccess={(result) => {
+            if (result?.followUp?.summary) {
+                onFollowUpRecorded(result.followUp.summary);
+                setFollowUpRefreshKey(value => value + 1);
+            }
             if (emailComposerType === 'report_email') {
                 handleStageChange('Report sent');
             } else if (emailComposerType === 'test') {
@@ -1246,11 +1257,12 @@ const data = await res.json();
             const msg = result?.savedToSent 
               ? 'Email sent and saved to INBOX.ECRM-sent!' 
               : 'Email sent successfully (check Sent folder manually)';
-            alert(msg);
+            alert(result?.followUpWarning ? `${msg}\n\n${result.followUpWarning}` : msg);
           }}
           initialSubject={getEmailData(lead, emailComposerType, templates).subject}
           initialBody={getEmailData(lead, emailComposerType, templates).body}
           recipients={getEmailData(lead, emailComposerType, templates).recipients}
+          messageType={emailComposerType}
         />
       )}
     </>

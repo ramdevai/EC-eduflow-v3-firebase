@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { getWhatsAppLink, getEmailData, getEmailLink, getMessageBody, getTestLinkByGrade } from '@/lib/messaging-utils';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { getWhatsAppLink, getEmailData, getEmailLink, getMessageBody, getTestLinkByGrade, getFollowUpMessageType, openWhatsApp } from '@/lib/messaging-utils';
 import { Lead } from '@/lib/types';
 
 describe('messaging utils', () => {
+  afterEach(() => vi.unstubAllGlobals());
   const mockLead: Lead = {
     id: 1,
     name: 'John Doe',
@@ -25,6 +26,34 @@ describe('messaging utils', () => {
     const decoded = decodeURIComponent(link);
     expect(decoded).toContain('register/test-token');
     expect(decoded).not.toContain('careertest.edumilestones.com');
+  });
+
+  it('distinguishes inquiry follow-ups from registration reminders', () => {
+    expect(getFollowUpMessageType(mockLead, 'followup')).toBe('followup');
+    expect(getFollowUpMessageType({ ...mockLead, stage: 'Registration requested' }, 'followup')).toBe('registration_reminder');
+    expect(getFollowUpMessageType(mockLead, 'onboarding')).toBe('onboarding');
+    expect(getFollowUpMessageType(mockLead, 'test')).toBe('test');
+  });
+
+  it('prepares a titled WhatsApp confirmation without retaining message text', () => {
+    const dispatchEvent = vi.fn();
+    vi.stubGlobal('window', { open: vi.fn(() => ({})), location: { origin: 'http://localhost:3001' }, dispatchEvent });
+    vi.stubGlobal('crypto', { randomUUID: () => '9d1a7e6c-2f63-4b8f-a195-43f4fa819b78' });
+    vi.stubGlobal('CustomEvent', class {
+      constructor(public type: string, public options: { detail: unknown }) {}
+    });
+    openWhatsApp({ ...mockLead, stage: 'Registration requested' }, 'followup');
+    const detail = dispatchEvent.mock.calls[0][0].options.detail;
+    expect(detail.messageType).toBe('registration_reminder');
+    expect(detail.happenedAt).toBeTruthy();
+    expect(detail).not.toHaveProperty('message');
+  });
+
+  it('does not prepare a confirmation when WhatsApp opening is blocked', () => {
+    const dispatchEvent = vi.fn();
+    vi.stubGlobal('window', { open: vi.fn(() => null), location: { origin: 'http://localhost:3001' }, dispatchEvent });
+    openWhatsApp(mockLead, 'test');
+    expect(dispatchEvent).not.toHaveBeenCalled();
   });
 
   it('should generate correct test link for test stage', () => {

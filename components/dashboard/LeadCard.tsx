@@ -87,6 +87,7 @@ export const LeadCard = memo(function LeadCard({ lead, onClick }: LeadCardProps)
           )}
         </div>
 
+        {!!lead.followUpCount && <div className="mb-3 space-y-1 text-[11px] text-slate-500"><p>{lead.followUpCount} follow-ups · Last {safeFormat(lead.lastFollowUp, 'dd MMM')}</p><p>{lead.lastFollowUpOutcome}{lead.nextFollowUpDate ? ` · Next ${safeFormat(lead.nextFollowUpDate, 'dd MMM')}` : ''}</p></div>}
         <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
             <Clock size={12} />

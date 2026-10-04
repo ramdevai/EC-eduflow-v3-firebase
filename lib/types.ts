@@ -79,6 +79,9 @@ export interface Lead {
   // Counseling & Business
   notes: string; // Counseling notes
   lastFollowUp: string;
+  followUpCount?: number;
+  lastFollowUpOutcome?: string;
+  nextFollowUpDate?: string;
   testLink: string;
   appointmentTime: string;
   feesPaid: FeesPaidStatus;

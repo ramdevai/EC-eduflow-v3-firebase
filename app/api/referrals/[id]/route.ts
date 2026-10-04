@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { updateReferral } from '@/lib/db-firestore';
+import { UserRole } from '@/lib/types';
+import { referralForRole } from '@/lib/partnership-workflow';
+import { z } from 'zod';
+
+const updateSchema = z.object({
+  status: z.enum(['Referred', 'Due', 'Paid', 'Didnt join']).optional(),
+  notificationChannel: z.enum(['Email', 'WhatsApp']).optional(),
+  followUpChannel: z.enum(['Email', 'WhatsApp']).optional(),
+}).strict();
 
 export async function PATCH(
   req: Request,
@@ -14,18 +23,25 @@ export async function PATCH(
   const { id } = await params;
 
   try {
-    const body = await req.json();
+    const body = updateSchema.safeParse(await req.json());
+    if (!body.success) {
+      return NextResponse.json({ error: 'Invalid referral update' }, { status: 400 });
+    }
+    if (body.data.status !== undefined && session.user.role !== UserRole.Admin) {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
     const updates: Record<string, unknown> = {};
-    if (body?.status !== undefined) updates.status = body.status;
-    if (body?.intimatedAt !== undefined) updates.intimatedAt = body.intimatedAt;
-    if (body?.intimatedBy !== undefined) updates.intimatedBy = body.intimatedBy;
-    if (body?.nextFollowUpDate !== undefined) updates.nextFollowUpDate = body.nextFollowUpDate;
-    if (body?.lastFollowUpNote !== undefined) updates.lastFollowUpNote = body.lastFollowUpNote;
-    if (body?.commissionAmount !== undefined) updates.commissionAmount = body.commissionAmount;
-    if (body?.commissionStatus !== undefined) updates.commissionStatus = body.commissionStatus;
-
-    const referral = await updateReferral(session.user.id, id, updates, body?.timelineNote);
-    return NextResponse.json({ referral });
+    if (body.data.status !== undefined) updates.status = body.data.status;
+    if (body.data.followUpChannel !== undefined) updates.followUpChannel = body.data.followUpChannel;
+    if (body.data.notificationChannel) {
+      updates.notificationChannel = body.data.notificationChannel;
+      updates.intimatedAt = new Date().toISOString();
+      updates.intimatedBy = session.user.id;
+    }
+    const note = body.data.followUpChannel ? `Referral follow-up sent by ${body.data.followUpChannel}`
+      : body.data.notificationChannel ? `Institute notified by ${body.data.notificationChannel}` : undefined;
+    const referral = await updateReferral(session.user.id, id, updates, note);
+    return NextResponse.json({ referral: referralForRole(referral, session.user.role) });
   } catch (error: any) {
     console.error('PATCH referral error:', error.message);
     const message = error.message || 'Failed to update referral';

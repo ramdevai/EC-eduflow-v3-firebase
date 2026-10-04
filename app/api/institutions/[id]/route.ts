@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { updateInstitution } from '@/lib/db-firestore';
+import { UserRole } from '@/lib/types';
 
 export async function PATCH(
   req: Request,
@@ -11,6 +12,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
+  if (session.user.role !== UserRole.Admin) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
   const { id } = await params;
 
   try {

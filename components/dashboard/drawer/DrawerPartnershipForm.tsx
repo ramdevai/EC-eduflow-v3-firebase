@@ -2,27 +2,24 @@
 
 import React, { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { Lead, Partnership, Referral, ReferralStatus } from '@/lib/types';
+import { Lead, Referral, ReferralStatus, UserRole } from '@/lib/types';
+import { ReferralPartner, partnerWhatsAppLink, REFERRAL_STATUSES, referralClosed, referralFollowUpMessage, referralReminderDue } from '@/lib/partnership-workflow';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Loader2, Mail, Send, X } from 'lucide-react';
-
-const REFERRAL_STATUSES: ReferralStatus[] = [
-  'Referred', 'Intimated', 'Acknowledged', 'Admitted', 'Commission Due', 'Commission Paid', 'Declined',
-];
+import { Loader2, Mail, MessageSquare, Send, X } from 'lucide-react';
 
 const STATUS_BADGE: Record<ReferralStatus, 'default' | 'success' | 'warning' | 'info' | 'error'> = {
   Referred: 'default',
-  Intimated: 'info',
-  Acknowledged: 'info',
-  Admitted: 'success',
-  'Commission Due': 'warning',
-  'Commission Paid': 'success',
-  Declined: 'error',
+  Due: 'warning',
+  Paid: 'success',
+  'Didnt join': 'default',
 };
 
 interface Props {
   lead: Lead;
+  focusedReferralId?: string;
+  templates?: any[];
+  onChanged?: () => void;
 }
 
 function IntimateModal({
@@ -30,21 +27,33 @@ function IntimateModal({
   lead,
   onClose,
   onSent,
+  channel,
+  referral,
+  isFollowUp,
+  templates,
 }: {
-  partnership: Partnership;
+  partnership: ReferralPartner;
   lead: Lead;
   onClose: () => void;
-  onSent: () => void;
+  onSent: () => Promise<void>;
+  channel: 'Email' | 'WhatsApp';
+  referral: Referral;
+  isFollowUp: boolean;
+  templates?: any[];
 }) {
   const studentName = lead.studentName || lead.name;
-  const [subject, setSubject] = useState(`Student Referral - ${studentName}`);
+  const followUp = referralFollowUpMessage(referral, partnership.pointOfContact?.name || '', templates);
+  const [subject, setSubject] = useState(isFollowUp ? followUp.subject : `Student Referral - ${studentName}`);
   const [body, setBody] = useState(
-    `Hi ${partnership.pointOfContact?.name || ''},\n\nI'd like to refer ${studentName} for admission consideration at ${partnership.institutionName}.\n\nParent/Guardian: ${lead.name}\nContact: ${lead.phone}${lead.email ? ` / ${lead.email}` : ''}\n\nPlease let us know once a decision is made so we can follow up.\n\nThanks,\nEduCompass`
+    isFollowUp ? followUp.body : `Hi ${partnership.pointOfContact?.name || ''},\n\nWe have recommended ${partnership.institutionName} to ${studentName} and would like to intimate you of this referral.\n\nParent/Guardian: ${lead.name}\nContact: ${lead.phone}${lead.email ? ` / ${lead.email}` : ''}\n\nThanks,\nEduCompass`
   );
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [whatsAppOpened, setWhatsAppOpened] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
-  const recipient = partnership.pointOfContact?.email;
+  const recipient = channel === 'Email' ? partnership.pointOfContact?.email : partnership.pointOfContact?.phone;
+  const whatsAppLink = partnerWhatsAppLink(partnership.pointOfContact?.phone || '', body);
 
   async function handleSend() {
     if (!recipient) {
@@ -54,6 +63,7 @@ function IntimateModal({
     setSending(true);
     setError(null);
     try {
+      if (!emailSent) {
       const formData = new FormData();
       formData.append('to', recipient);
       formData.append('subject', subject);
@@ -61,9 +71,23 @@ function IntimateModal({
       const res = await fetch('/api/email/send', { method: 'POST', body: formData });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.details || data.error || 'Failed to send email');
-      onSent();
+      setEmailSent(true);
+      }
+      await onSent();
     } catch (err: any) {
       setError(err.message || 'Failed to send email');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function confirmWhatsApp() {
+    setSending(true);
+    setError(null);
+    try {
+      await onSent();
+    } catch (err: any) {
+      setError(err.message || 'Failed to record notification');
     } finally {
       setSending(false);
     }
@@ -76,7 +100,7 @@ function IntimateModal({
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center"><Mail size={18} /></div>
             <div>
-              <h3 className="text-sm font-black text-slate-900 dark:text-white">Intimate {partnership.institutionName}</h3>
+              <h3 className="text-sm font-black text-slate-900 dark:text-white">{isFollowUp ? 'Follow up with' : 'Notify'} {partnership.institutionName} by {channel}</h3>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">To: {recipient || 'No contact email on file'}</p>
             </div>
           </div>
@@ -84,11 +108,11 @@ function IntimateModal({
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {error && <div className="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-xl text-red-600 text-xs font-bold">{error}</div>}
-          <input
+          {channel === 'Email' && <input
             value={subject}
             onChange={e => setSubject(e.target.value)}
             className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold outline-none focus:border-primary-500"
-          />
+          />}
           <textarea
             value={body}
             onChange={e => setBody(e.target.value)}
@@ -98,24 +122,40 @@ function IntimateModal({
         </div>
         <div className="p-5 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-3">
           <Button variant="outline" className="rounded-xl" onClick={onClose} disabled={sending}>Cancel</Button>
-          <Button className="rounded-xl" onClick={handleSend} disabled={sending || !recipient}>
-            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} Send
-          </Button>
+          {channel === 'Email' ? (
+            <Button className="rounded-xl" onClick={handleSend} disabled={sending || !recipient}>
+              {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />} {emailSent ? 'Record Sent Email' : 'Send Email'}
+            </Button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <Button variant="outline" disabled={!whatsAppLink || sending} onClick={() => {
+                if (!whatsAppLink) return;
+                window.open(whatsAppLink, 'eduflow-whatsapp');
+                setWhatsAppOpened(true);
+              }}><MessageSquare size={16} /> Open WhatsApp</Button>
+              <Button disabled={!whatsAppOpened || sending} onClick={confirmWhatsApp}>
+                {sending && <Loader2 size={16} className="animate-spin" />} Confirm Sent
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-export function DrawerPartnershipForm({ lead }: Props) {
+export function DrawerPartnershipForm({ lead, focusedReferralId, templates, onChanged }: Props) {
   const { data: session } = useSession();
-  const [partnerships, setPartnerships] = useState<Partnership[]>([]);
+  const [partnerships, setPartnerships] = useState<ReferralPartner[]>([]);
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPartnershipId, setSelectedPartnershipId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [intimatingReferral, setIntimatingReferral] = useState<Referral | null>(null);
+  const [notificationChannel, setNotificationChannel] = useState<'Email' | 'WhatsApp'>('Email');
+  const [isFollowUp, setIsFollowUp] = useState(false);
+  const isAdmin = session?.user?.role === UserRole.Admin;
 
   useEffect(() => {
     let cancelled = false;
@@ -123,15 +163,18 @@ export function DrawerPartnershipForm({ lead }: Props) {
       setLoading(true);
       try {
         const [partnershipsRes, referralsRes] = await Promise.all([
-          fetch('/api/partnerships'),
+          fetch('/api/partnerships?forReferral=true'),
           fetch(`/api/referrals?leadId=${lead.id}`),
         ]);
         const partnershipsData = await partnershipsRes.json().catch(() => ({}));
         const referralsData = await referralsRes.json().catch(() => ({}));
+        if (!partnershipsRes.ok || !referralsRes.ok) throw new Error('Failed to load referrals');
         if (!cancelled) {
           setPartnerships(partnershipsData.partnerships || []);
           setReferrals(referralsData.referrals || []);
         }
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Failed to load referrals');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -140,11 +183,11 @@ export function DrawerPartnershipForm({ lead }: Props) {
     return () => { cancelled = true; };
   }, [lead.id]);
 
-  async function refreshReferrals() {
-    const res = await fetch(`/api/referrals?leadId=${lead.id}`);
-    const data = await res.json().catch(() => ({}));
-    setReferrals(data.referrals || []);
-  }
+  useEffect(() => {
+    if (loading || !focusedReferralId) return;
+    const frame = requestAnimationFrame(() => document.getElementById(`referral-${focusedReferralId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    return () => cancelAnimationFrame(frame);
+  }, [loading, focusedReferralId]);
 
   async function referToPartner() {
     const partnership = partnerships.find(p => p.id === selectedPartnershipId);
@@ -167,6 +210,7 @@ export function DrawerPartnershipForm({ lead }: Props) {
       if (!res.ok) throw new Error(data.error || 'Failed to create referral');
       setReferrals(current => [data.referral, ...current]);
       setSelectedPartnershipId('');
+      onChanged?.();
     } catch (err: any) {
       setError(err.message || 'Failed to create referral');
     } finally {
@@ -186,8 +230,20 @@ export function DrawerPartnershipForm({ lead }: Props) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Failed to update referral');
       setReferrals(current => current.map(r => r.id === referralId ? data.referral : r));
+      if (updates.status === 'Due') {
+        try {
+          const refreshed = await fetch(`/api/referrals?leadId=${encodeURIComponent(lead.id)}`);
+          if (!refreshed.ok) throw new Error('Refresh failed');
+          const latest = await refreshed.json();
+          setReferrals(latest.referrals || []);
+        } catch {
+          setError('Status saved. Reopen this section to see updates to the other referrals.');
+        }
+      }
+      onChanged?.();
     } catch (err: any) {
       setError(err.message || 'Failed to update referral');
+      throw err;
     } finally {
       setBusy(false);
     }
@@ -196,10 +252,7 @@ export function DrawerPartnershipForm({ lead }: Props) {
   async function handleIntimated() {
     if (!intimatingReferral || !session?.user?.id) return;
     await patchReferral(intimatingReferral.id, {
-      status: 'Intimated',
-      intimatedAt: new Date().toISOString(),
-      intimatedBy: session.user.id,
-      timelineNote: `Intimated ${intimatingReferral.institutionName} by email`,
+      ...(isFollowUp ? { followUpChannel: notificationChannel } : { notificationChannel }),
     });
     setIntimatingReferral(null);
   }
@@ -212,28 +265,28 @@ export function DrawerPartnershipForm({ lead }: Props) {
     <div className="space-y-5">
       {error && <div className="p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/20 rounded-xl text-red-600 text-xs font-bold">{error}</div>}
 
-      {partnerships.length === 0 ? (
-        <p className="text-xs font-medium text-slate-400">No partnerships set up yet. Add one from the Partnerships tab first.</p>
+      {!partnerships.some(p => p.status === 'Active') ? (
+        <p className="text-xs font-medium text-slate-400">No active partners available.</p>
       ) : (
         <div className="flex gap-2">
-          <select
+                <select
             value={selectedPartnershipId}
             onChange={e => setSelectedPartnershipId(e.target.value)}
             className="flex-1 h-11 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-primary-500"
           >
-            <option value="">Refer to a partner...</option>
-            {partnerships.map(p => (
+            <option value="">Institute recommended to student...</option>
+            {partnerships.filter(p => p.status === 'Active').map(p => (
               <option key={p.id} value={p.id}>{p.institutionName}</option>
             ))}
           </select>
-          <Button className="rounded-2xl" onClick={referToPartner} disabled={busy || !selectedPartnershipId}>Refer</Button>
+          <Button className="rounded-2xl" onClick={referToPartner} disabled={busy || !selectedPartnershipId}>Record Referral</Button>
         </div>
       )}
 
       {referrals.length > 0 && (
         <div className="space-y-4">
           {referrals.map(referral => (
-            <div key={referral.id} className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
+            <div key={referral.id} id={`referral-${referral.id}`} className="scroll-mt-4 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-black text-slate-900 dark:text-white">{referral.institutionName}</p>
                 <Badge variant={STATUS_BADGE[referral.status]}>{referral.status}</Badge>
@@ -244,53 +297,45 @@ export function DrawerPartnershipForm({ lead }: Props) {
                   size="sm"
                   variant="outline"
                   className="rounded-xl text-[10px]"
-                  onClick={() => setIntimatingReferral(referral)}
-                  disabled={busy}
+                  onClick={() => { setIsFollowUp(false); setNotificationChannel('Email'); setIntimatingReferral(referral); }}
+                  disabled={busy || !partnerships.find(p => p.id === referral.partnershipId)?.pointOfContact?.email}
                 >
-                  <Mail size={12} /> Intimate Institute
+                  <Mail size={12} /> Notify by Email
                 </Button>
-                <select
+                <Button size="sm" variant="outline" className="rounded-xl text-[10px]"
+                  onClick={() => { setIsFollowUp(false); setNotificationChannel('WhatsApp'); setIntimatingReferral(referral); }}
+                  disabled={busy || !partnerWhatsAppLink(partnerships.find(p => p.id === referral.partnershipId)?.pointOfContact?.phone || '', '')}>
+                  <MessageSquare size={12} /> Notify by WhatsApp
+                </Button>
+                {isAdmin && <select
                   value={referral.status}
-                  onChange={e => patchReferral(referral.id, { status: e.target.value })}
+                  onChange={e => { void patchReferral(referral.id, { status: e.target.value }).catch(() => {}); }}
                   disabled={busy}
                   className="h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 text-[10px] font-bold text-slate-600 dark:text-slate-300 outline-none"
                 >
                   {REFERRAL_STATUSES.map(status => (
                     <option key={status} value={status}>{status}</option>
                   ))}
-                </select>
+                </select>}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <label className="grid gap-1">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Follow up on</span>
-                  <input
-                    type="date"
-                    defaultValue={referral.nextFollowUpDate || ''}
-                    onBlur={e => { if (e.target.value !== referral.nextFollowUpDate) patchReferral(referral.id, { nextFollowUpDate: e.target.value }); }}
-                    className="h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none"
-                  />
-                </label>
-                <label className="grid gap-1">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Commission Amount</span>
-                  <input
-                    defaultValue={referral.commissionAmount || ''}
-                    onBlur={e => { if (e.target.value !== referral.commissionAmount) patchReferral(referral.id, { commissionAmount: e.target.value }); }}
-                    placeholder="e.g. ₹15,000"
-                    className="h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none"
-                  />
-                </label>
-              </div>
-
-              <label className="grid gap-1">
-                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Follow-up Note</span>
-                <input
-                  defaultValue={referral.lastFollowUpNote || ''}
-                  onBlur={e => { if (e.target.value !== referral.lastFollowUpNote) patchReferral(referral.id, { lastFollowUpNote: e.target.value }); }}
-                  placeholder="What happened on the last check-in?"
-                  className="h-8 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 text-[11px] font-bold text-slate-600 dark:text-slate-300 outline-none"
-                />
-              </label>
+              {referral.intimatedAt && <p className="text-xs text-slate-500">Institute notified{referral.notificationChannel ? ` by ${referral.notificationChannel}` : ''}</p>}
+              {!referralClosed(referral.status) && <div className="space-y-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+                <p className={`text-xs ${referralReminderDue(referral) ? 'font-bold text-amber-700 dark:text-amber-400' : 'text-slate-500'}`}>
+                  {referralReminderDue(referral) ? 'Follow-up due' : 'Next follow-up'}: {referral.nextFollowUpDate || 'Not scheduled'}
+                </p>
+                {referral.lastFollowUpAt && <p className="text-xs text-slate-500">Last follow-up: {new Date(referral.lastFollowUpAt).toLocaleDateString('en-IN')} by {referral.followUpChannel}</p>}
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { setIsFollowUp(true); setNotificationChannel('Email'); setIntimatingReferral(referral); }}
+                    disabled={busy || !partnerships.find(p => p.id === referral.partnershipId)?.pointOfContact?.email}>
+                    <Mail size={14} /> Follow up by Email
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { setIsFollowUp(true); setNotificationChannel('WhatsApp'); setIntimatingReferral(referral); }}
+                    disabled={busy || !partnerWhatsAppLink(partnerships.find(p => p.id === referral.partnershipId)?.pointOfContact?.phone || '', '')}>
+                    <MessageSquare size={14} /> Follow up by WhatsApp
+                  </Button>
+                </div>
+              </div>}
             </div>
           ))}
         </div>
@@ -302,16 +347,16 @@ export function DrawerPartnershipForm({ lead }: Props) {
             id: intimatingReferral.partnershipId,
             institutionId: intimatingReferral.institutionId,
             institutionName: intimatingReferral.institutionName,
-            status: 'Active',
             pointOfContact: { name: '', role: '' },
-            mouSigned: false,
-            createdAt: '',
-            updatedAt: '',
-            createdBy: '',
+            status: 'Inactive',
           }}
           lead={lead}
           onClose={() => setIntimatingReferral(null)}
           onSent={handleIntimated}
+          channel={notificationChannel}
+          referral={intimatingReferral}
+          isFollowUp={isFollowUp}
+          templates={templates}
         />
       )}
     </div>

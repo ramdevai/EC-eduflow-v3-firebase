@@ -243,7 +243,7 @@ export interface Career {
 // and general contacts stay on the shared Institution master above -
 // Partnership only owns the terms and the referral point of contact, which
 // may differ from Institution.contacts.
-export type PartnershipStatus = 'Prospecting' | 'Active' | 'Inactive';
+export type PartnershipStatus = 'Active' | 'Inactive';
 
 export interface Partnership {
   id: string;
@@ -263,16 +263,12 @@ export interface Partnership {
 // A single lead referred to a partner institution for admission, tracked
 // through to commission outcome. Kept as its own top-level collection
 // (rather than embedded on Partnership, the way SchoolProgramme embeds
-// sessions) so it can be queried by due-date across every partnership and
-// by lead.
+// sessions) so it can be queried by partnership and by lead.
 export type ReferralStatus =
   | 'Referred'
-  | 'Intimated'
-  | 'Acknowledged'
-  | 'Admitted'
-  | 'Commission Due'
-  | 'Commission Paid'
-  | 'Declined';
+  | 'Due'
+  | 'Paid'
+  | 'Didnt join';
 
 export interface ReferralTimelineEntry {
   date: string;
@@ -292,10 +288,10 @@ export interface Referral {
   referredBy: string;
   intimatedAt?: string;
   intimatedBy?: string;
-  nextFollowUpDate?: string;
-  lastFollowUpNote?: string;
-  commissionAmount?: string;
-  commissionStatus?: 'Pending' | 'Paid';
+  notificationChannel?: 'Email' | 'WhatsApp';
+  nextFollowUpDate?: string | null;
+  lastFollowUpAt?: string;
+  followUpChannel?: 'Email' | 'WhatsApp';
   timeline: ReferralTimelineEntry[];
   updatedAt: string;
 }

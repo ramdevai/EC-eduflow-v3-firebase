@@ -2,16 +2,23 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { addPartnership, getPartnerships } from '@/lib/db-firestore';
 import { UserRole } from '@/lib/types';
+import { partnerForReferral } from '@/lib/partnership-workflow';
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth() as any;
   if (!session?.user?.id || !session?.user?.role) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
+  const forReferral = new URL(req.url).searchParams.get('forReferral') === 'true';
+  if (!forReferral && session.user.role !== UserRole.Admin) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
   try {
     const partnerships = await getPartnerships();
-    return NextResponse.json({ partnerships });
+    return NextResponse.json({ partnerships: forReferral
+      ? partnerships.map(partnerForReferral)
+      : partnerships });
   } catch (error: any) {
     console.error('GET partnerships error:', error.message);
     return NextResponse.json({ error: error.message || 'Failed to fetch partnerships' }, { status: 500 });
@@ -22,6 +29,9 @@ export async function POST(req: Request) {
   const session = await auth() as any;
   if (!session?.user?.id || !session?.user?.role) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+  }
+  if (session.user.role !== UserRole.Admin) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
   }
 
   try {

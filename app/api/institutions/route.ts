@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { addInstitution, getInstitutions } from '@/lib/db-firestore';
+import { UserRole } from '@/lib/types';
 
 export async function GET() {
   const session = await auth() as any;
@@ -23,6 +24,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
+  if (session.user.role !== UserRole.Admin) {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
   try {
     const body = await req.json();
     if (typeof body?.name !== 'string') {

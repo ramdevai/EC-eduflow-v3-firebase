@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { addReferral, getReferrals } from '@/lib/db-firestore';
+import { addReferral, getReferrals, getPartnershipById } from '@/lib/db-firestore';
+import { UserRole } from '@/lib/types';
+import { referralForRole, referralReminderDue } from '@/lib/partnership-workflow';
 
 export async function GET(req: Request) {
   const session = await auth() as any;
@@ -11,11 +13,11 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const leadId = searchParams.get('leadId') || undefined;
   const partnershipId = searchParams.get('partnershipId') || undefined;
-  const dueForFollowUp = searchParams.get('dueForFollowUp') === 'true';
 
   try {
-    const referrals = await getReferrals({ leadId, partnershipId, dueForFollowUp });
-    return NextResponse.json({ referrals });
+    const referrals = await getReferrals({ leadId, partnershipId });
+    const visible = referrals.map(r => referralForRole(r, session.user.role));
+    return NextResponse.json({ referrals: searchParams.get('remindersOnly') === 'true' ? visible.filter(r => referralReminderDue(r)) : visible });
   } catch (error: any) {
     console.error('GET referrals error:', error.message);
     return NextResponse.json({ error: error.message || 'Failed to fetch referrals' }, { status: 500 });
@@ -40,14 +42,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'A lead and a partnership are required' }, { status: 400 });
     }
 
+    const partner = await getPartnershipById(body.partnershipId);
+    if (!partner || partner.status !== 'Active') {
+      return NextResponse.json({ error: 'An active partnership is required' }, { status: 400 });
+    }
     const referral = await addReferral(session.user.id, {
       leadId: body.leadId,
       leadName: body.leadName,
       partnershipId: body.partnershipId,
-      institutionId: body.institutionId,
-      institutionName: body.institutionName,
+      institutionId: partner.institutionId,
+      institutionName: partner.institutionName,
     });
-    return NextResponse.json({ referral }, { status: 201 });
+    return NextResponse.json({ referral: referralForRole(referral, session.user.role) }, { status: 201 });
   } catch (error: any) {
     console.error('POST referrals error:', error.message);
     const message = error.message || 'Failed to create referral';

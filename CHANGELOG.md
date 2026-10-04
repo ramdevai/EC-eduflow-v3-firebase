@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.4.0] - 2026-10-04
+
+### Added
+- Separate Partnerships and Referrals sections with an admin-only partnership master and staff referral access.
+- Active/Inactive and MOU Signed toggle switches; inactive partnership details are disabled.
+- Student-grouped referral listing with readable dates and explicit follow-up filters.
+- Referral links open the lead drawer at the expanded Partnerships section and selected referral.
+- Editable institute referral follow-up template for email and WhatsApp.
+- Recurring 30-day in-app reminders after referral, joining (Due), and each confirmed follow-up.
+
+### Changed
+- Use Referred, Due (joined, commission owed), Paid, and Didnt join statuses; status changes are admin-only.
+- Marking a referral Due automatically closes the student's other Referred entries as Didnt join and stops their reminders, preserving Due/Paid entries and manual overrides.
+- Paid/Didnt join stop reminders. Referral amounts and payment-ledger tracking are omitted.
+- Retain existing lead follow-up history, messaging confirmations, and booking fixes.
+
 ## [v0.3.0] - 2026-10-04
 
 ### Added

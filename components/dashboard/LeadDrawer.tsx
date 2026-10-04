@@ -78,6 +78,9 @@ interface LeadDrawerProps {
   followUpDraft?: WhatsAppFollowUpDraft | null;
   onFollowUpRecorded: (summary: FollowUpSummary) => void;
   onFollowUpDraftConsumed: () => void;
+  initialSection?: string;
+  focusedReferralId?: string;
+  onReferralsChanged?: () => void;
 }
 
 type BusySlot = {
@@ -87,11 +90,17 @@ type BusySlot = {
   end: string;
 };
 
-export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates, followUpDraft, onFollowUpRecorded, onFollowUpDraftConsumed }: LeadDrawerProps) {
+export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, onDelete, fetchLeads, stages, templates, followUpDraft, onFollowUpRecorded, onFollowUpDraftConsumed, initialSection, focusedReferralId, onReferralsChanged }: LeadDrawerProps) {
   const { data: session } = useSession();
   const isAdmin = session?.user?.role === UserRole.Admin;
 
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<string | null>(initialSection || null);
+  useEffect(() => {
+    if (!initialSection) return;
+    setActiveSection(initialSection);
+    const frame = requestAnimationFrame(() => document.getElementById(`lead-section-${initialSection}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    return () => cancelAnimationFrame(frame);
+  }, [initialSection, focusedReferralId]);
   const [localStage, setLocalStage] = useState<LeadStage | null>(lead.stage);
   const [localFeesPaid, setLocalFeesPaid] = useState<FeesPaidStatus>(lead.feesPaid || 'Due');
   const [copied, setCopied] = useState(false);
@@ -432,6 +441,8 @@ const data = await res.json();
   const SectionHeader = ({ id, title, icon: Icon }: { id: string, title: string, icon: any }) => (
     <button
       type="button"
+      id={`lead-section-${id}`}
+      aria-expanded={activeSection === id}
       onMouseDown={(e) => e.preventDefault()}
       onClick={(e) => {
         e.preventDefault();
@@ -891,7 +902,7 @@ const data = await res.json();
                 {/* Partnerships Section */}
                 <SectionHeader id="partnerships" title="Partnerships" icon={Handshake} />
                 {activeSection === 'partnerships' && (
-                    <DrawerPartnershipForm lead={lead} />
+                    <DrawerPartnershipForm lead={lead} focusedReferralId={focusedReferralId} templates={templates} onChanged={onReferralsChanged} />
                 )}
 
 

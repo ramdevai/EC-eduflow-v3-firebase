@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.3.0] - 2026-10-04
+
+### Added
+- Lead follow-up history with contact outcomes, staff attribution, and next-contact dates.
+- Compact titled WhatsApp confirmations with a "Mark as sent" action.
+- Automatic follow-up entries after successful Eduflow emails, preserving planned next-contact dates.
+- Distinct titles for inquiry follow-ups, registration reminders, assessment links, and other message actions.
+
+### Changed
+- Show only the latest contact by default, with show/hide and pagination for older history.
+- Combine channel and action title on one line and italicise staff attribution; omit message bodies from history.
+- Keep local review fixtures isolated from production data.
+
+## [v0.2.1] - 2026-10-04
+
+### Fixed
+- Show only available slots in the booking calendar.
+- Restore a cleared calendar lookahead field to the 3-day default and keep values within 1-14 whole days.
+- Display the default when an empty or invalid calendar lookahead setting is loaded.
+
 ## [v0.2.0] - 2026-10-02
 
 ### Added

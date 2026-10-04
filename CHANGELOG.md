@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.2.1] - 2026-10-04
+
+### Fixed
+- Show only available slots in the booking calendar.
+- Restore a cleared calendar lookahead field to the 3-day default and keep values within 1-14 whole days.
+- Display the default when an empty or invalid calendar lookahead setting is loaded.
+
 ## [v0.2.0] - 2026-10-02
 
 ### Added

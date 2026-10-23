@@ -22,6 +22,12 @@ export async function PATCH(
 
   try {
     const body = await req.json();
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Invalid lead update' }, { status: 400 });
+    }
+    if (['followUpCount', 'lastFollowUp', 'lastFollowUpOutcome', 'nextFollowUpDate'].some(field => field in body)) {
+      return NextResponse.json({ error: 'Record a follow-up to update contact history' }, { status: 400 });
+    }
     await updateLeads(session.user.id, session.user.role as UserRole, [{ id, data: body }]);
     return NextResponse.json({ success: true });
   } catch (error: any) {

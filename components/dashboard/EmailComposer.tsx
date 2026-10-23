@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Lead } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { getFollowUpMessageType, MessageType } from '@/lib/messaging-utils';
 
 interface EmailComposerProps {
   lead: Lead;
@@ -22,14 +23,16 @@ interface EmailComposerProps {
   initialSubject: string;
   initialBody: string;
   recipients: string[];
+  messageType: MessageType;
 }
 
-export function EmailComposer({ lead, onClose, onSuccess, initialSubject, initialBody, recipients }: EmailComposerProps) {
+export function EmailComposer({ lead, onClose, onSuccess, initialSubject, initialBody, recipients, messageType }: EmailComposerProps) {
   const [subject, setSubject] = useState(initialSubject);
   const [body, setBody] = useState(initialBody);
   const [file, setFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requestId] = useState(() => crypto.randomUUID());
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -43,6 +46,7 @@ export function EmailComposer({ lead, onClose, onSuccess, initialSubject, initia
   };
 
   const handleSend = async () => {
+    if (sending) return;
     setSending(true);
     setError(null);
 
@@ -50,6 +54,9 @@ export function EmailComposer({ lead, onClose, onSuccess, initialSubject, initia
     formData.append('to', recipients.join(', '));
     formData.append('subject', subject);
     formData.append('body', body);
+    formData.append('leadId', lead.id);
+    formData.append('messageType', getFollowUpMessageType(lead, messageType));
+    formData.append('requestId', requestId);
     if (file) {
       formData.append('report', file);
     }

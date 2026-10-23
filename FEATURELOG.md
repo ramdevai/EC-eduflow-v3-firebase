@@ -11,5 +11,6 @@ This file tracks the status and description of features in the EduCompass CRM.
 | **Google Contacts Sync** | ✅ Active | Automated daily fetching of leads identified by date suffix. |
 | **Delegated Admin Access**| ✅ Active | Shared access to Admin's Google Calendar and Contacts for Staff. |
 | **Communication Center** | ✅ Active | WhatsApp and Email templates for outreach. |
+| **Lead Follow-Up History** | Active in 0.3.0 | Confirmed WhatsApp actions, automatic sent-email contacts, manual conversations, next-contact dates, and compact expandable history. |
 | **Public Registration** | ✅ Active | Unique links for students to fill their profile details. |
 | **Manual Data Import** | ✅ Active | Importing leads from external Google Sheets (Sheet migration utility). |

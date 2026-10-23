@@ -59,6 +59,7 @@ export const ListView = memo(function ListView({ leads, onLeadClick }: ListViewP
                 <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Status</th>
                 <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Education</th>
                 <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Date</th>
+                <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Follow-ups</th>
                 <th className="p-4 text-right"></th>
               </tr>
             </thead>
@@ -92,6 +93,11 @@ export const ListView = memo(function ListView({ leads, onLeadClick }: ListViewP
                       <Clock size={14} className="text-slate-300" />
                       {safeFormat(lead.inquiryDate)}
                     </div>
+                  </td>
+                  <td className="p-4 text-xs text-slate-500">
+                    <p>{lead.followUpCount || 0} follow-ups</p>
+                    {lead.lastFollowUp && <p className="mt-1 text-[10px]">Last {safeFormat(lead.lastFollowUp, 'dd MMM')} · {lead.lastFollowUpOutcome}</p>}
+                    {lead.nextFollowUpDate && <p className="mt-1 text-[10px] text-primary-600">Next {safeFormat(lead.nextFollowUpDate, 'dd MMM')}</p>}
                   </td>
                   <td className="p-4 text-right">
                     <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-slate-400">

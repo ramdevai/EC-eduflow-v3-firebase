@@ -45,6 +45,11 @@ interface Props {
 
 type Tab = 'general' | 'integrations' | 'staff' | 'utilities' | 'about';
 
+const normalizeCalendarLookaheadDays = (value: number) =>
+    Number.isFinite(value)
+        ? Math.min(14, Math.max(1, Math.trunc(value)))
+        : DEFAULT_SYSTEM_SETTINGS.calendarLookaheadDays;
+
 export const SettingsModal = ({ onClose, onImportLeads }: Props) => {
     const { data: session } = useSession();
     const isAdmin = session?.user?.role === UserRole.Admin;
@@ -97,7 +102,10 @@ export const SettingsModal = ({ onClose, onImportLeads }: Props) => {
         const res = await fetch('/api/admin/settings');
         if (res.ok) {
           const data = await res.json();
-          setSettings(data);
+          setSettings({
+            ...data,
+            calendarLookaheadDays: normalizeCalendarLookaheadDays(data.calendarLookaheadDays),
+          });
         }
       } catch (error) {
         console.error('Failed to load settings', error);
@@ -440,8 +448,14 @@ export const SettingsModal = ({ onClose, onImportLeads }: Props) => {
                                                  type="number" 
                                                  min="1" 
                                                  max="14" 
+                                                 step="1"
+                                                 required
                                                  value={settings.calendarLookaheadDays}
-                                                 onChange={(e) => saveSettings({ calendarLookaheadDays: parseInt(e.target.value) })}
+                                                 onChange={(e) => {
+                                                     const calendarLookaheadDays = normalizeCalendarLookaheadDays(e.target.valueAsNumber);
+                                                     setSettings(prev => ({ ...prev, calendarLookaheadDays }));
+                                                     void saveSettings({ calendarLookaheadDays });
+                                                 }}
                                                  className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-medium focus:border-primary-500 outline-none"
                                              />
                                              <p className="text-[10px] text-slate-400 mt-1">Maximum days shown when booking 1:1 sessions (1-14)</p>

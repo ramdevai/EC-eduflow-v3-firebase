@@ -78,7 +78,18 @@ export function useLeads() {
 
         const data = await res.json();
         if (Array.isArray(data.leads)) {
-          setLeads(data.leads);
+          // Merge rather than replace: overwriting `leads` wholesale would reorder
+          // the pipeline/Kanban view, since this "all leads" fetch can include
+          // leads (e.g. customers, lost) that weren't in the original pipeline
+          // order. Keep already-loaded leads in their existing position and only
+          // append ones we haven't seen yet.
+          setLeads(prev => {
+            const byId = new Map<string, Lead>(data.leads.map((lead: Lead) => [lead.id, lead]));
+            const merged = prev.map(lead => byId.get(lead.id) ?? lead);
+            const existingIds = new Set(prev.map(lead => lead.id));
+            const appended = data.leads.filter((lead: Lead) => !existingIds.has(lead.id));
+            return [...merged, ...appended];
+          });
           setAllLeadsLoaded(true);
           setCounts(data.counts || { pipeline: 0, customers: 0, feesPending: 0, stages: {} });
         }

@@ -49,6 +49,10 @@ export function SearchBar({ placeholder, onSearch, onFocusChange, initialValue =
         onBlur={() => {
           // Small delay to allow clicking the clear button before it hides/unfocuses
           setTimeout(() => {
+            // If the whole window/app lost focus (e.g. switching to another app),
+            // the input blurs too, but that's not the user asking to leave search —
+            // only close search mode when focus moved elsewhere inside the page.
+            if (!document.hasFocus()) return;
             setIsFocused(false);
             onFocusChange?.(false);
           }, 200);

@@ -321,26 +321,12 @@ export async function getAllLeads(
     });
 
     return leads.sort((a, b) => compareDateValuesDesc(a.updatedAt, b.updatedAt));
-  } else {
-    // Default fallback ordering
-    leadsRef = leadsRef.orderBy('updatedAt', 'desc');
   }
-
-  // Only apply ordering and pagination at the DB level for categories that don't use inequality filters
-  // OR if we have the necessary composite indexes.
-  // Pipeline and Customers will be handled in JS for sorting to be safe.
-  if (options?.category !== 'pipeline' && options?.category !== 'customers') {
-    if (options?.lastId) {
-      const lastDoc = await adminDb.collection(LEADS_COLLECTION).doc(options.lastId).get();
-      if (lastDoc.exists) {
-        leadsRef = leadsRef.startAfter(lastDoc);
-      }
-    }
-
-    if (options?.limit) {
-      leadsRef = leadsRef.limit(options.limit);
-    }
-  }
+  // No default-category orderBy here: `updatedAt` is stored as a display-formatted
+  // string (e.g. "23 Oct 2026"), not a Firestore Timestamp, so Firestore's own
+  // orderBy would sort it lexicographically rather than chronologically. We sort
+  // in JS below with the same comparator every other category uses, so all
+  // categories return leads in the same, correct "latest first" order.
 
   const snapshot = await leadsRef.get();
   let leads = snapshot.docs.map(doc => {
@@ -404,26 +390,19 @@ export async function getAllLeads(
     leads = leads.filter(lead => !isLostLead(lead));
   }
 
-  // Performance optimization: Sort in JS for categories that would otherwise require complex indexes
-  if (options?.category === 'pipeline' || options?.category === 'customers') {
-    const sorted = leads.sort((a, b) => compareDateValuesDesc(a.updatedAt, b.updatedAt));
-    
-    // For customers, we simulate lazy loading by returning only the requested slice
-    // This allows the frontend to keep its lazy-loading logic while the server handles the full set in memory
-    if (options?.category === 'customers' && options?.limit) {
-      // In this mode, lastId is an index or we just return the first slice
-      // Since we fetch everything on the server, we just return the first 'limit' items
-      // The frontend will receive 1000 items anyway if we don't slice, but let's be efficient.
-      // Wait, if I slice, I lose the ability to "load more" unless I know the lastId.
-      
-      // Actually, since we are in summary mode, returning all 1000 is safer and fast.
-      return sorted;
-    }
-    
-    return sorted;
+  // Sort in JS for every category (including the default/no-category case), since
+  // `updatedAt` isn't a reliably orderable Firestore field (see note above) and
+  // this keeps every query path returning leads in the same "latest first" order.
+  const sorted = leads.sort((a, b) => compareDateValuesDesc(a.updatedAt, b.updatedAt));
+
+  // The default (no-category) case previously paginated at the DB level via
+  // lastId/limit; no current caller uses that, but keep limit support via a
+  // simple slice now that sorting happens in JS.
+  if (!options?.category && options?.limit) {
+    return sorted.slice(0, options.limit);
   }
 
-  return leads;
+  return sorted;
 }
 
 export async function addLeads(callerUid: string, role: UserRole, leads: Partial<Lead>[]): Promise<string[]> {

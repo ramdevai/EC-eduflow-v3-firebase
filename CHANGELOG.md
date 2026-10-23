@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.4.1] - 2026-10-23
+
+### Fixed
+- Searching leads no longer permanently reorders the pipeline/Kanban view: the all-leads search fetch sorted leads via Firestore's own `orderBy` on a display-formatted date string (lexicographic, not chronological), and then replaced the shared leads list wholesale instead of merging into it.
+- Search mode no longer closes when the browser window loses focus (e.g. switching to another app); it now only closes when focus moves elsewhere inside the page.
+
 ## [v0.4.0] - 2026-10-04
 
 ### Added

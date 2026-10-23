@@ -42,3 +42,9 @@ docs/source-data/school-programmes/timetables/*.jpg
 
 # stray local Firestore emulator export dumps
 firebase-export-*/
+
+# Claude Code local dev-server launch config (per-machine convenience)
+.claude/
+
+# local reference material, not part of the codebase
+reference resources/

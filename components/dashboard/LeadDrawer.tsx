@@ -125,15 +125,26 @@ export const LeadDrawer = memo(function LeadDrawer({ lead, onClose, onUpdate, on
     setEmailComposerType(type);
   };
 
-  // Auto-select test link if Registration done and no test link currently set
+  // Auto-select test link if Registration done and no test link currently set, and
+  // re-confirm it whenever grade/board changes after the link was auto-suggested
+  // (a manually-picked link, different from the last auto-suggestion, is left alone).
+  const autoSuggestedTestLinkRef = React.useRef<{ leadId: string; suggested: string | undefined }>({ leadId: '', suggested: undefined });
   React.useEffect(() => {
     const stage = normalizeStage(lead.stage);
-    if (stage === 'Registration done' && (!lead.testLink || lead.testLink === 'FALSE')) {
-      const suggested = getTestLinkByGrade(lead.grade, lead.board);
-      if (suggested && suggested !== lead.testLink) {
-        onUpdate(lead.id, { testLink: suggested });
-      }
+    if (stage !== 'Registration done') return;
+
+    if (autoSuggestedTestLinkRef.current.leadId !== lead.id) {
+      autoSuggestedTestLinkRef.current = { leadId: lead.id, suggested: undefined };
     }
+
+    const suggested = getTestLinkByGrade(lead.grade, lead.board);
+    const testLinkIsUnset = !lead.testLink || lead.testLink === 'FALSE';
+    const testLinkMatchesPriorSuggestion = !!lead.testLink && lead.testLink === autoSuggestedTestLinkRef.current.suggested;
+
+    if (suggested && suggested !== lead.testLink && (testLinkIsUnset || testLinkMatchesPriorSuggestion)) {
+      onUpdate(lead.id, { testLink: suggested });
+    }
+    autoSuggestedTestLinkRef.current = { leadId: lead.id, suggested };
   }, [lead.id, lead.stage, lead.grade, lead.board, lead.testLink, onUpdate]);
 
   // Fetch system settings from server for accurate slot duration & lookahead

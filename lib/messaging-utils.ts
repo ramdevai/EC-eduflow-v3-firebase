@@ -208,10 +208,23 @@ export function getEmailLink(lead: Lead, templates?: any[]) {
 }
 
 
+const ROMAN_GRADE_TO_ARABIC: Record<string, string> = {
+  xii: '12', xi: '11', x: '10', ix: '9', viii: '8', vii: '7',
+  vi: '6', v: '5', iv: '4', iii: '3', ii: '2', i: '1',
+};
+
 export function getTestLinkByGrade(grade: string | undefined, board: string | undefined): string | undefined {
   if (!grade) return undefined;
-  const g = grade.toLowerCase();
+  let g = grade.toLowerCase();
   const b = (board || '').toLowerCase();
+
+  // Some schools record class as a roman numeral (e.g. "Class X", "IX") instead of a digit.
+  if (!/\d/.test(g)) {
+    const romanWord = g.replace(/^(class|grade|std\.?|standard)\s*/, '').trim();
+    if (ROMAN_GRADE_TO_ARABIC[romanWord]) {
+      g = ROMAN_GRADE_TO_ARABIC[romanWord];
+    }
+  }
 
   if (b.includes('ib') || b.includes('igcse')) {
     if (g.includes('11') || g.includes('12') || g.includes('level') || g.includes('dp')) return TEST_LINKS["High School (IBDP/A-level)"];

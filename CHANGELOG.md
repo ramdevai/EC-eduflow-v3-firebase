@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.4.2] - 2026-10-24
+
+### Fixed
+- `getTestLinkByGrade` only matched Arabic-digit grades, so students recorded with a roman-numeral class (e.g. "Class X", "IX") never matched a test, leaving the Test Link dropdown unselected even though grade/board were valid.
+- The Test Link auto-suggest in the lead drawer only filled in once when blank; it now re-confirms the suggestion whenever grade or board changes, replacing a stale auto-suggested link while leaving a manually picked one alone.
+
 ## [v0.4.1] - 2026-10-23
 
 ### Fixed

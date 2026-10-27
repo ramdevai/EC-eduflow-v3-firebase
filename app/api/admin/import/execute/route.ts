@@ -4,6 +4,21 @@ import { UserRole, Lead, FeesPaidStatus, CommunityJoinedStatus } from '@/lib/typ
 import { addLeads, updateLeads, getAllLeads } from '@/lib/db-firestore';
 import { safeFormat, safeParseISO, computeLeadStatus, normalizeStage } from '@/lib/utils';
 
+// Returns the trimmed value of the first matching, non-empty CSV column, or
+// undefined when none of the aliases are present. Used to tell "column was
+// blank" apart from "column was absent" so updates never clobber existing
+// data with a value the CSV simply didn't provide for that row.
+function extract(row: any, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const raw = row[key];
+    if (raw !== undefined && raw !== null) {
+      const val = raw.toString().trim();
+      if (val !== '') return val;
+    }
+  }
+  return undefined;
+}
+
 export async function POST(req: Request) {
   const session = await auth() as any;
   const { rows, externalSheetId, handleDuplicates = 'update', source } = await req.json();
@@ -47,12 +62,45 @@ export async function POST(req: Request) {
     const BOARDS = ['CBSE', 'ICSE', 'IGCSE', 'SSC', 'IB', 'STATE BOARD', 'MAHARASHTRA'];
     const GRADES = ['10TH', '12TH', '8TH', '9TH', '11TH'];
 
+    // Simple string fields: [Lead field name, CSV header aliases].
+    const SIMPLE_FIELDS: [keyof Lead, string[]][] = [
+      ['address', ['address', 'Address']],
+      ['gender', ['gender', 'Gender']],
+      ['dob', ['dob', 'DOB']],
+      ['grade', ['grade', 'Grade', 'class', 'Class']],
+      ['board', ['board', 'Board']],
+      ['school', ['school', 'School']],
+      ['hobbies', ['hobbies', 'Hobbies']],
+      ['fatherName', ['fatherName', 'FatherName', 'Father Name']],
+      ['fatherPhone', ['fatherPhone', 'FatherPhone', 'Father Phone']],
+      ['fatherEmail', ['fatherEmail', 'FatherEmail', 'Father Email']],
+      ['fatherOccupation', ['fatherOccupation', 'FatherOccupation', 'Father Occupation']],
+      ['motherName', ['motherName', 'MotherName', 'Mother Name']],
+      ['motherPhone', ['motherPhone', 'MotherPhone', 'Mother Phone']],
+      ['motherEmail', ['motherEmail', 'MotherEmail', 'Mother Email']],
+      ['motherOccupation', ['motherOccupation', 'MotherOccupation', 'Mother Occupation']],
+      ['source', ['source', 'Source']],
+      ['comments', ['comments', 'Comments']],
+      ['notes', ['notes', 'Notes']],
+      ['lastFollowUp', ['lastFollowUp', 'LastFollowUp', 'Last Follow Up']],
+      ['testLink', ['testLink', 'TestLink', 'Test Link']],
+      ['appointmentTime', ['appointmentTime', 'AppointmentTime', 'Appointment Time']],
+      ['feesAmount', ['feesAmount', 'FeesAmount', 'Fees Amount']],
+      ['paymentMode', ['paymentMode', 'PaymentMode', 'Payment Mode']],
+      ['transactionId', ['transactionId', 'TransactionId', 'Transaction ID']],
+      ['reportSentDate', ['reportSentDate', 'ReportSentDate', 'Report Sent Date']],
+      ['convertedDate', ['convertedDate', 'ConvertedDate', 'Converted Date']],
+      ['reportPdfUrl', ['reportPdfUrl', 'ReportPdfUrl', 'Report PDF URL']],
+      ['registrationToken', ['registrationToken', 'RegistrationToken', 'Registration Token']],
+      ['calendarEventId', ['calendarEventId', 'CalendarEventId', 'Calendar Event ID']],
+    ];
+
     for (const row of rows) {
       const email = (row.email || row.Email || row.EMAIL || '').toString().trim().toLowerCase();
       const phoneRaw = (row.phone || row.Phone || row.PHONE || row.mobile || row.Mobile || '').toString();
       const phone = phoneRaw.replace(/\D/g, '').slice(-10);
       const name = (row.name || row.Name || row.NAME || row.student || row.Student || '').toString().trim();
-      const googleId = (row.googleContactId || row.GoogleContactId || row['Google Contact ID'] || '').toString().trim();
+      const googleId = extract(row, ['googleContactId', 'GoogleContactId', 'Google Contact ID']);
 
       // Robustness: Skip rows that are clearly fragments of scrambled CSV lines
       if (!name || name.length < 2 || BOARDS.includes(name.toUpperCase()) || GRADES.includes(name.toUpperCase())) {
@@ -60,77 +108,82 @@ export async function POST(req: Request) {
         continue;
       }
 
-      // We allow leads even with only a name, especially if it matches an existing orphan
-      // Or if it has any other identifier
-      const rawStage = row.stage || row.Stage || row.STAGE || 'New';
-      const normalizedStage = normalizeStage(rawStage);
-      const csvStatus = row.status || row.Status || row.STATUS;
-      const computedStatus = computeLeadStatus(normalizedStage, csvStatus);
-
-      const inquiryDateRaw = row.inquiryDate || row.InquiryDate || row['Inquiry Date'] || row.timestamp || row.Timestamp || row.date || row.Date;
-      const inquiryDate = inquiryDateRaw ? safeFormat(safeParseISO(inquiryDateRaw)) : '';
-
-      const lastStageUpdateRaw = row.lastStageUpdate || row.LastStageUpdate || row['Last Stage Update'];
-      const lastStageUpdate = lastStageUpdateRaw ? safeFormat(safeParseISO(lastStageUpdateRaw)) : '';
-
-      const leadData: Partial<Lead> = {
-        name,
-        email: email || '',
-        phone: phone || '',
-        address: (row.address || row.Address || '').toString().trim(),
-        gender: (row.gender || row.Gender || '').toString().trim(),
-        dob: (row.dob || row.DOB || '').toString().trim(),
-        grade: (row.grade || row.Grade || row.class || row.Class || '').toString().trim(),
-        board: (row.board || row.Board || '').toString().trim(),
-        school: (row.school || row.School || '').toString().trim(),
-        hobbies: (row.hobbies || row.Hobbies || '').toString().trim(),
-        
-        fatherName: (row.fatherName || row.FatherName || row['Father Name'] || '').toString().trim(),
-        fatherPhone: (row.fatherPhone || row.FatherPhone || row['Father Phone'] || '').toString().trim(),
-        fatherEmail: (row.fatherEmail || row.FatherEmail || row['Father Email'] || '').toString().trim(),
-        fatherOccupation: (row.fatherOccupation || row.FatherOccupation || row['Father Occupation'] || '').toString().trim(),
-        
-        motherName: (row.motherName || row.MotherName || row['Mother Name'] || '').toString().trim(),
-        motherPhone: (row.motherPhone || row.MotherPhone || row['Mother Phone'] || '').toString().trim(),
-        motherEmail: (row.motherEmail || row.MotherEmail || row['Mother Email'] || '').toString().trim(),
-        motherOccupation: (row.motherOccupation || row.MotherOccupation || row['Mother Occupation'] || '').toString().trim(),
-
-        source: row.source || row.Source || row['Source'] || source || 'CSV Import',
-        comments: (row.comments || row.Comments || '').toString().trim(),
-        status: computedStatus,
-        stage: normalizedStage as any,
-        inquiryDate,
-        lastStageUpdate,
-        notes: (row.notes || row.Notes || '').toString().trim(),
-        
-        lastFollowUp: (row.lastFollowUp || row.LastFollowUp || row['Last Follow Up'] || safeFormat(new Date())).toString().trim(),
-        testLink: (row.testLink || row.TestLink || row['Test Link'] || '').toString().trim(),
-        appointmentTime: (row.appointmentTime || row.AppointmentTime || row['Appointment Time'] || '').toString().trim(),
-        feesPaid: (row.feesPaid || row.FeesPaid || row['Fees Paid'] || 'Due') as FeesPaidStatus,
-        feesAmount: (row.feesAmount || row.FeesAmount || row['Fees Amount'] || '').toString().trim(),
-        paymentMode: (row.paymentMode || row.PaymentMode || row['Payment Mode'] || '').toString().trim(),
-        transactionId: (row.transactionId || row.TransactionId || row['Transaction ID'] || '').toString().trim(),
-        reportSentDate: (row.reportSentDate || row.ReportSentDate || row['Report Sent Date'] || '').toString().trim(),
-        convertedDate: (row.convertedDate || row.ConvertedDate || row['Converted Date'] || '').toString().trim(),
-        reportPdfUrl: (row.reportPdfUrl || row.ReportPdfUrl || row['Report PDF URL'] || '').toString().trim(),
-        communityJoined: (row.communityJoined || row.CommunityJoined || row['Community Joined'] || 'No') as CommunityJoinedStatus,
-        registrationToken: (row.registrationToken || row.RegistrationToken || row['Registration Token'] || '').toString().trim(),
-        calendarEventId: (row.calendarEventId || row.CalendarEventId || row['Calendar Event ID'] || '').toString().trim(),
-        googleContactId: (row.googleContactId || row.GoogleContactId || row['Google Contact ID'] || '').toString().trim(),
-        communicateViaEmailOnly: row.communicateViaEmailOnly === 'TRUE' || row.communicateViaEmailOnly === true,
-      };
-
       const existingByEmail = email ? emailMap.get(email) : null;
       const existingByPhone = phone ? phoneMap.get(phone) : null;
       const existingByGoogleId = googleId ? googleIdMap.get(googleId) : null;
       const existingByName = !email && !phone ? nameMap.get(name.toLowerCase()) : null;
       const existingLead = existingByEmail || existingByPhone || existingByGoogleId || existingByName;
 
-      if (existingLead) {
-        leadsToUpdate.push({ id: existingLead.id, data: leadData });
-        updatedCount++;
-      } else {
+      if (existingLead && handleDuplicates === 'skip') {
+        skipped++;
+        continue;
+      }
+
+      const stageRaw = extract(row, ['stage', 'Stage', 'STAGE']);
+      const statusRaw = extract(row, ['status', 'Status', 'STATUS']);
+      const feesPaidRaw = extract(row, ['feesPaid', 'FeesPaid', 'Fees Paid']);
+      const communityJoinedRaw = extract(row, ['communityJoined', 'CommunityJoined', 'Community Joined']);
+      const inquiryDateRaw = extract(row, ['inquiryDate', 'InquiryDate', 'Inquiry Date', 'timestamp', 'Timestamp', 'date', 'Date']);
+      const lastStageUpdateRaw = extract(row, ['lastStageUpdate', 'LastStageUpdate', 'Last Stage Update']);
+      const communicateViaEmailOnlyProvided = row.communicateViaEmailOnly !== undefined;
+
+      if (!existingLead) {
+        // New lead: fill every field so the record is complete, defaulting
+        // anything the CSV didn't provide.
+        const normalizedStage = normalizeStage(stageRaw || 'New');
+        const computedStatus = computeLeadStatus(normalizedStage, statusRaw);
+        const inquiryDate = inquiryDateRaw ? safeFormat(safeParseISO(inquiryDateRaw)) : '';
+        const lastStageUpdate = lastStageUpdateRaw ? safeFormat(safeParseISO(lastStageUpdateRaw)) : '';
+
+        const leadData: Partial<Lead> = {
+          name,
+          email: email || '',
+          phone: phone || '',
+          status: computedStatus,
+          stage: normalizedStage as any,
+          inquiryDate,
+          lastStageUpdate,
+          lastFollowUp: safeFormat(new Date()),
+          feesPaid: 'Due' as FeesPaidStatus,
+          communityJoined: 'No' as CommunityJoinedStatus,
+          googleContactId: googleId || '',
+          communicateViaEmailOnly: row.communicateViaEmailOnly === 'TRUE' || row.communicateViaEmailOnly === true,
+        };
+        for (const [field, keys] of SIMPLE_FIELDS) {
+          (leadData as any)[field] = extract(row, keys) || '';
+        }
+        if (!leadData.source) leadData.source = source || 'CSV Import';
+        if (feesPaidRaw) leadData.feesPaid = feesPaidRaw as FeesPaidStatus;
+        if (communityJoinedRaw) leadData.communityJoined = communityJoinedRaw as CommunityJoinedStatus;
+
         leadsToImport.push(leadData);
+      } else {
+        // Existing lead: only touch fields the CSV row actually supplied,
+        // so columns absent from this import leave existing data untouched.
+        const updateData: Partial<Lead> = { name };
+        if (email) updateData.email = email;
+        if (phone) updateData.phone = phone;
+        if (googleId) updateData.googleContactId = googleId;
+        if (communicateViaEmailOnlyProvided) {
+          updateData.communicateViaEmailOnly = row.communicateViaEmailOnly === 'TRUE' || row.communicateViaEmailOnly === true;
+        }
+        for (const [field, keys] of SIMPLE_FIELDS) {
+          const val = extract(row, keys);
+          if (val !== undefined) (updateData as any)[field] = val;
+        }
+
+        if (stageRaw || statusRaw) {
+          const normalizedStage = stageRaw ? normalizeStage(stageRaw) : existingLead.stage;
+          updateData.stage = normalizedStage as any;
+          updateData.status = computeLeadStatus(normalizedStage, statusRaw);
+        }
+        if (feesPaidRaw) updateData.feesPaid = feesPaidRaw as FeesPaidStatus;
+        if (communityJoinedRaw) updateData.communityJoined = communityJoinedRaw as CommunityJoinedStatus;
+        if (inquiryDateRaw) updateData.inquiryDate = safeFormat(safeParseISO(inquiryDateRaw));
+        if (lastStageUpdateRaw) updateData.lastStageUpdate = safeFormat(safeParseISO(lastStageUpdateRaw));
+
+        leadsToUpdate.push({ id: existingLead.id, data: updateData });
+        updatedCount++;
       }
     }
 

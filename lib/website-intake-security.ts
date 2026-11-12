@@ -1,14 +1,22 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
+import { normalizeLeadPhone } from './normalize-lead-phone.mjs';
 
 export const WebsiteIntakeSchema = z.object({
   requestId: z.string().uuid(),
   submittedAt: z.string().datetime(),
   contact: z.object({
     name: z.string().trim().min(2).max(100),
-    phone: z.string().trim().min(10).max(24),
+    phone: z.string().trim().min(8).max(24),
     email: z.string().trim().email().max(254).or(z.literal('')),
-  }).strict(),
+  }).strict().transform((contact, context) => {
+    const phoneNormalized = normalizeLeadPhone(contact.phone);
+    if (!phoneNormalized) {
+      context.addIssue({ code: 'custom', path: ['phone'], message: 'Invalid phone number' });
+      return z.NEVER;
+    }
+    return { ...contact, phoneNormalized };
+  }),
   persona: z.enum(['student', 'parent', 'professional', 'school']),
   interest: z.enum([
     'subject-selection',
@@ -36,18 +44,6 @@ export const WebsiteIntakeSchema = z.object({
 }).strict();
 
 export type WebsiteIntake = z.infer<typeof WebsiteIntakeSchema>;
-
-export function normalizeWebsitePhone(value: string): string {
-  let digits = value.replace(/\D/g, '');
-  if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1);
-  if (digits.length === 10) digits = `91${digits}`;
-  if (digits.length < 10 || digits.length > 15) throw new Error('Invalid phone number');
-  return `+${digits}`;
-}
-
-export function websiteLeadIdentity(phone: string): string {
-  return createHash('sha256').update(normalizeWebsitePhone(phone)).digest('hex');
-}
 
 export function createWebsiteIntakeSignature(
   secret: string,

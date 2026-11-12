@@ -5,7 +5,7 @@ import {
   verifyWebsiteIntakeSignature,
 } from '@/lib/website-intake-security';
 import {
-  createOrRefreshWebsiteLead,
+  createWebsiteLeadOccurrence,
   WebsiteIntakeRateLimitError,
 } from '@/lib/website-intake';
 
@@ -38,9 +38,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
 
-    const result = await createOrRefreshWebsiteLead(parsed);
+    const result = await createWebsiteLeadOccurrence(parsed);
     return NextResponse.json(
-      { reference: result.reference, created: result.created },
+      result,
       { status: result.created ? 201 : 200 },
     );
   } catch (error) {
@@ -50,10 +50,7 @@ export async function POST(req: Request) {
     if (error instanceof ZodError || error instanceof SyntaxError) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
     }
-    console.error('Website lead intake failed', {
-      requestId,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    console.error('Website lead intake failed', { requestId });
     return NextResponse.json({ error: 'Unable to process enquiry' }, { status: 500 });
   }
 }

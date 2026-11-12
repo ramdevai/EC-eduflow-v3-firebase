@@ -11,6 +11,10 @@ const apply = args.has('--apply');
 const dryRun = !apply;
 
 if (environment === 'production') {
+  if (process.env.NEXT_PUBLIC_APP_ENV !== 'production' ||
+      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID !== PRODUCTION_PROJECT_ID) {
+    throw new Error(`Production migrations require NEXT_PUBLIC_APP_ENV=production and NEXT_PUBLIC_FIREBASE_PROJECT_ID=${PRODUCTION_PROJECT_ID}.`);
+  }
   if (apply && process.env.CONFIRM_FIREBASE_PROJECT !== PRODUCTION_PROJECT_ID) {
     throw new Error(
       `Production apply requires CONFIRM_FIREBASE_PROJECT=${PRODUCTION_PROJECT_ID}.`

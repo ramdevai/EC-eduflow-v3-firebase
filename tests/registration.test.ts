@@ -40,6 +40,18 @@ describe('public registration identity separation', () => {
     }, lead)).toThrow('studentEmail is required');
   });
 
+  it('preserves the collaboration source while accepting other registration sources', () => {
+    const submission = {
+      studentName: 'Student',
+      studentPhone: '1111111111',
+      studentEmail: 'parent@example.com',
+      source: 'Workshop',
+    };
+
+    expect(buildRegistrationUpdates(submission, { ...lead, source: 'Collaboration' })).not.toHaveProperty('source');
+    expect(buildRegistrationUpdates(submission, { ...lead, source: 'Website' })).toHaveProperty('source', 'Workshop');
+  });
+
   it('stores student identity without overwriting primary contact', () => {
     const updates = buildRegistrationUpdates({
       name: 'Attempted overwrite',

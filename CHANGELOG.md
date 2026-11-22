@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.6.1] - 2026-11-22
+
+- Interest form submissions use Collaboration as their lead source whether or not an event code is supplied. Completing registration preserves that source.
+
 ## [v0.6.0] - 2026-11-22
 
 - Authorized CRM users can set up, launch, and close collaborations and view their enquiries.

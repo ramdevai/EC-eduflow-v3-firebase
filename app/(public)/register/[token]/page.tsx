@@ -20,6 +20,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { COLLABORATION_LEAD_SOURCE } from '@/lib/types';
 
 export default function RegistrationPage() {
   const params = useParams();
@@ -328,17 +329,19 @@ export default function RegistrationPage() {
             </div>
             
             <div className="space-y-6">
-                <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">How did you know about me?</label>
-                    <select name="source" defaultValue={formData.source} className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all">
-                        <option value="">Select source...</option>
-                        <option value="Social Media">Social Media (Instagram/LinkedIn)</option>
-                        <option value="Website">Website</option>
-                        <option value="Friend/Family">Referral (Friend/Family)</option>
-                        <option value="Workshop">Workshop / School Session</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
+                {formData.source !== COLLABORATION_LEAD_SOURCE && (
+                  <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">How did you know about me?</label>
+                      <select name="source" defaultValue={formData.source} className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all">
+                          <option value="">Select source...</option>
+                          <option value="Social Media">Social Media (Instagram/LinkedIn)</option>
+                          <option value="Website">Website</option>
+                          <option value="Friend/Family">Referral (Friend/Family)</option>
+                          <option value="Workshop">Workshop / School Session</option>
+                          <option value="Other">Other</option>
+                      </select>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Any other comments / questions?</label>

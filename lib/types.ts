@@ -37,6 +37,8 @@ export interface User {
   role: UserRole;
 }
 
+export const COLLABORATION_LEAD_SOURCE = 'Collaboration';
+
 export interface Lead {
   ownerUid: string;
   // Basic & System

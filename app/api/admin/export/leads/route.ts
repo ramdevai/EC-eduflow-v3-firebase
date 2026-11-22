@@ -18,6 +18,7 @@ export async function GET() {
     // Convert to CSV
     const csv = Papa.unparse(leads, {
       header: true,
+      escapeFormulae: true,
       skipEmptyLines: true,
     });
 

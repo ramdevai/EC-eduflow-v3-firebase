@@ -30,6 +30,7 @@ const BottomNav = dynamic(() => import('@/components/dashboard/BottomNav').then(
 const TodayView = dynamic(() => import('@/components/dashboard/TodayView').then(mod => mod.TodayView), { ssr: false });
 const SchoolProgrammesView = dynamic(() => import('@/components/dashboard/SchoolProgrammesView').then(mod => mod.SchoolProgrammesView), { ssr: false });
 const CareersView = dynamic(() => import('@/components/dashboard/CareersView').then(mod => mod.CareersView), { ssr: false });
+const CollaborationsView = dynamic(() => import('@/components/dashboard/CollaborationsView').then(mod => mod.CollaborationsView), { ssr: false });
 const PartnershipsHub = dynamic(() => import('@/components/dashboard/PartnershipsHub').then(mod => mod.PartnershipsHub), { ssr: false });
 const TemplatesView = dynamic(() => import('@/components/dashboard/TemplatesView').then(mod => mod.TemplatesView), { ssr: false });
 const LostLeadsView = dynamic(() => import('@/components/dashboard/LostLeadsView').then(mod => mod.LostLeadsView), { ssr: false });
@@ -73,7 +74,8 @@ export default function Dashboard() {
     updateLead, 
     deleteLead, 
     addLead,
-    applyFollowUpSummary
+    applyFollowUpSummary,
+    cacheLead,
   } = useLeads();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -134,6 +136,12 @@ export default function Dashboard() {
       setActiveTab('leads');
     }
   }, [activeTab, session?.user?.role]);
+
+  useEffect(() => {
+    if (activeTab === 'collaborations' && !session?.user?.canManageCollaborations) {
+      setActiveTab('leads');
+    }
+  }, [activeTab, session?.user?.canManageCollaborations]);
 
   useEffect(() => {
     if (activeTab === 'careers' && session?.user?.role !== UserRole.Admin) {
@@ -337,7 +345,7 @@ export default function Dashboard() {
       </div>
 
       <main className="flex-1 px-4 py-6 md:py-10 md:px-10 max-w-7xl mx-auto w-full overflow-hidden">
-        {activeTab !== 'school-programmes' && activeTab !== 'careers' && activeTab !== 'partnerships' && (
+        {activeTab !== 'school-programmes' && activeTab !== 'careers' && activeTab !== 'partnerships' && activeTab !== 'collaborations' && (
         <header className="flex flex-col gap-6 mb-8">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -515,6 +523,12 @@ export default function Dashboard() {
         )}
         {activeTab === 'school-programmes' && session?.user?.role === UserRole.Admin && <SchoolProgrammesView onMobileMenuClick={() => setIsSidebarOpen(true)} />}
         {activeTab === 'careers' && session?.user?.role === UserRole.Admin && <CareersView onMobileMenuClick={() => setIsSidebarOpen(true)} />}
+        {activeTab === 'collaborations' && session?.user?.canManageCollaborations && (
+          <CollaborationsView onMenu={() => setIsSidebarOpen(true)} onLead={lead => {
+            cacheLead(lead);
+            setSelectedLead(lead);
+          }} />
+        )}
         {activeTab === 'partnerships' && (
           <PartnershipsHub
             onMobileMenuClick={() => setIsSidebarOpen(true)}

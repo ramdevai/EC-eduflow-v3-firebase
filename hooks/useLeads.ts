@@ -348,12 +348,19 @@ export function useLeads() {
     }
   }, [session?.user?.id, session?.user?.role]);
 
+  const cacheLead = useCallback((lead: Lead) => {
+    setLeads(current => current.some(item => item.id === lead.id)
+      ? current.map(item => item.id === lead.id ? lead : item)
+      : [...current, lead]);
+  }, []);
+
   const applyFollowUpSummary = useCallback((id: string, summary: FollowUpSummary) => {
     setLeads(current => current.map(lead => lead.id === id ? { ...lead, ...summary } : lead));
   }, []);
 
   return {
     applyFollowUpSummary,
+    cacheLead,
     leads,
     counts,
     templates,

@@ -1,0 +1,3 @@
+# Keep the tracked historical data export and local build cache out of CLI deployments.
+EduCompass CRM Workspace - Leads.csv
+tsconfig.tsbuildinfo

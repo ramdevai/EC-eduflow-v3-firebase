@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.6.0] - 2026-11-22
+
+- Authorized CRM users can set up, launch, and close collaborations and view their enquiries.
+- The signed website intake records student details and preserves event code attribution and any offer terms on each lead.
+- CSV exports escape spreadsheet formulas in lead fields.
+
+## [v0.5.0] - 2026-11-12
+
+- Each new website enquiry creates a separate CRM lead, including when another lead uses the same phone. Retrying the same request returns the stored result.
+- New website leads store a normalized phone. The production backfill populated this field for 1,575 existing CRM records.
+
 ## [v0.4.2] - 2026-10-24
 
 ### Fixed

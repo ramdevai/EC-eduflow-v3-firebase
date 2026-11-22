@@ -1,14 +1,23 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
+import { CollaborationCode } from './collaboration-schema';
+import { normalizeLeadPhone } from './normalize-lead-phone.mjs';
 
 export const WebsiteIntakeSchema = z.object({
   requestId: z.string().uuid(),
   submittedAt: z.string().datetime(),
   contact: z.object({
     name: z.string().trim().min(2).max(100),
-    phone: z.string().trim().min(10).max(24),
+    phone: z.string().trim().min(8).max(24),
     email: z.string().trim().email().max(254).or(z.literal('')),
-  }).strict(),
+  }).strict().transform((contact, context) => {
+    const phoneNormalized = normalizeLeadPhone(contact.phone);
+    if (!phoneNormalized) {
+      context.addIssue({ code: 'custom', path: ['phone'], message: 'Invalid phone number' });
+      return z.NEVER;
+    }
+    return { ...contact, phoneNormalized };
+  }),
   persona: z.enum(['student', 'parent', 'professional', 'school']),
   interest: z.enum([
     'subject-selection',
@@ -21,7 +30,7 @@ export const WebsiteIntakeSchema = z.object({
   message: z.string().trim().max(1200),
   consent: z.object({
     contact: z.literal(true),
-    version: z.literal('website-enquiry-v1'),
+    version: z.enum(['website-enquiry-v1', 'website-interest-v1']),
   }).strict(),
   attribution: z.object({
     source: z.string().trim().max(100),
@@ -33,21 +42,20 @@ export const WebsiteIntakeSchema = z.object({
     referrer: z.string().trim().max(500),
   }).strict(),
   clientFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
-}).strict();
+  collaborationInterest: z.object({
+    studentName: z.string().trim().min(2).max(100),
+    grade: z.string().trim().min(1).max(40),
+    board: z.string().trim().min(1).max(80),
+    school: z.string().trim().min(2).max(150),
+    code: CollaborationCode.or(z.literal('')),
+  }).strict().optional(),
+}).strict().refine(intake => {
+  if (!intake.collaborationInterest) return intake.consent.version === 'website-enquiry-v1';
+  return intake.consent.version === 'website-interest-v1' && intake.persona === 'parent' &&
+    intake.interest === 'psychometric-assessment' && Boolean(intake.contact.email);
+}, 'Invalid enquiry type or consent');
 
 export type WebsiteIntake = z.infer<typeof WebsiteIntakeSchema>;
-
-export function normalizeWebsitePhone(value: string): string {
-  let digits = value.replace(/\D/g, '');
-  if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1);
-  if (digits.length === 10) digits = `91${digits}`;
-  if (digits.length < 10 || digits.length > 15) throw new Error('Invalid phone number');
-  return `+${digits}`;
-}
-
-export function websiteLeadIdentity(phone: string): string {
-  return createHash('sha256').update(normalizeWebsitePhone(phone)).digest('hex');
-}
 
 export function createWebsiteIntakeSignature(
   secret: string,

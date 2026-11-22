@@ -1,15 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
   createWebsiteIntakeSignature,
-  normalizeWebsitePhone,
   verifyWebsiteIntakeSignature,
   WebsiteIntakeSchema,
 } from '@/lib/website-intake-security';
 
+import { normalizeLeadPhone } from '@/lib/normalize-lead-phone.mjs';
+
 describe('website intake security', () => {
   it('normalizes Indian mobile numbers', () => {
-    expect(normalizeWebsitePhone('98765 43210')).toBe('+919876543210');
-    expect(normalizeWebsitePhone('+91 98765 43210')).toBe('+919876543210');
+    expect(normalizeLeadPhone('98765 43210')).toBe('+919876543210');
+    expect(normalizeLeadPhone('+91 98765 43210')).toBe('+919876543210');
+    expect(normalizeLeadPhone('09876543210')).toBe('+919876543210');
+    expect(normalizeLeadPhone('919876543210')).toBe('+919876543210');
+    expect(normalizeLeadPhone('+44 (20) 7946 0958')).toBe('+442079460958');
+    expect(normalizeLeadPhone('+0123456789')).toBeNull();
+    expect(normalizeLeadPhone('abc9876543210')).toBeNull();
   });
 
   it('verifies a fresh signed request and rejects tampering', () => {

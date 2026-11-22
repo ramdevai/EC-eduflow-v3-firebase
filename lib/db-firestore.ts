@@ -55,7 +55,7 @@ interface TemplateDocument {
 }
 
 // Helper to convert Firestore DocumentData to Lead type
-const mapDocToLead = (doc: FirebaseFirestore.DocumentData): Lead => {
+export const mapDocToLead = (doc: FirebaseFirestore.DocumentData): Lead => {
   return {
     id: doc.id,
     ownerUid: doc.ownerUid,
@@ -87,6 +87,10 @@ const mapDocToLead = (doc: FirebaseFirestore.DocumentData): Lead => {
     motherEmail: doc.motherEmail,
     motherOccupation: doc.motherOccupation,
     source: doc.source,
+    collaborationId: doc.collaborationId,
+    collaborationCode: doc.collaborationCode,
+    collaborationTitle: doc.collaborationTitle,
+    collaborationOffer: doc.collaborationOffer,
     comments: doc.comments,
     notes: doc.notes,
     lastFollowUp: doc.lastFollowUp,
@@ -301,6 +305,10 @@ export async function getAllLeads(
           motherEmail: data.motherEmail || '',
           motherOccupation: data.motherOccupation || '',
           source: data.source || '',
+          collaborationId: data.collaborationId,
+          collaborationCode: data.collaborationCode,
+          collaborationTitle: data.collaborationTitle,
+          collaborationOffer: data.collaborationOffer,
           comments: data.comments || '',
           notes: data.notes || '',
           lastFollowUp: data.lastFollowUp || '',
@@ -369,6 +377,10 @@ export async function getAllLeads(
         motherEmail: data.motherEmail || '',
         motherOccupation: data.motherOccupation || '',
         source: data.source || '',
+        collaborationId: data.collaborationId,
+        collaborationCode: data.collaborationCode,
+        collaborationTitle: data.collaborationTitle,
+        collaborationOffer: data.collaborationOffer,
         comments: data.comments || '',
         notes: data.notes || '',
         lastFollowUp: data.lastFollowUp || '',

@@ -162,6 +162,7 @@ export default function RegistrationPage() {
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Full Name</label>
                     <input 
                         name="studentName"
+                        defaultValue={formData.studentName}
                         required 
                         autoComplete="name"
                         className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-primary-500 rounded-2xl text-sm font-bold outline-none transition-all" 

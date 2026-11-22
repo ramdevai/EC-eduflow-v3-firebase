@@ -28,6 +28,7 @@ const ALLOWED_REGISTRATION_FIELDS = [
 
 export function getPublicRegistrationData(lead: Lead) {
   return {
+    ...(lead.collaborationId && lead.studentName && { studentName: lead.studentName }),
     grade: lead.grade,
     board: lead.board,
     address: lead.address,

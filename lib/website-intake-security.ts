@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
+import { CollaborationCode } from './collaboration-schema';
 import { normalizeLeadPhone } from './normalize-lead-phone.mjs';
 
 export const WebsiteIntakeSchema = z.object({
@@ -29,7 +30,7 @@ export const WebsiteIntakeSchema = z.object({
   message: z.string().trim().max(1200),
   consent: z.object({
     contact: z.literal(true),
-    version: z.literal('website-enquiry-v1'),
+    version: z.enum(['website-enquiry-v1', 'website-interest-v1']),
   }).strict(),
   attribution: z.object({
     source: z.string().trim().max(100),
@@ -41,7 +42,18 @@ export const WebsiteIntakeSchema = z.object({
     referrer: z.string().trim().max(500),
   }).strict(),
   clientFingerprint: z.string().regex(/^[0-9a-f]{64}$/),
-}).strict();
+  collaborationInterest: z.object({
+    studentName: z.string().trim().min(2).max(100),
+    grade: z.string().trim().min(1).max(40),
+    board: z.string().trim().min(1).max(80),
+    school: z.string().trim().min(2).max(150),
+    code: CollaborationCode.or(z.literal('')),
+  }).strict().optional(),
+}).strict().refine(intake => {
+  if (!intake.collaborationInterest) return intake.consent.version === 'website-enquiry-v1';
+  return intake.consent.version === 'website-interest-v1' && intake.persona === 'parent' &&
+    intake.interest === 'psychometric-assessment' && Boolean(intake.contact.email);
+}, 'Invalid enquiry type or consent');
 
 export type WebsiteIntake = z.infer<typeof WebsiteIntakeSchema>;
 

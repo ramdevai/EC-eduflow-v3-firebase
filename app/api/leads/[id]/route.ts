@@ -28,6 +28,9 @@ export async function PATCH(
     if (['followUpCount', 'lastFollowUp', 'lastFollowUpOutcome', 'nextFollowUpDate'].some(field => field in body)) {
       return NextResponse.json({ error: 'Record a follow-up to update contact history' }, { status: 400 });
     }
+    if (['collaborationId', 'collaborationCode', 'collaborationTitle', 'collaborationOffer'].some(field => field in body)) {
+      return NextResponse.json({ error: 'Collaboration attribution is set at intake' }, { status: 400 });
+    }
     await updateLeads(session.user.id, session.user.role as UserRole, [{ id, data: body }]);
     return NextResponse.json({ success: true });
   } catch (error: any) {

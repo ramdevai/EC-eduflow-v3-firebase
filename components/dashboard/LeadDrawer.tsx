@@ -854,6 +854,12 @@ const data = await res.json();
                 </p>
                 <div className="pt-2 text-xs text-slate-500 space-y-1">
                   <p><span className="font-black uppercase tracking-wider text-[10px]">Primary Contact:</span> {lead.name}</p>
+                  {lead.collaborationCode && (
+                    <div className="mt-2 break-words">
+                      <p><span className="font-semibold">Collaboration</span> {lead.collaborationTitle} ({lead.collaborationCode})</p>
+                      {lead.collaborationOffer && <p><span className="font-semibold">Offer terms</span> {lead.collaborationOffer}</p>}
+                    </div>
+                  )}
                   <p>{lead.phone}{lead.email ? ` | ${lead.email}` : ''}</p>
                 </div>
               </header>

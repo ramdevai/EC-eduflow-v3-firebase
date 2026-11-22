@@ -26,7 +26,7 @@ vi.mock('@/lib/server-firebase', () => {
           const result = await callback({
             get: async ({ path }) => {
               transactionReads.add(path);
-              return { exists: records.has(path), data: () => records.get(path) };
+              return { id: path.split('/').at(-1), exists: records.has(path), data: () => records.get(path) };
             },
             set: ({ path }, value) => writes.set(path, value),
           });
@@ -43,15 +43,16 @@ vi.mock('@/lib/server-firebase', () => {
 const secret = 'test-signing-secret';
 const fingerprint = 'a'.repeat(64);
 
-function signedRequest(requestId: string, phone = '98765 43210') {
+function signedRequest(requestId: string, phone = '98765 43210', code?: string) {
   const body = JSON.stringify({
     requestId,
     submittedAt: new Date().toISOString(),
-    contact: { name: 'Test Contact', phone, email: '' },
+    contact: { name: 'Test Contact', phone, email: code === undefined ? '' : 'parent@example.com' },
     persona: 'parent',
-    interest: 'subject-selection',
+    interest: code === undefined ? 'subject-selection' : 'psychometric-assessment',
     message: '',
-    consent: { contact: true, version: 'website-enquiry-v1' },
+    consent: { contact: true, version: code === undefined ? 'website-enquiry-v1' : 'website-interest-v1' },
+    ...(code !== undefined && { collaborationInterest: { studentName: 'Sample Student', grade: '10', board: 'CBSE', school: 'Sample Institute', code } }),
     attribution: { source: '', medium: '', campaign: '', content: '', term: '', landingPage: '/', referrer: '' },
     clientFingerprint: fingerprint,
   });
@@ -134,5 +135,49 @@ describe('website lead occurrences', () => {
     expect(response.status).toBe(400);
     expect(transactionReads.size).toBe(0);
     expect(records.size).toBe(0);
+  });
+});
+
+
+describe('collaboration enquiries', () => {
+  const campaign = { status: 'Active', code: 'CKM2601', title: 'Assessment interest', ownerUid: 'binal', offer: 'Pilot offer' };
+
+  beforeEach(() => {
+    records.set('collaborationCodes/CKM2601', { collaborationId: 'pilot' });
+    records.set('collaborations/pilot', campaign);
+  });
+
+  it('maps the parent and student fields, stores the offer and preserves attribution on retry after closure', async () => {
+    const id = randomUUID();
+    const response = await POST(signedRequest(id, undefined, ' ckm2601 '));
+    expect(response.status).toBe(201);
+    const result = await response.json();
+    const leadRecord = `leads/${result.leadId}`;
+    expect(records.get(leadRecord)).toMatchObject({
+      ownerUid: 'binal', name: 'Test Contact', email: 'parent@example.com', studentName: 'Sample Student',
+      grade: '10', board: 'CBSE', school: 'Sample Institute', collaborationId: 'pilot',
+      collaborationCode: 'CKM2601', collaborationTitle: 'Assessment interest', collaborationOffer: 'Pilot offer',
+      stage: 'New', status: 'Open',
+    });
+
+    records.set('collaborations/pilot', { ...campaign, status: 'Closed' });
+    expect(await (await POST(signedRequest(id, undefined, 'CKM2601'))).json()).toEqual(result);
+    expect([...records.keys()].filter(path => path.startsWith('leads/'))).toEqual([leadRecord]);
+  });
+
+  it('rejects closed and unknown codes and accepts the same enquiry with the code cleared', async () => {
+    records.set('collaborations/pilot', { ...campaign, status: 'Closed' });
+    const id = randomUUID();
+    for (const code of ['CKM2601', 'UNKNOWN']) {
+      expect((await POST(signedRequest(id, undefined, code))).status).toBe(422);
+    }
+    expect([...records.keys()].some(path => path.startsWith('leads/'))).toBe(false);
+    const response = await POST(signedRequest(id, undefined, ''));
+    expect(response.status).toBe(201);
+    const { leadId } = await response.json();
+    expect(records.get(`leads/${leadId}`)).toMatchObject({
+      name: 'Test Contact', grade: '10', ownerUid: 'website-owner',
+    });
+    expect(records.get(`leads/${leadId}`)).not.toHaveProperty('collaborationCode');
   });
 });

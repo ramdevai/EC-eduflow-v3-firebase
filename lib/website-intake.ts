@@ -2,6 +2,7 @@ import 'server-only';
 
 import { adminDb } from './server-firebase';
 import { generateRegistrationSid, generateRegistrationToken } from './utils';
+import { CollaborationError, resolveCollaboration } from './collaborations';
 import type { WebsiteIntake } from './website-intake-security';
 
 const PERSONA_LABELS: Record<WebsiteIntake['persona'], string> = {
@@ -38,11 +39,13 @@ export async function createWebsiteLeadOccurrence(intake: WebsiteIntake): Promis
   const now = new Date().toISOString();
   const reference = intake.requestId.slice(0, 8).toUpperCase();
   const intakeRef = adminDb.collection('websiteIntakes').doc(intake.requestId);
-  const rateRef = adminDb.collection('websiteIntakeRateLimits').doc(intake.clientFingerprint);
-  const limit = Number(process.env.WEBSITE_INTAKE_RATE_LIMIT || 10);
+  const interest = intake.collaborationInterest;
+  const rateKey = interest ? `interest_${intake.clientFingerprint}` : intake.clientFingerprint;
+  const rateRef = adminDb.collection('websiteIntakeRateLimits').doc(rateKey);
+  const limit = interest ? 30 : Number(process.env.WEBSITE_INTAKE_RATE_LIMIT || 10);
   const windowMs = 15 * 60 * 1000;
 
-  return adminDb.runTransaction(async transaction => {
+  const result = await adminDb.runTransaction(async transaction => {
     const existingIntake = await transaction.get(intakeRef);
 
     if (existingIntake.exists) {
@@ -60,7 +63,8 @@ export async function createWebsiteLeadOccurrence(intake: WebsiteIntake): Promis
     const requestCount = sameWindow ? Number(rate.requestCount || 0) + 1 : 1;
     if (requestCount > limit) throw new WebsiteIntakeRateLimitError('Rate limit exceeded');
 
-    const leadRef = adminDb.collection('leads').doc();
+    // Resolve the code in the same transaction so a concurrent closure takes effect on new leads.
+    const campaign = interest?.code ? await resolveCollaboration(transaction, interest.code) : undefined;
 
     transaction.set(rateRef, {
       windowStartedAt: sameWindow ? rate.windowStartedAt : currentTime,
@@ -68,8 +72,11 @@ export async function createWebsiteLeadOccurrence(intake: WebsiteIntake): Promis
       updatedAt: now,
     });
 
+    if (campaign === null) return null; // Count invalid codes toward the rate limit, too.
+
+    const leadRef = adminDb.collection('leads').doc();
     transaction.set(leadRef, {
-      ownerUid,
+      ownerUid: campaign?.ownerUid || ownerUid,
       name: intake.contact.name,
       phone: intake.contact.phone,
       phoneNormalized: intake.contact.phoneNormalized,
@@ -79,8 +86,15 @@ export async function createWebsiteLeadOccurrence(intake: WebsiteIntake): Promis
       inquiryDate: now,
       updatedAt: now,
       lastStageUpdate: now,
-      grade: '',
-      board: '',
+      grade: interest?.grade || '',
+      board: interest?.board || '',
+      ...(interest && { studentName: interest.studentName, school: interest.school }),
+      ...(campaign && {
+        collaborationId: campaign.id,
+        collaborationCode: campaign.code,
+        collaborationTitle: campaign.title,
+        ...(campaign.offer && { collaborationOffer: campaign.offer }),
+      }),
       source: 'Website',
       comments: enquirySummary(intake),
       notes: '',
@@ -117,4 +131,8 @@ export async function createWebsiteLeadOccurrence(intake: WebsiteIntake): Promis
 
     return { leadId: leadRef.id, reference, created: true };
   });
+  if (!result) {
+    throw new CollaborationError('This collaboration code is unavailable. Check it or leave the field blank.', 422);
+  }
+  return result;
 }

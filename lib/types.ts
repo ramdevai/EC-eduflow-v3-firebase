@@ -24,6 +24,7 @@ export type DashboardTab =
   | 'today'
   | 'school-programmes'
   | 'careers'
+  | 'collaborations'
   | 'partnerships'
   | 'templates'
   | 'lost'
@@ -74,6 +75,10 @@ export interface Lead {
   
   // Marketing & Discovery
   source?: string; // "How did you know about me?"
+  collaborationId?: string;
+  collaborationCode?: string;
+  collaborationTitle?: string;
+  collaborationOffer?: string;
   comments?: string;
 
   // Counseling & Business

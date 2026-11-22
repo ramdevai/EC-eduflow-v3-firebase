@@ -14,7 +14,8 @@ import {
   BarChart3,
   School,
   Briefcase,
-  Handshake
+  Handshake,
+  Megaphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DashboardTab, UserRole } from '@/lib/types';
@@ -131,6 +132,14 @@ export const Sidebar = memo(function Sidebar({ activeTab, setActiveTab, onMobile
                 isActive={activeTab === 'partnerships'}
                 onClick={() => setActiveTab('partnerships')}
               />
+            {session?.user?.canManageCollaborations && (
+              <NavButton
+                icon={Megaphone}
+                label="Collaborations"
+                isActive={activeTab === 'collaborations'}
+                onClick={() => setActiveTab('collaborations')}
+              />
+            )}
             <NavButton
               icon={TrendingDown}
               label="Deals Lost" 

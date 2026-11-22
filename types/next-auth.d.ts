@@ -10,6 +10,7 @@ declare module "next-auth" {
     user?: {
       id?: string;
       role?: UserRole;
+      canManageCollaborations?: boolean;
     } & DefaultSession["user"];
   }
 

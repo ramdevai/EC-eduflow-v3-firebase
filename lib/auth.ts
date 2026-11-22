@@ -15,6 +15,11 @@ const OWNER_EMAILS = (process.env.OWNER_EMAILS || "")
   .map(email => email.trim().toLowerCase())
   .filter(email => email.length > 0);
 
+const collaborationManagerEmails = new Set((process.env.COLLABORATION_MANAGER_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(Boolean));
+
 const ALL_ADMINS = Array.from(new Set([...ADMIN_EMAILS, ...OWNER_EMAILS]));
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -80,6 +85,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (session.user) {
         session.user.id = token.sub;
         session.user.role = token.role as UserRole;
+        session.user.canManageCollaborations = token.role === UserRole.Admin ||
+          (token.role === UserRole.Staff && collaborationManagerEmails.has(session.user.email?.toLowerCase() || ''));
         if (token.picture) session.user.image = token.picture;
       }
       return session;

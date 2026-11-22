@@ -2,6 +2,7 @@ import 'server-only';
 
 import { adminDb } from './server-firebase';
 import { generateRegistrationSid, generateRegistrationToken } from './utils';
+import { COLLABORATION_LEAD_SOURCE } from './types';
 import { CollaborationError, resolveCollaboration } from './collaborations';
 import type { WebsiteIntake } from './website-intake-security';
 
@@ -24,7 +25,8 @@ const INTEREST_LABELS: Record<WebsiteIntake['interest'], string> = {
 export class WebsiteIntakeRateLimitError extends Error {}
 
 function enquirySummary(intake: WebsiteIntake): string {
-  const header = `[Website enquiry · ${PERSONA_LABELS[intake.persona]} · ${INTEREST_LABELS[intake.interest]}]`;
+  const source = intake.collaborationInterest ? COLLABORATION_LEAD_SOURCE : 'Website';
+  const header = `[${source} enquiry · ${PERSONA_LABELS[intake.persona]} · ${INTEREST_LABELS[intake.interest]}]`;
   return intake.message ? `${header}\n${intake.message}` : header;
 }
 
@@ -95,7 +97,7 @@ export async function createWebsiteLeadOccurrence(intake: WebsiteIntake): Promis
         collaborationTitle: campaign.title,
         ...(campaign.offer && { collaborationOffer: campaign.offer }),
       }),
-      source: 'Website',
+      source: interest ? COLLABORATION_LEAD_SOURCE : 'Website',
       comments: enquirySummary(intake),
       notes: '',
       lastFollowUp: '',

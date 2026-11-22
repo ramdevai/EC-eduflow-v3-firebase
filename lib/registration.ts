@@ -1,4 +1,4 @@
-import { Lead } from './types';
+import { COLLABORATION_LEAD_SOURCE, type Lead } from './types';
 import { safeFormat } from './utils';
 
 const ALLOWED_REGISTRATION_FIELDS = [
@@ -62,6 +62,7 @@ export function buildRegistrationUpdates(
 
   const updates: Record<string, unknown> = {};
   for (const field of ALLOWED_REGISTRATION_FIELDS) {
+    if (field === 'source' && lead.source === COLLABORATION_LEAD_SOURCE) continue;
     if (Object.prototype.hasOwnProperty.call(body, field)) {
       updates[field] = typeof body[field] === 'string' ? body[field].trim() : body[field];
     }

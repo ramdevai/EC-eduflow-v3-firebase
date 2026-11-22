@@ -156,7 +156,7 @@ describe('collaboration enquiries', () => {
     expect(records.get(leadRecord)).toMatchObject({
       ownerUid: 'binal', name: 'Test Contact', email: 'parent@example.com', studentName: 'Sample Student',
       grade: '10', board: 'CBSE', school: 'Sample Institute', collaborationId: 'pilot',
-      collaborationCode: 'CKM2601', collaborationTitle: 'Assessment interest', collaborationOffer: 'Pilot offer',
+      collaborationCode: 'CKM2601', collaborationTitle: 'Assessment interest', collaborationOffer: 'Pilot offer', source: 'Collaboration',
       stage: 'New', status: 'Open',
     });
 
@@ -176,7 +176,7 @@ describe('collaboration enquiries', () => {
     expect(response.status).toBe(201);
     const { leadId } = await response.json();
     expect(records.get(`leads/${leadId}`)).toMatchObject({
-      name: 'Test Contact', grade: '10', ownerUid: 'website-owner',
+      name: 'Test Contact', grade: '10', ownerUid: 'website-owner', source: 'Collaboration',
     });
     expect(records.get(`leads/${leadId}`)).not.toHaveProperty('collaborationCode');
   });

@@ -105,6 +105,12 @@ export interface Lead {
   communicateViaEmailOnly?: boolean;
   privacy_consent?: boolean;
   privacy_consent_date?: string;
+  legalAcceptance?: boolean;
+  legalAcceptanceDate?: string;
+  privacyNoticeVersion?: string;
+  privacyNoticeUrl?: string;
+  serviceTermsVersion?: string;
+  serviceTermsUrl?: string;
   primaryContactRecoveredAt?: string;
 }
 

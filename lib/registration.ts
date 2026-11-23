@@ -1,4 +1,10 @@
 import { COLLABORATION_LEAD_SOURCE, type Lead } from './types';
+import {
+  PRIVACY_NOTICE_URL,
+  PRIVACY_NOTICE_VERSION,
+  SERVICE_TERMS_URL,
+  SERVICE_TERMS_VERSION,
+} from './legal-documents';
 import { safeFormat } from './utils';
 
 const ALLOWED_REGISTRATION_FIELDS = [
@@ -22,8 +28,6 @@ const ALLOWED_REGISTRATION_FIELDS = [
   'motherOccupation',
   'source',
   'comments',
-  'privacy_consent',
-  'privacy_consent_date',
 ] as const;
 
 export function getPublicRegistrationData(lead: Lead) {
@@ -51,13 +55,18 @@ export function getPublicRegistrationData(lead: Lead) {
 
 export function buildRegistrationUpdates(
   body: Record<string, unknown>,
-  lead: Lead
+  lead: Lead,
+  acceptedAt = new Date().toISOString()
 ): Partial<Lead> {
   const requiredStudentFields = ['studentName', 'studentPhone', 'studentEmail'] as const;
   for (const field of requiredStudentFields) {
     if (typeof body[field] !== 'string' || !body[field].trim()) {
       throw new Error(`${field} is required`);
     }
+  }
+
+  if (body.legalAcceptance !== true) {
+    throw new Error('You must accept the service terms and privacy notice');
   }
 
   const updates: Record<string, unknown> = {};
@@ -69,6 +78,14 @@ export function buildRegistrationUpdates(
   }
 
   updates.dob = typeof body.dob === 'string' ? safeFormat(body.dob) : lead.dob || '';
+  updates.privacy_consent = true;
+  updates.privacy_consent_date = acceptedAt;
+  updates.legalAcceptance = true;
+  updates.legalAcceptanceDate = acceptedAt;
+  updates.privacyNoticeVersion = PRIVACY_NOTICE_VERSION;
+  updates.privacyNoticeUrl = PRIVACY_NOTICE_URL;
+  updates.serviceTermsVersion = SERVICE_TERMS_VERSION;
+  updates.serviceTermsUrl = SERVICE_TERMS_URL;
   updates.stage = lead.stage === 'Registration requested' ? 'Registration done' : lead.stage;
   return updates as Partial<Lead>;
 }

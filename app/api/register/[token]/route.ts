@@ -52,7 +52,8 @@ export async function POST(
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Registration POST failure:', error);
-    const isValidationError = String(error.message).endsWith('is required');
+    const message = String(error.message);
+    const isValidationError = message.endsWith('is required') || message.startsWith('You must accept');
     return NextResponse.json({
       error: 'Registration submission failed',
       details: error.message

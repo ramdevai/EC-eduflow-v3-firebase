@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { COLLABORATION_LEAD_SOURCE } from '@/lib/types';
+import { PRIVACY_NOTICE_URL, SERVICE_TERMS_PATH } from '@/lib/legal-documents';
 
 export default function RegistrationPage() {
   const params = useParams();
@@ -70,8 +71,7 @@ export default function RegistrationPage() {
         body: JSON.stringify({ 
           ...data, 
           sid,
-          privacy_consent: true,
-          privacy_consent_date: new Date().toISOString()
+          legalAcceptance: data.legalAcceptance === 'accepted',
         }),
       });
       if (!res.ok) {
@@ -349,36 +349,43 @@ export default function RegistrationPage() {
                 </div>
             </div>
           </Card>
-          {/* Data Privacy & Consent */}
+          {/* Consent and terms */}
           <Card className="p-8 space-y-6 border-white/20 bg-slate-50/50">
              <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
                     <ShieldCheck size={20} />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 tracking-tight">Privacy Notice & Consent</h3>
+                <h3 className="text-xl font-bold text-slate-900 tracking-tight">Consent and terms</h3>
             </div>
             
             <div className="space-y-4 text-sm text-slate-600 leading-relaxed">
-                <div className="space-y-2">
-                    <p className="font-bold text-slate-900">Privacy & Data Collection</p>
-                    <p>
-                        EduCompass collects student and family details solely to provide career counseling and assessments. 
-                        Your data is handled securely under the DPDP Act 2023. You have the right to access, correct, or request deletion of your data 
-                        at any time by contacting our Grievance Officer at <span className="text-primary-600 font-bold">support@educompass.in</span>.
-                    </p>
-                </div>
+                <p>
+                    EduCompass uses the information provided in this form to deliver Educational Consulting Services,
+                    including assessments and counselling where applicable.
+                </p>
 
                 <div className="pt-4 space-y-4">
                     <label className="flex items-start gap-3 cursor-pointer group">
                         <div className="pt-0.5">
                             <input 
                                 type="checkbox" 
+                                name="legalAcceptance"
+                                value="accepted"
                                 required 
                                 className="w-5 h-5 rounded border-2 border-slate-200 text-primary-600 focus:ring-primary-500 cursor-pointer" 
                             />
                         </div>
                         <span className="text-xs font-bold text-slate-900 group-hover:text-primary-600 transition-colors">
-                            I provide my free, specific, and informed consent to EduCompass to process my personal data for career counseling purposes as described above. <span className="text-red-500">*</span>
+                            I confirm that I am the student or, where the student is under 18, their parent or lawful guardian.
+                            I accept EduCompass&apos;s{' '}
+                            <a href={SERVICE_TERMS_PATH} target="_blank" rel="noopener noreferrer" className="text-primary-600 underline underline-offset-2">
+                                Educational Consulting Services Terms
+                            </a>{' '}
+                            and consent to the processing of personal information as described in the{' '}
+                            <a href={PRIVACY_NOTICE_URL} target="_blank" rel="noopener noreferrer" className="text-primary-600 underline underline-offset-2">
+                                Privacy Notice
+                            </a>.
+                            <span className="text-red-500"> *</span>
                         </span>
                     </label>
                 </div>
